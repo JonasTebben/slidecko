@@ -1,0 +1,124 @@
+/* Slide rendering, shared by editor, thumbnails, presenter, print, PPTX and the importer's
+   measurements. It mirrors Slidev's own CSS (UnoCSS preflight + layouts-base.css + the course
+   theme) at Slidev's 980×552 canvas, so imported slides keep their exact layout. */
+
+.slide {
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --bg: #fff; --fg: #181818; --title: inherit; --accent: #3ab9d5; --accent-fg: #fff;
+  --code-bg: #f5f5f5; --code-fg: #1b1b1b; --code-size: 12px; --code-line: 18px;
+  --stripe: color-mix(in srgb, var(--fg) 6%, transparent);
+  --border: color-mix(in srgb, var(--fg) 16%, transparent);
+  position: relative; width: var(--slide-w, 980px); height: var(--slide-h, 552px); overflow: hidden; transform-origin: 0 0;
+  box-sizing: border-box; text-align: left;
+  font-family: var(--font, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif);
+  font-size: 17.6px; line-height: 1.5; color: var(--fg); background-color: var(--bg);
+  font-variant-ligatures: none; -webkit-font-smoothing: antialiased;
+  color-scheme: light; /* slides look the same in the editor's dark mode */
+}
+
+/* --- UnoCSS/Tailwind preflight, limited to slides --- */
+.slide *, .slide *::before, .slide *::after { box-sizing: border-box; border: 0 solid #e5e7eb; }
+.slide :is(h1, h2, h3, h4, h5, h6) { font-size: inherit; font-weight: inherit; margin: 0; }
+.slide :is(p, blockquote, figure, pre, dl, dd, hr) { margin: 0; }
+.slide :is(ul, ol) { list-style: none; margin: 0; padding: 0; }
+.slide :is(img, svg, video, iframe) { display: block; vertical-align: middle; }
+.slide :is(img, video) { max-width: 100%; height: auto; }
+.slide a { color: inherit; text-decoration: inherit; }
+.slide table { border-collapse: collapse; border-color: inherit; text-indent: 0; }
+.slide :is(code, kbd, pre) { font-family: var(--mono); font-size: 1em; }
+.slide :is(b, strong) { font-weight: bolder; }
+.slide :is(v-clicks, v-click, v-after) { display: contents; }
+
+/* --- Slidev layouts-base.css --- */
+.slide .flow { position: absolute; inset: 0; padding: 40px 56px; }
+.slide .flow.center { display: grid; }
+.slide .flow.center > .center-wrap { margin: auto 0; width: 100%; }
+.slide h1 { font-size: 36px; line-height: 40px; margin-bottom: 16px; margin-left: -0.05em; }
+.slide h2 { font-size: 30px; line-height: 36px; }
+.slide h3 { font-size: 24px; line-height: 32px; }
+.slide h4 { font-size: 20px; line-height: 28px; }
+.slide h5 { font-size: 16px; line-height: 24px; }
+.slide h6 { font-size: 14px; line-height: 20px; padding-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; opacity: 0.4; }
+.slide p { margin: 16px 0; line-height: 24px; }
+.slide ul { list-style: square; }
+.slide ol { list-style: decimal; }
+.slide li { line-height: 1.8em; margin-left: 1.1em; padding-left: 0.2em; }
+.slide blockquote { background: var(--code-bg); color: var(--code-fg); font-size: 14px; line-height: 20px; padding: 4px 8px; border-left: 1px solid var(--accent); border-radius: 4px; }
+.slide blockquote > * { margin: 0; }
+.slide table { width: 100%; }
+.slide tr { border-bottom: 1px solid var(--border); }
+.slide th { text-align: left; font-weight: 400; }
+.slide :is(td, th) { padding: 12px 8px; }
+.slide a { border-bottom: 1px dashed currentColor; }
+.slide :is(b, strong) { font-weight: 600; }
+.slide kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 2px 4px; font-size: 12px; }
+.slide :not(pre) > code { font-size: 0.9em; padding: 2px 6px; border-radius: 4px; background: var(--code-bg); color: var(--code-fg); }
+.slide pre.code {
+  margin: 4px 0; padding: 8px; border-radius: var(--code-radius, 4px); overflow: hidden; white-space: pre; tab-size: 2;
+  background: color-mix(in srgb, var(--code-bg) var(--code-alpha, 100%), transparent); color: var(--code-fg); font-size: var(--code-size); line-height: var(--code-line);
+}
+.slide pre.code code { font: inherit; background: none; padding: 0; }
+/* line numbers and Slidev's highlighted lines ({2,4-5}: the others are dimmed) */
+.slide pre.code .ln { opacity: 0.45; user-select: none; }
+.slide pre.code .line.dim { opacity: 0.3; }
+/* light code backgrounds: highlight.js/styles/github.css, with the colours that stay below 4.5:1 on the themes'
+   tinted code backgrounds (Solarized, Nord, Papier …) darkened, same hues */
+.slide pre.code:not(.dark) :is(.hljs-keyword, .hljs-doctag, .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-variable.language_) { color: #c32836; }
+.slide pre.code:not(.dark) :is(.hljs-built_in, .hljs-symbol) { color: #aa4907; }
+.slide pre.code:not(.dark) :is(.hljs-comment, .hljs-code, .hljs-formula) { color: #5f6770; }
+.slide pre.code:not(.dark) :is(.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo, .hljs-addition) { color: #1e7633; }
+/* syntax colours on a dark code background (github-dark) */
+.slide pre.code.dark :is(.hljs-keyword, .hljs-doctag, .hljs-template-tag, .hljs-type, .hljs-variable.language_) { color: #ff7b72; }
+.slide pre.code.dark :is(.hljs-title, .hljs-title.class_, .hljs-title.function_) { color: #d2a8ff; }
+.slide pre.code.dark :is(.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta, .hljs-number, .hljs-operator, .hljs-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id) { color: #79c0ff; }
+.slide pre.code.dark :is(.hljs-regexp, .hljs-string, .hljs-meta .hljs-string) { color: #a5d6ff; }
+.slide pre.code.dark :is(.hljs-built_in, .hljs-symbol) { color: #ffa657; }
+.slide pre.code.dark :is(.hljs-comment, .hljs-code, .hljs-formula) { color: #8b949e; }
+.slide pre.code.dark :is(.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo) { color: #7ee787; }
+.slide pre.code.dark :is(.hljs-subst, .hljs-section, .hljs-bullet, .hljs-emphasis, .hljs-strong) { color: inherit; }
+.slide pre.code.dark .hljs-addition { color: #aff5b4; background: #033a16; }
+.slide pre.code.dark .hljs-deletion { color: #ffdcd7; background: #67060c; }
+.slide .pageno { position: absolute; right: 0; bottom: 0; padding: 8px; font-size: 12px; line-height: 16px; }
+
+/* --- elements (editor representation of a slide) --- */
+.slide .el { position: absolute; }
+.slide .el > .content { min-height: 100%; outline: none; overflow-wrap: break-word; }
+.slide .el > .content:is(.v-middle, .v-bottom) { display: flex; flex-direction: column; justify-content: center; }
+.slide .el > .content.v-bottom { justify-content: flex-end; }
+.slide .el > .content > :first-child { margin-top: 0 !important; }
+.slide .el > .content > :last-child { margin-bottom: 0 !important; }
+.slide .el.filled > .content { padding: 12px 16px; border-radius: 10px; }
+/* element shadow (--shadow set per element): on what is drawn, not on the selection frame and handles */
+.slide .el > :not(.handle) { filter: var(--shadow, none); }
+/* a cropped picture is cut by clip-path after its filter: the shadow goes on the box instead */
+.slide .el.image.cropped { filter: var(--shadow, none); }
+.slide .el.image.cropped > img { filter: none; }
+/* locked (editor only): a dashed selection frame instead of handles */
+.slide .el.locked.selected { outline-style: dashed !important; cursor: default; }
+.slide .el.code pre.code, .slide .el.code textarea.code { margin: 0; width: 100%; height: 100%; }
+.slide .el.code textarea.code { display: block; border: 0; background: #fff; resize: none; outline: none; font: inherit; font-family: var(--mono); font-size: var(--code-size); line-height: var(--code-line); }
+/* image classes from Slidev keep their look (rounded, border, shadow), the box decides the size */
+.slide .el.image img { width: 100%; height: 100%; object-fit: contain; max-width: none !important; max-height: none !important; margin: 0 !important; position: static !important; inset: auto !important; transform: none !important; }
+/* text in a shape: centred over it */
+.slide .el.shape { text-align: center; } /* el.align on the box overrides it */
+/* the frame centres one block (flex would split inline text into items), the block holds the text */
+.slide .el.shape .shape-text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 8px 12px; overflow-wrap: anywhere; }
+.slide .el.shape .shape-text > .content { outline: none; min-height: 1em; flex-shrink: 0; } /* never squeezed: its height is what the shrinking measures */
+.slide .el.shape .shape-text > .content > * { margin: 0; }
+.slide .el.shape > .shape-text { filter: none; } /* the shadow belongs to the shape, not its text */
+/* cropped picture (el.crop): scaled and shifted by --crop-*, clip-path cuts it to the box */
+.slide .el.image.cropped img { position: absolute !important; left: var(--crop-l) !important; top: var(--crop-t) !important; width: var(--crop-w); height: var(--crop-h); object-fit: fill; clip-path: var(--crop-clip); }
+.slide .el.shape svg { width: 100%; height: 100%; overflow: visible; }
+.slide .el.video .video { position: relative; width: 100%; height: 100%; background: #000 center / cover no-repeat; border-radius: 6px; overflow: hidden; }
+.slide .el.video iframe { width: 100%; height: 100%; border: 0; }
+.slide .el.video .play { position: absolute; inset: 0; margin: auto; width: 64px; height: 44px; border-radius: 12px; background: #e00; }
+.slide .el.video .play::after { content: ''; position: absolute; left: 26px; top: 13px; border: 9px solid transparent; border-left: 15px solid #fff; border-right: 0; }
+.slide .el.video .yt-consent { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 12px; border: 0; border-radius: 6px; background: #fffe; color: #111; font: 600 14px/1.3 system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.slide .el.video .yt-consent small { font-weight: 400; font-size: 11px; color: #555; }
+.slide .el.table .tbl-wrap { position: relative; width: 100%; height: 100%; }
+.slide .el.shape .shape-box { width: 100%; height: 100%; }
+.slide .el.table table { height: 100%; table-layout: fixed; }
+.slide .el.table :is(td, th) { overflow-wrap: break-word; vertical-align: middle; }
+.slide .el.table :is(td, th):focus { outline: 2px solid #6366f1; outline-offset: -2px; }
+/* a colour chosen for the whole box beats the theme's heading/paragraph colours */
+.slide .el.colored > .content :is(h1, h2, h3, h4, h5, h6, p, li, blockquote, strong, em) { color: inherit; }

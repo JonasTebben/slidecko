@@ -1,0 +1,236 @@
+import TurndownService from 'turndown'
+import { gfm } from 'turndown-plugin-gfm'
+import { fmGet } from './parseSlidev.js'
+import { parseRatio } from './format.js'
+import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss } from './themes.js'
+
+// Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
+//
+// Compatibility rules:
+// - A slide that was imported and not changed since is written back as its original markdown,
+//   byte for byte (v-clicks, Tailwind classes, Mermaid, notes … all survive).
+// - A changed or new slide is written as absolutely positioned <div>s on Slidev's canvas (980×552 at 16/9)
+//   with markdown inside; importSlidev.js reads these boxes back at the same positions.
+// - Slides return to the file (deck) they belong to; the entry file embeds the decks via `src:`.
+
+const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '*' })
+turndown.use(gfm)
+// markup markdown cannot express stays HTML (Slidev renders inline HTML)
+turndown.keep(node => ['V-CLICKS', 'V-CLICK', 'V-AFTER', 'MARK', 'U', 'SUB', 'SUP', 'KBD'].includes(node.nodeName) ||
+  (node.nodeName === 'SPAN' && node.getAttribute('style')) || (node.nodeName === 'DIV' && node.getAttribute('data-callout')) ||
+  (/^(P|H\d|LI)$/.test(node.nodeName) && /text-align/.test(node.getAttribute('style') || '')))
+turndown.addRule('img', {
+  filter: 'img',
+  replacement: (_, n) => {
+    const src = n.getAttribute('src') || ''
+    const cls = n.getAttribute('class'), style = n.getAttribute('style'), alt = n.getAttribute('alt') || ''
+    return cls || style ? `<img src="${src}"${cls ? ` class="${cls}"` : ''}${style ? ` style="${style}"` : ''} />` : `![${alt}](${src})`
+  },
+})
+
+// identity of a slide's content, ignoring element ids (they change on every load)
+export function slideHash(slide) {
+  let h = 0
+  for (const c of JSON.stringify([slide.layout, slide.elements.map(({ id, ...e }) => e)])) h = (h * 31 + c.charCodeAt(0)) | 0
+  return h
+}
+export const imagePath = src => decodeURI(src).replace(/^\.?\//, '')
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
+function boxStyle(el, extra = '') {
+  const px = n => Math.round(n) + 'px'
+  let s = `position:absolute;left:${px(el.x)};top:${px(el.y)};width:${px(el.w)};height:${px(el.h)}`
+  if (el.fontSize) s += `;font-size:${px(el.fontSize)}`
+  if (el.color) s += `;color:${el.color}`
+  if (fontStack(el.font)) s += `;font-family:${fontStack(el.font)};--heading-font:${fontStack(el.font)}`
+  if (el.align) s += `;text-align:${el.align}`
+  if (el.valign) s += `;display:flex;flex-direction:column;justify-content:${el.valign === 'middle' ? 'center' : 'flex-end'}`
+  if (el.fill && el.type === 'text') s += `;background-color:${el.fillAlpha != null ? `color-mix(in srgb, ${el.fill} ${el.fillAlpha}%, transparent)` : el.fill}`
+  if (el.stroke && el.type === 'text') s += `;border:${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}`
+  if ((el.fill || el.stroke) && el.type === 'text') s += ';padding:12px 16px;border-radius:10px'
+  if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
+  if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`
+  return s + extra
+}
+
+// a table cell is one Markdown line: a list in it stays HTML (Markdown would make it "- a<br>- b" text)
+const inline = html => (/<(ul|ol)[\s>]/.test(html || '') ? html.replace(/\n+/g, '') : turndown.turndown(html || '').replace(/\n+/g, '<br>')).replace(/\|/g, '\\|') || ' '
+function tableMd(el) {
+  const align = c => ({ left: ':---', center: ':---:', right: '---:' })[el.align?.[c]] || '---'
+  if (el.header !== false && !el.fills && !el.borders) {
+    const [head, ...body] = el.rows
+    const row = r => `| ${r.map(inline).join(' | ')} |`
+    return [row(head), `| ${head.map((_, c) => align(c)).join(' | ')} |`, ...body.map(row)].join('\n')
+  }
+  // markdown tables always have a header row and no cell colours or borders; otherwise it stays an HTML table
+  const style = (r, c) => [el.fills?.[r]?.[c] && `background:${el.fills[r][c]}`, ...['top', 'right', 'bottom', 'left'].map((k, i) => el.borders?.[r]?.[c]?.[i] && `border-${k}:${el.borders[r][c][i]}`)].filter(Boolean).join(';')
+  const cell = (t, r) => (h, c) => `<${t}${el.align?.[c] ? ` align="${el.align[c]}"` : ''}${style(r, c) ? ` style="${style(r, c)}"` : ''}>${h}</${t}>`
+  const head = el.header !== false ? `<thead><tr>${el.rows[0].map(cell('th', 0)).join('')}</tr></thead>` : ''
+  const n = head ? 1 : 0
+  return `<table>${head}<tbody>${el.rows.slice(n).map((r, i) => `<tr>${r.map(cell('td', i + n)).join('')}</tr>`).join('')}</tbody></table>`
+}
+
+export function shapeSvg(el) {
+  const { w, h } = el, sw = el.strokeWidth || 0, f = el.fill || 'none', st = el.stroke || 'none'
+  const a = `fill="${f}"${el.fillAlpha != null ? ` fill-opacity="${el.fillAlpha / 100}"` : ''} stroke="${st}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`
+  const i = sw / 2
+  const body = {
+    rect: `<rect x="${i}" y="${i}" width="${Math.max(0, w - sw)}" height="${Math.max(0, h - sw)}" rx="${el.radius || 0}" ${a}/>`,
+    rounded: `<rect x="${i}" y="${i}" width="${Math.max(0, w - sw)}" height="${Math.max(0, h - sw)}" rx="${Math.min(w, h) / 4}" ${a}/>`,
+    ellipse: `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${Math.max(0, w / 2 - i)}" ry="${Math.max(0, h / 2 - i)}" ${a}/>`,
+    triangle: `<polygon points="${w / 2},${i} ${w - i},${h - i} ${i},${h - i}" ${a}/>`,
+    arrow: `<polygon points="0,${h * 0.3} ${w - h / 2},${h * 0.3} ${w - h / 2},0 ${w},${h / 2} ${w - h / 2},${h} ${w - h / 2},${h * 0.7} 0,${h * 0.7}" ${a}/>`,
+    line: `<line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" stroke="${st === 'none' ? f : st}" stroke-width="${sw || 3}" stroke-linecap="round"/>`,
+  }[el.shape] || ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="overflow:visible">${body}</svg>`
+}
+
+let curShapeFont = {} // toSlidev()'s shapeFont while it runs
+let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
+function elementMd(el) {
+  switch (el.type) {
+    case 'image': {
+      const r = el.radius ? `;border-radius:${el.radius}px` : ''
+      if (el.crop) {
+        // cropped: a clipping box with the picture scaled and shifted inside; data-crop brings the crop back on import
+        const c = el.crop, p = v => Math.round(v * 1e4) / 100 + '%'
+        return `<div data-crop="${[c.x, c.y, c.w, c.h].join(',')}" style="${boxStyle({ ...el, fontSize: 0 })};overflow:hidden${r}"><img src="${esc(el.src)}" style="position:absolute;left:${p(-c.x / c.w)};top:${p(-c.y / c.h)};width:${p(1 / c.w)};height:${p(1 / c.h)};max-width:none;max-height:none;margin:0" /></div>`
+      }
+      return `<img src="${esc(el.src)}"${el.cls ? ` class="${esc(el.cls)}"` : ''} style="${boxStyle({ ...el, fontSize: 0 })};object-fit:contain;max-width:none;max-height:none;margin:0${r}" />`
+    }
+    case 'code': {
+      const size = el.fontSize ? `;--slidev-code-font-size:${el.fontSize}px;--slidev-code-line-height:${Math.round(el.fontSize * 1.4)}px` : ''
+      const fence = '`'.repeat(Math.max(3, ...(el.code.match(/`+/g) || []).map(t => t.length + 1)))
+      const info = [el.lang === 'plaintext' ? '' : el.lang, el.meta].filter(Boolean).join(' ')
+      // own background, opacity and corners as Slidev's code variables; the class picks matching syntax colours
+      const own = el.fill || el.fillAlpha != null
+      const bg = own ? `;--slidev-code-background:${el.fillAlpha != null ? `color-mix(in srgb, ${el.fill || 'var(--code-bg, #f5f5f5)'} ${el.fillAlpha}%, transparent)` : el.fill}` : ''
+      const look = bg + (el.radius != null ? `;--slidev-code-radius:${el.radius}px` : '') + (el.fill ? `;color:${codeDark(el, curTheme) ? '#e6edf3' : '#1f2328'}` : '')
+      return `<div${el.fill ? ` class="${codeDark(el, curTheme) ? 'code-dark' : 'code-light'}"` : ''} style="${boxStyle(el, size + look)}">\n\n${fence}${info}\n${el.code}\n${fence}\n\n</div>`
+    }
+    case 'table': {
+      const data = `data-table="${el.preset || 'theme'}"${el.firstCol ? ' data-firstcol' : ''}${el.compact ? ' data-compact' : ''}${el.borders ? ' data-borders' : ''}`
+      return `<div ${data} style="${boxStyle(el)}">\n\n${tableMd(el)}\n\n</div>`
+    }
+    case 'shape':
+      return `<div data-shape="${el.shape}" data-fill="${el.fill}" data-stroke="${el.stroke}" data-sw="${el.strokeWidth || 0}" data-radius="${el.radius || 0}"${el.fillAlpha != null ? ` data-alpha="${el.fillAlpha}"` : ''} style="${boxStyle(el)}">${shapeSvg(el)}${el.html ? `<div class="shape-text" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;text-align:${el.align || 'center'}"><div${curShapeFont[el.id] ? ` style="font-size:${curShapeFont[el.id]}"` : ''}>${el.html}</div></div>` : ''}</div>`
+    case 'video':
+      return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
+    default: // text
+      return `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">\n\n${turndown.turndown(el.html || '').trim()}\n\n</div>`
+  }
+}
+
+export const COLORED = ':is(h1, h2, h3, h4, h5, h6, p, li, blockquote, strong, em)'
+// CSS a changed slide needs beyond the theme (scoped to the slide by Slidev)
+function slideStyle(slide) {
+  const presets = [...new Set(slide.elements.filter(e => e.type === 'table' && e.preset !== 'theme').map(e => e.preset))]
+  const tables = slide.elements.some(e => e.type === 'table' && (e.firstCol || e.compact || e.borders || e.preset !== 'theme'))
+  const callouts = slide.elements.some(e => e.type === 'text' && /data-callout/.test(e.html))
+  const css = (tables ? tableCss('.slidev-layout', presets) : '') + (callouts ? calloutCss('.slidev-layout') : '')
+    // a text colour chosen for the box beats the theme's heading/paragraph colours
+    + (slide.elements.some(e => e.type === 'text' && e.color) ? `.slidev-layout [data-color] ${COLORED} { color: inherit !important; }\n` : '')
+    // a code block with an own background: Shiki's light or dark colours, whichever stays readable on it
+    + (slide.elements.some(e => e.type === 'code' && e.fill) ? '.code-dark .shiki, .code-dark .shiki span { color: var(--shiki-dark) !important; }\n.code-light .shiki, .code-light .shiki span { color: var(--shiki-light) !important; }\n' : '')
+  return css ? `\n\n<style>\n${css.trim()}\n</style>` : ''
+}
+
+// Slidev compiles slides as Vue templates: "{{" in text would be read as an interpolation.
+// Fenced and inline code (Slidev adds v-pre there) and HTML tags are skipped; text gets Slidev's documented v-pre span.
+// (an entity like &#123; would not help: markdown-it decodes it back to "{" before Vue sees it)
+const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)[\s\S]*?[^`]\2(?!`)|<\/?[a-zA-Z][^>]*>|\{\{/gm
+export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
+
+function slideMd(slide) {
+  if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
+  const body = escapeMustache(slide.elements.map(elementMd).join('\n\n') + slideStyle(slide))
+  return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>')}\n-->` : body
+}
+
+// the slide's own frontmatter, with `layout:` following the layout chosen in the editor
+function slideFm(slide) {
+  const fm = slide.fm || ''
+  if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
+  const rest = fm.replace(/^layout:.*\n?/m, '').trim()
+  return slide.layout === 'default' && !fmGet(fm, 'layout') ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
+}
+
+export function slideToMarkdown(slide) {
+  const fm = slideFm(slide)
+  return (fm ? `---\n${fm}\n---\n\n` : '') + slideMd(slide).trim() + '\n'
+}
+
+// returns { files: { path: text }, images: { path: assetId } }
+// projectFiles: the project's other files (theme, package.json …), written back unchanged
+// shapeFont: element id -> font size the editor shrank its shape text to
+export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth }, projectFiles = {}, { shapeFont = {} } = {}) {
+  entry ||= 'slides.md'
+  const dir = entry.split('/').slice(0, -1).join('/')
+  // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
+  curTheme = theme
+  curShapeFont = shapeFont
+  const { slidev: own, pkg } = themeOf(theme)
+  // consecutive slides of the same file form one part
+  const parts = []
+  for (const s of slides) {
+    const file = s.file || entry
+    if (parts.at(-1)?.file !== file) parts.push({ file, slides: [] })
+    parts.at(-1).slides.push(s)
+  }
+  const files = { ...projectFiles }
+  const write = (path, list) => {
+    files[path] = list.map((s, i) => {
+      const head = s.fm ? `---\n${s.fm}\n---` : i ? '---' : ''
+      const next = i < list.length - 1 ? '\n'.repeat((s.gap ?? 1) + 1) : '\n'
+      return [head, s.body].filter(Boolean).join('\n\n') + next
+    }).join('')
+  }
+  const entrySlides = []
+  const used = {}
+  for (const part of parts) {
+    const list = part.slides.map(s => ({ fm: slideFm(s), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
+    if (part.file === entry) { entrySlides.push(...list); continue }
+    // a file whose slides were split up by reordering continues in "name-2.md"
+    const n = (used[part.file] = (used[part.file] || 0) + 1)
+    const path = n > 1 ? part.file.replace(/(\.md)?$/, `-${n}.md`) : part.file
+    write(path, list)
+    const src = dir && path.startsWith(dir + '/') ? './' + path.slice(dir.length + 1) : dir ? '/' + path : './' + path
+    entrySlides.push({ fm: `src: ${src}`, body: '' })
+  }
+  // headmatter (first frontmatter of the entry): theme and title
+  const first = entrySlides[0] || (entrySlides[0] = { fm: '', body: '' })
+  if (!fmGet(first.fm, 'theme')) first.fm = `theme: ${own || 'default'}\n${first.fm}`.trim()
+  if (!fmGet(first.fm, 'title')) first.fm = `title: ${JSON.stringify(title || 'Presentation')}\n${first.fm}`.trim()
+  // slide format: written when it is not Slidev's default or the headmatter already names it (a value that means the same stays as written)
+  const ratio = v => parseRatio(v) || 16 / 9
+  const format = (key, value, same, isDefault) => {
+    const cur = fmGet(first.fm, key)
+    if (cur ? same(cur) : isDefault) return
+    first.fm = cur ? first.fm.replace(new RegExp(`^${key}:.*$`, 'm'), `${key}: ${value}`) : `${first.fm}\n${key}: ${value}`.trim()
+  }
+  if (aspectRatio) format('aspectRatio', aspectRatio, v => Math.abs(ratio(v) - ratio(aspectRatio)) < 1e-4, Math.abs(ratio(aspectRatio) - 16 / 9) < 1e-4)
+  if (canvasWidth) format('canvasWidth', canvasWidth, v => +v === +canvasWidth, +canvasWidth === 980)
+  write(entry, entrySlides)
+  if (!own) files['style.css'] = slidevThemeCss(theme) + (projectFiles['style.css'] ? '\n' + projectFiles['style.css'] : '') // the project's own rules stay
+  // project-wide font sizes: Slidev loads style.css from the project root for every slide
+  const typoRules = typoCss('.slidev-layout', typo, l => `.${l}`)
+  if (typoRules) files['style.css'] = `${files['style.css'] || projectFiles['style.css'] || ''}\n/* font sizes for all slides (Slidecko) */\n${typoRules}`.trimStart()
+  files['package.json'] ||= JSON.stringify({ name: 'slides', private: true, type: 'module', scripts: { dev: 'slidev --open', build: 'slidev build', export: 'slidev export' }, dependencies: { '@slidev/cli': '^52.11.3', '@slidev/theme-default': 'latest' } }, null, 2) + '\n'
+  // the theme package must be installable; an imported package.json that already lists it stays byte for byte
+  if (own && fmGet(first.fm, 'theme') === own) {
+    try {
+      const p = JSON.parse(files['package.json'])
+      if (!p.dependencies?.[own]) files['package.json'] = JSON.stringify({ ...p, dependencies: { ...p.dependencies, [own]: pkg } }, null, 2) + '\n'
+    } catch { /* not JSON: leave the project's file alone */ }
+  }
+
+  const images = {}
+  for (const s of slides) for (const el of s.elements) {
+    if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
+    for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
+      const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]
+      if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id
+    }
+  }
+  return { files, images }
+}
