@@ -18,7 +18,7 @@ import * as A from './actions.js'
 import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells } from './tableOps.js'
 import { toggleMarked, codeOpts, withLines } from './hl.js'
 import { find, replace, ranges, pattern } from './search.js'
-import { loadSession, saveSession, sessionView, selIds, selIndexes } from './session.js'
+import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, parseViewHash } from './session.js'
 
 const { slide, selection, primary } = A
 const ready = ref(false)
@@ -248,20 +248,22 @@ watch(() => deck.slides, () => {
   unoTimer = setTimeout(() => applyUno(JSON.stringify(deck.slides.map(s => s.elements.map(e => [e.html, e.cls, e.rows]))).replace(/\\"/g, '"')), 200)
 }, { deep: true, immediate: true })
 watchEffect(() => { document.title = ui.home ? 'Slidecko' : `${deck.title} – Slidecko` })
-const sessionState = () => ({ project: deck.id, home: ui.home, slide: ui.slide, sel: selIndexes(deck.slides[ui.slide], ui.sel), collapsed: [...collapsed.value], find: findQ.value, yt: ui.yt, listTop: document.querySelector('.slide-list')?.scrollTop || 0 })
+const sessionState = () => ({ project: deck.id, slide: ui.slide, sel: selIndexes(deck.slides[ui.slide], ui.sel), collapsed: [...collapsed.value], find: findQ.value, yt: ui.yt, listTop: document.querySelector('.slide-list')?.scrollTop || 0 })
 
 onMounted(async () => {
   const session = loadSession()
   if (typeof session.find === 'string') findQ.value = session.find.slice(0, 500)
   ui.yt = session.yt === true // YouTube allowed in this tab: survives a reload, not a new tab
-  await restore(session)
-  const back = sessionView(session, deck)
+  // the view comes from the URL (a reload keeps it, a link can choose it); without one the last project opens
+  const view = parseViewHash(location.hash)
+  await restore({ project: view?.project, home: view?.home })
+  if (view?.project && view.project === deck.id) ui.slide = Math.max(0, Math.min(view.slide, deck.slides.length - 1))
+  const back = sessionView(session, deck) // what the URL does not hold
   if (back) {
     collapsed.value = new Set(back.collapsed)
-    ui.slide = back.slide
     await nextTick() // the slide watcher clears the selection first
     // untouched imported slides get their elements only once rendered and measured
-    if (back.sel.length) {
+    if (back.sel.length && back.slide === ui.slide) {
       const stop = watch(() => deck.slides[back.slide]?.elements.length, n => {
         if (ui.slide !== back.slide) return stop()
         if (n) { ui.sel = selIds(deck.slides[back.slide], back.sel); stop() }
@@ -270,6 +272,19 @@ onMounted(async () => {
     }
   }
   ready.value = true
+  // overview, project and slide go into the browser history: back and forward step through them
+  const viewUrl = () => location.pathname + location.search + viewHash(ui.home, deck.id, ui.slide)
+  let popping = false
+  window.history.replaceState(window.history.state, '', viewUrl())
+  watch(() => viewHash(ui.home, deck.id, ui.slide), h => {
+    if (h !== location.hash) window.history[popping ? 'replaceState' : 'pushState'](null, '', viewUrl())
+  })
+  addEventListener('popstate', async () => {
+    popping = true
+    await showView(parseViewHash(location.hash))
+    await nextTick()
+    popping = false
+  })
   if (back?.listTop) nextTick(() => { const l = document.querySelector('.slide-list'); if (l) l.scrollTop = back.listTop })
   watchEffect(() => saveSession(sessionState()))
   addEventListener('pagehide', () => saveSession(sessionState())) // the list's scroll position is not reactive
@@ -287,6 +302,16 @@ let stageBox
 const fitStage = () => { if (stageBox) scale.value = Math.max(0.1, Math.min((stageBox.width - 64) / format.w, (stageBox.height - 64) / format.h)) }
 watch(format, () => { fitStage(); fitPresenter() })
 watch(() => ui.slide, () => { ui.sel = []; ui.editing = null })
+async function showView(v) {
+  if (!v) return
+  if (v.home) { ui.home = true; return }
+  if (v.project !== deck.id) {
+    if (!library.list.some(p => p.id === v.project)) return // deleted or from another browser: stay where we are
+    try { await openProject(v.project) } catch { return }
+  }
+  ui.home = false
+  ui.slide = Math.max(0, Math.min(v.slide, deck.slides.length - 1))
+}
 
 // a closed dialog can keep the focus (palette input): that is not typing
 const inField = e => e.target.closest?.('input, textarea, select, dialog[open], [contenteditable=true]') && !e.target.closest('dialog:not([open])')

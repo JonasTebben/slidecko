@@ -1,5 +1,6 @@
-// UI state of this tab that a reload should bring back: open project or overview, current slide, selection,
-// folded decks, scroll position of the slide list, the search text and whether YouTube was allowed.
+// UI state of this tab that a reload should bring back and the URL does not hold (overview, project and slide are
+// in the hash, see viewHash): selection, folded decks, scroll position of the slide list, the search text and whether
+// YouTube was allowed. project and slide are kept only to tell which project and slide the selection belongs to.
 // sessionStorage: survives a reload, a new tab starts fresh. Nothing here leaves the browser.
 const KEY = 'slides-builder:session'
 
@@ -26,4 +27,13 @@ export function sessionView(s, deck) {
     collapsed: (Array.isArray(s.collapsed) ? s.collapsed : []).filter(f => files.has(f)),
     listTop: Number(s.listTop) || 0,
   }
+}
+
+// the view in the URL hash, so reload, links and the browser's back and forward bring it back:
+// #home = project overview, #<project>/<slide no.>; no or another hash = no view (the app opens the last project)
+export const viewHash = (home, project, slide) => (home || !project ? '#home' : `#${project}/${slide + 1}`)
+export function parseViewHash(hash) {
+  if (hash === '#home') return { home: true }
+  const m = /^#([a-z0-9]+)\/(\d+)$/.exec(hash)
+  return m ? { project: m[1], slide: Math.max(0, Number(m[2]) - 1) } : null
 }

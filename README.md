@@ -58,7 +58,7 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 |---|---|---|
 | IndexedDB `slides-builder` | Projekte (Folien, Bilder, Projektdateien), Projektliste | bis zum Löschen des Projekts („Entfernen“) oder der Website-Daten |
 | localStorage `slides-builder:*` | zuletzt geöffnetes Projekt (`last`), Sprache (`lang`), Hell/Dunkel (`scheme`: `system`, `light` oder `dark`), Exportformat (`export`), „Schriftgrößen beibehalten“ (`keep-sizes`), eigene Textstile (`text-presets`), importierte Themes (`themes`), Suchoptionen ohne Suchbegriff (`find`) | dauerhaft (Sprache und Hell/Dunkel gelten auch für Landing Page und `legal.html`) |
-| sessionStorage `slides-builder:session` | Ansicht des Tabs (Projekt, Folie, Auswahl, eingeklappte Foliensätze, Scrollposition), Suchbegriff, YouTube-Freigabe | bis der Tab geschlossen wird |
+| sessionStorage `slides-builder:session` | Ansicht des Tabs (Auswahl samt Projekt und Folie, zu denen sie gehört, eingeklappte Foliensätze, Scrollposition), Suchbegriff, YouTube-Freigabe | bis der Tab geschlossen wird |
 
 - Die App setzt keine Cookies, nutzt kein Tracking und lädt keine Daten hoch. Importe werden im Browser gelesen, Exporte im Browser erzeugt.
 - YouTube wird erst nach einem Klick auf „YouTube-Inhalte laden“ geladen: Vorschaubilder von `i.ytimg.com`, der Player von `www.youtube-nocookie.com`. Dabei gehen Daten an Google. Rechtsgrundlage ist die Einwilligung durch den Klick. Die Freigabe gilt pro Tab.
@@ -95,7 +95,8 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 - **Markdown/KI**: „Folien aus Markdown einfügen“ (⇧M) nimmt Slidev-Markdown entgegen, z. B. von einer KI erzeugt. „Markdown dieser Folie“ (M) bearbeitet eine einzelne Folie als Text.
 - **Präsentieren**: Vollbild (P/F5), Referentenansicht mit Notizen, nächster Folie und Timer (⌥P), klickbare Links, Videos laufen live.
 - **Tastenkürzel**: ⌘K bzw. `?` zeigt alle Befehle mit ihren Kürzeln.
-- **Neu laden ohne Verlust**: Offenes Projekt bzw. Projektübersicht, aktuelle Folie, ausgewählte Elemente, eingeklappte Foliensätze und die Scrollposition der Folienliste stehen pro Tab im `sessionStorage` und sind nach einem Reload wieder da (ein neuer Tab startet mit dem zuletzt geöffneten Projekt).
+- **Ansicht in der URL, Zurück und Vor**: Projektübersicht (`#home`) bzw. offenes Projekt und Folie (`#<projekt>/<folie>`) stehen im Hash der Adresse. Jeder Wechsel ist ein Eintrag in der Browser-History, Zurück/Vor springen zwischen Übersicht, Projekten und Folien, Neu laden und Links öffnen genau diese Ansicht. `/app/` ohne Hash öffnet das zuletzt benutzte Projekt.
+- **Neu laden ohne Verlust**: Was nicht in der URL steht (ausgewählte Elemente, eingeklappte Foliensätze, Scrollposition der Folienliste, Suchbegriff), liegt pro Tab im `sessionStorage` und ist nach einem Reload wieder da.
 
 ## Themes: Lesbarkeit
 
@@ -124,7 +125,7 @@ Alle vorgegebenen Themes sind auf Kontrast geprüft (WCAG AA): Text mindestens 4
 | `themes/jbt.theme.json` | JBT Theme zum Importieren (Slidev-Paket `jbt-theme`) |
 | `src/scheme.js` | Hell/Dunkel der Oberfläche |
 | `src/store.js`, `src/actions.js` | Projektzustand, Speicherung, Befehle |
-| `src/session.js` | Ansichtszustand des Tabs für den Reload (sessionStorage) |
+| `src/session.js` | Ansicht im URL-Hash (`viewHash`/`parseViewHash`) und übriger Ansichtszustand des Tabs für den Reload (sessionStorage) |
 | `src/i18n.js`, `src/locales/` | Übersetzungen der Oberfläche (deutscher Text ist der Schlüssel) |
 | `server.js` | Bun-Server für Railway: liefert `dist/` aus, `/health` |
 | `src/AppFooter.vue`, `src/support.js` | Fußzeile, Stripe-Link |
