@@ -5,6 +5,7 @@ import SlideView from './SlideView.vue'
 import { t } from './i18n.js'
 import { THEMES, FONTS, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf } from './themes.js'
 import { download } from './actions.js'
+import CodeEditor from './CodeEditor.vue'
 
 const emit = defineEmits(['saved', 'deleted'])
 const dlg = ref()
@@ -92,7 +93,7 @@ const PREVIEWS = computed(() => [
           <details class="te-css" :open="!!draft.css">
             <summary>{{ t('Eigenes CSS') }}</summary>
             <p>{{ t('Gilt nur für dieses Theme; & steht für die Folie, z. B. & h1 { … } oder &.layout-cover { … }.') }}</p>
-            <textarea v-model="draft.css" spellcheck="false" rows="8" :aria-label="t('Eigenes CSS')" />
+            <CodeEditor v-model="draft.css" :label="t('Eigenes CSS')" />
             <label class="check"><input v-model="draft.base" type="checkbox" /> {{ t('Grundregeln der Themes anwenden (Titelleiste, Titelfolie …)') }}</label>
           </details>
         </div>

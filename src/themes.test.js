@@ -11,6 +11,9 @@ test('JBT is no built-in theme, its file imports with id, layouts and Slidev pac
   assert.ok(!themeIds(false).includes('jbt'))
   assert.equal(THEMES.jbt.pkg, 'github:JonasTebben/jbt-theme#v1.1.1')
   assert.ok(themeLayouts('jbt').some(l => l[0] === 'quiz'))
+  // every top-level rule of the theme file is the theme's own (&); general editor rules belong in slide.css
+  const tops = THEMES.jbt.css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{[^{}]*\}/g, '{}').split('{}').map(x => x.trim()).filter(Boolean)
+  assert.deepEqual(tops.filter(x => !x.startsWith('&')), [])
   // own CSS nests under the theme class; base: false keeps the generic theme rules off its slides
   const css = editorCss()
   assert.match(css, /\.theme-jbt \{\n[\s\S]*&\.layout-quiz/)

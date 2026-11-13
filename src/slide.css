@@ -113,3 +113,5 @@
 .slide .el.table table { height: 100%; table-layout: fixed; }
 .slide .el.table :is(td, th) { overflow-wrap: break-word; vertical-align: middle; }
 .slide .el.table :is(td, th):focus { outline: 2px solid #6366f1; outline-offset: -2px; }
+/* a colour chosen for the whole box beats the theme's heading/paragraph colours */
+.slide .el.colored > .content :is(h1, h2, h3, h4, h5, h6, p, li, blockquote, strong, em) { color: inherit; }
