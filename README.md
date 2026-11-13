@@ -57,12 +57,12 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 | Wo | Was | Wie lange |
 |---|---|---|
 | IndexedDB `slides-builder` | Projekte (Folien, Bilder, Projektdateien), Projektliste | bis zum Löschen des Projekts („Entfernen“) oder der Website-Daten |
-| localStorage `slides-builder:*` | zuletzt geöffnetes Projekt (`last`), Sprache (`lang`), Exportformat (`export`), „Schriftgrößen beibehalten“ (`keep-sizes`), eigene Textstile (`text-presets`), importierte Themes (`themes`), Suchoptionen ohne Suchbegriff (`find`) | dauerhaft (Sprache gilt auch für Landing Page und `legal.html`) |
+| localStorage `slides-builder:*` | zuletzt geöffnetes Projekt (`last`), Sprache (`lang`), Hell/Dunkel (`scheme`: `system`, `light` oder `dark`), Exportformat (`export`), „Schriftgrößen beibehalten“ (`keep-sizes`), eigene Textstile (`text-presets`), importierte Themes (`themes`), Suchoptionen ohne Suchbegriff (`find`) | dauerhaft (Sprache und Hell/Dunkel gelten auch für Landing Page und `legal.html`) |
 | sessionStorage `slides-builder:session` | Ansicht des Tabs (Projekt, Folie, Auswahl, eingeklappte Foliensätze, Scrollposition), Suchbegriff, YouTube-Freigabe | bis der Tab geschlossen wird |
 
 - Die App setzt keine Cookies, nutzt kein Tracking und lädt keine Daten hoch. Importe werden im Browser gelesen, Exporte im Browser erzeugt.
 - YouTube wird erst nach einem Klick auf „YouTube-Inhalte laden“ geladen: Vorschaubilder von `i.ytimg.com`, der Player von `www.youtube-nocookie.com`. Dabei gehen Daten an Google. Rechtsgrundlage ist die Einwilligung durch den Klick. Die Freigabe gilt pro Tab.
-- Ändert sich, was die App speichert (`src/session.js`, `src/store.js`, `src/i18n.js`), müssen diese Tabelle und `legal.html` (beide Sprachen) mitgezogen werden.
+- Ändert sich, was die App speichert (`src/session.js`, `src/store.js`, `src/i18n.js`, `src/scheme.js`), müssen diese Tabelle und `legal.html` (beide Sprachen) mitgezogen werden.
 
 ## Was es kann
 
@@ -88,13 +88,25 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
   - **Schrift für alle Folien**: Ist nichts ausgewählt, legt der Inspector die Größen für Text, Titel und Code im ganzen Projekt fest. Sie gelten in jedem Theme und werden beim Slidev-Export in `style.css` geschrieben.
   - Hilfslinien mit Einrasten (Alt schaltet es aus), Format übertragen (Pinsel im Inspector oder ⌘⌥C / ⌘⌥V: Schrift, Größe, Farben, Füllung, Deckkraft, Ausrichtung, Kontur, Ecken – zwischen Textfeldern, Formen, Codeblöcken und Bildern nur das, was beide haben), Mehrfachauswahl (mehrere Textfelder gemeinsam formatieren: Schriftart, -größe, Ausrichtung, Text- und Hintergrundfarbe; Schatten und Position sperren für alle markierten Elemente; „Gemischt“ zeigt unterschiedliche Werte), Kontur für Textfelder (Farbe, Stärke, durchgezogen/gestrichelt/gepunktet – in allen Exporten), Schatten (weich/deutlich) für Textfelder, Formen, Bilder und Codeblöcke – im Slidev-, PPTX- und ODP-Export, Position sperren (gesperrte Elemente lassen sich bearbeiten, aber nicht verschieben, skalieren oder ausrichten; bleibt im Slidev-Projekt erhalten), Deckkraft für Hintergründe von Textfeldern, Formen und Codeblöcken (in allen Exporten), Ausrichten (einzeln an der Folie, mehrere aneinander oder an der Folie) und Verteilen, Text links/zentriert/rechts/Blocksatz und oben/mittig/unten, Kopieren und Einfügen, Rückgängig/Wiederholen.
   - Folien-Presets, 13 vorgegebene Themes.
-- **Theme-Editor**: Farben, Schriften und eigenes CSS (`&` = die Folie) mit Live-Vorschau. Vorgegebene Themes bleiben unverändert – Änderungen daran werden als eigenes Theme gespeichert. Eigene Themes liegen im Browser, reisen in der Projektdatei mit und lassen sich als `.theme.json` exportieren und importieren (Theme-Menü → „Importieren …“). Das JBT Theme ist kein vorgegebenes Theme mehr, sondern liegt als [`themes/jbt.theme.json`](themes/jbt.theme.json) zum Importieren bereit.
+- **Theme-Editor**: Farben, Schriften und eigenes CSS (`&` = die Folie) mit Live-Vorschau. Vorgegebene Themes bleiben unverändert – Änderungen daran werden als eigenes Theme gespeichert. Eigene Themes liegen im Browser, reisen in der Projektdatei mit und lassen sich als `.theme.json` exportieren und importieren (Theme-Menü → „Importieren …“). Das JBT Theme ist kein vorgegebenes Theme mehr, sondern liegt als [`themes/jbt.theme.json`](themes/jbt.theme.json) zum Importieren bereit; ein erneuter Import ersetzt die gespeicherte Kopie (Projekte behalten das Theme). Das CSS-Feld ist ein Code-Editor (CodeMirror, wird erst beim Öffnen geladen) mit Zeilennummern und Hervorhebung.
+- **Hell/Dunkel**: Die Oberfläche folgt dem System oder ist fest hell bzw. dunkel (Schalter mit Sonne/Mond in der Fußzeile, auf Landing Page und `legal.html` neben EN/DE). Eine gemeinsame Einstellung für App und Seiten (`src/scheme.js`, `public/site.js`); sie setzt `<html data-scheme="light|dark">`, das `app.css` und `site.css` lesen. Folien behalten in jedem Modus ihre Theme-Farben, auch der CSS-Editor wird dunkel.
 - **Theme wechseln ohne Layoutbruch**: „Schriftgrößen beim Wechsel beibehalten“ ist standardmäßig an. Das neue Theme übernimmt dann Farben und Schriften, aber die Größen des bisherigen Themes, sodass Boxen und Umbrüche bleiben. Beim Zurückwechseln wird das aufgehoben. Ein Theme-Wechsel ändert nie gespeicherte Boxgrößen.
 - **Auf Import-Stand zurücksetzen**: Eine importierte Folie (oder per Befehl alle geänderten) wird aus ihrem Original-Markdown neu dargestellt und danach wieder unverändert exportiert.
 - **Markdown/KI**: „Folien aus Markdown einfügen“ (⇧M) nimmt Slidev-Markdown entgegen, z. B. von einer KI erzeugt. „Markdown dieser Folie“ (M) bearbeitet eine einzelne Folie als Text.
 - **Präsentieren**: Vollbild (P/F5), Referentenansicht mit Notizen, nächster Folie und Timer (⌥P), klickbare Links, Videos laufen live.
 - **Tastenkürzel**: ⌘K bzw. `?` zeigt alle Befehle mit ihren Kürzeln.
 - **Neu laden ohne Verlust**: Offenes Projekt bzw. Projektübersicht, aktuelle Folie, ausgewählte Elemente, eingeklappte Foliensätze und die Scrollposition der Folienliste stehen pro Tab im `sessionStorage` und sind nach einem Reload wieder da (ein neuer Tab startet mit dem zuletzt geöffneten Projekt).
+
+## Themes: Lesbarkeit
+
+Alle vorgegebenen Themes sind auf Kontrast geprüft (WCAG AA): Text mindestens 4,5:1 zu seinem Hintergrund, große Schrift (Titel, Kennzahl) mindestens 3:1 – in jeder Folienvorlage, mit Zitat, Hinweisboxen, Code und allen Tabellen-Presets. Für neue oder geänderte Themes gilt:
+
+- `accent-fg` setzen, wenn die Akzentfarbe hell ist (Text in Tabellenköpfen auf dem Akzent, z. B. Nacht, Neon, Dracula). Die Akzentfarbe selbst muss auf `bg` als Linkfarbe 4,5:1 erreichen.
+- Hat die Titelfolie einen farbigen Hintergrund (`cover-bg`), `cover-fg` setzen: Zitat, Kennzahl und Links der zentrierten Layouts übernehmen diese Farbe.
+- `bar` darf eine Farbe oder ein Verlauf sein; eine Farbe wird intern zu einem einfarbigen Verlauf (sonst verwirft der Browser den ganzen Folienhintergrund).
+- Vorlagen in `src/presets.js` nutzen keine festen hellen Füllungen, sondern halbtransparente (`fillAlpha`), damit dunkle Themes lesbar bleiben.
+- Syntaxfarben auf hellem Code-Hintergrund stehen in `src/slide.css` (GitHub-Farben, abgedunkelt), auf dunklem schaltet `codeDark()` auf GitHub Dark.
+- Das JBT Theme (`base: false`) bringt alle Regeln im eigenen CSS mit; Änderungen an seinem Aussehen gehören auch ins Paket [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) (neuer Tag, dann `pkg` in `themes/jbt.theme.json` und die Tests anpassen), weil der Slidev-Export das Paket statt des CSS nutzt.
 
 ## Aufbau
 
@@ -108,6 +120,9 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 | `src/exportOdp.js` | OpenDocument-Writer mit der Schnittstelle von pptxgenjs |
 | `src/exportFormats.js` | Bilder, originalgetreue PPTX, HTML-Präsentation, Druck-Vorbereitung |
 | `src/themes.js`, `src/slide.css` | Themes, Tabellen- und Hinweisbox-Stile (identisch im Editor und im Slidev-Export) |
+| `src/ThemeEditor.vue`, `src/CodeEditor.vue` | Theme-Editor mit Vorschau, CSS-Editor (CodeMirror) |
+| `themes/jbt.theme.json` | JBT Theme zum Importieren (Slidev-Paket `jbt-theme`) |
+| `src/scheme.js` | Hell/Dunkel der Oberfläche |
 | `src/store.js`, `src/actions.js` | Projektzustand, Speicherung, Befehle |
 | `src/session.js` | Ansichtszustand des Tabs für den Reload (sessionStorage) |
 | `src/i18n.js`, `src/locales/` | Übersetzungen der Oberfläche (deutscher Text ist der Schlüssel) |

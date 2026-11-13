@@ -1,5 +1,7 @@
 <script setup>
 import { t, lang, LOCALES } from './i18n.js'
+import { scheme, SCHEMES, isDark } from './scheme.js'
+import Icon from './Icon.vue'
 import { SUPPORT_URL } from './support.js'
 </script>
 
@@ -12,5 +14,8 @@ import { SUPPORT_URL } from './support.js'
     · <select v-model="lang" class="lang" :aria-label="t('Sprache')">
       <option v-for="(l, code) in LOCALES" :key="code" :value="code">{{ l.name }}</option>
     </select>
+    · <label class="scheme-pick" :title="t('Darstellung')"><Icon :name="isDark ? 'moon' : 'sun'" :size="14" /><select v-model="scheme" class="scheme" :aria-label="t('Darstellung')">
+      <option v-for="[id, name] in SCHEMES" :key="id" :value="id">{{ t(name) }}</option>
+    </select></label>
   </footer>
 </template>

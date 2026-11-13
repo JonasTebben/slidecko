@@ -634,4 +634,8 @@ export default {
   "Wirklich löschen?": "Really delete?",
   "Als eigenes Theme speichern": "Save as own theme",
   "Name": "Name",
+  "Darstellung": "Appearance",
+  "System": "System",
+  "Hell": "Light",
+  "Dunkel": "Dark",
 }

@@ -74,7 +74,7 @@ const PREVIEWS = computed(() => [
       <p v-if="!editId">{{ t('Vorgegebene Themes bleiben unverändert – deine Änderungen werden als eigenes Theme gespeichert.') }}</p>
       <div class="te-body">
         <div class="te-fields">
-          <label class="te-row">{{ t('Name') }}<input v-model="draft.name" maxlength="60" required /></label>
+          <label class="te-row">{{ t('Name') }}<input v-model="draft.name" maxlength="60" required autofocus /></label>
           <label v-for="[k, n] in COLORS" :key="k" class="te-row">{{ t(n) }}
             <span class="te-color">
               <input type="color" :value="hex(draft.vars[k])" :aria-label="t(n)" @input="draft.vars[k] = $event.target.value" />
