@@ -1,0 +1,167 @@
+// Themes, table presets and callouts. Everything here is plain CSS text built from one source, so
+// the editor and the exported Slidev project use the very same rules:
+//   root = '.slide' + layout(n) = '.layout-n'      in the editor
+//   root = '.slidev-layout' + layout(n) = '.n'     in Slidev (style.css / per-slide <style>)
+// A theme is a set of CSS variables; 'jbt' is the JBT Theme, a Slidev theme package (github.com/JonasTebben/jbt-theme)
+// mirrored in slide.css; the Slidev export names it as `theme:` and adds it to package.json.
+
+const SANS = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+const SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif"
+const ROUND = "'Avenir Next', Avenir, Nunito, 'Segoe UI', system-ui, sans-serif"
+const GEO = "Futura, 'Century Gothic', 'Trebuchet MS', system-ui, sans-serif"
+const HUMAN = "'Gill Sans', 'Gill Sans MT', Optima, Candara, 'Segoe UI', sans-serif"
+const MONO = "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace"
+// fonts a text box can pick instead of the theme's (el.font); system fonts only, so exports need nothing to embed
+export const FONTS = { sans: ['Sans', SANS], serif: ['Serif', SERIF], round: ['Rund', ROUND], geo: ['Geometrisch', GEO], human: ['Humanistisch', HUMAN], mono: ['Mono', MONO] }
+export const fontStack = k => (Object.hasOwn(FONTS, k) ? FONTS[k][1] : undefined)
+// a CSS font-family as written or as the browser serializes it -> its FONTS key
+const bare = s => s.replace(/["'\s]/g, '').toLowerCase()
+export const fontKey = stack => stack && Object.keys(FONTS).find(k => bare(FONTS[k][1]) === bare(stack))
+
+export const THEMES = {
+  jbt: { name: 'JBT Theme', slidev: 'jbt-theme', pkg: 'github:JonasTebben/jbt-theme#v1.1.1', swatch: ['#006b96', '#00b6ff', '#ffffff'] },
+  hell: { name: 'Klar', vars: { bg: '#ffffff', fg: '#1f2937', title: '#0f172a', accent: '#2563eb', 'code-bg': '#f1f5f9', 'code-fg': '#0f172a', font: SANS, 'cover-bg': 'linear-gradient(135deg, #eff6ff, #ffffff 60%)', rule: '#2563eb' } },
+  dunkel: { name: 'Nacht', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
+  serif: { name: 'Papier', vars: { bg: '#fbf8f1', fg: '#3b342b', title: '#7c2d12', accent: '#a4452c', 'code-bg': '#f0e9da', 'code-fg': '#3b342b', font: SERIF, 'heading-weight': '400', 'cover-bg': '#f4ecdc' } },
+  ozean: { name: 'Ozean', vars: { bg: '#ffffff', fg: '#16324f', title: '#0b2545', accent: '#0e7490', 'code-bg': '#ecfeff', 'code-fg': '#083344', font: SANS, bar: 'linear-gradient(90deg, #0b2545, #0e7490)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #0b2545, #0e7490 60%, #22d3ee)', 'cover-fg': '#ffffff' } },
+  wald: { name: 'Wald', vars: { bg: '#fbfdf8', fg: '#22311f', title: '#1f4d2b', accent: '#3f7d3a', 'code-bg': '#eef5e9', 'code-fg': '#1f2a1c', font: HUMAN, 'cover-bg': 'linear-gradient(160deg, #1f4d2b, #3f7d3a)', 'cover-fg': '#f1f8ec', rule: '#8fbc5a' } },
+  sonne: { name: 'Abendrot', vars: { bg: '#fffaf6', fg: '#3d2a24', title: '#9a3412', accent: '#ea580c', 'code-bg': '#fff1e6', 'code-fg': '#3d2a24', font: ROUND, 'heading-weight': '700', bar: 'linear-gradient(90deg, #f97316, #db2777)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #f97316, #db2777 55%, #7c3aed)', 'cover-fg': '#ffffff' } },
+  nord: { name: 'Nord', vars: { bg: '#eceff4', fg: '#3b4252', title: '#2e3440', accent: '#5e81ac', 'code-bg': '#e5e9f0', 'code-fg': '#2e3440', font: SANS, 'cover-bg': '#2e3440', 'cover-fg': '#eceff4', rule: '#88c0d0' } },
+  dracula: { name: 'Dracula', dark: true, vars: { bg: '#282a36', fg: '#f8f8f2', title: '#ff79c6', accent: '#bd93f9', 'accent-fg': '#282a36', 'code-bg': '#1e1f29', 'code-fg': '#f8f8f2', font: SANS, 'cover-bg': 'linear-gradient(135deg, #282a36, #44475a)' } },
+  solarized: { name: 'Solarized', vars: { bg: '#fdf6e3', fg: '#586e75', title: '#cb4b16', accent: '#268bd2', 'code-bg': '#eee8d5', 'code-fg': '#073642', font: SANS, 'cover-bg': '#073642', 'cover-fg': '#fdf6e3' } },
+  pastell: { name: 'Pastell', vars: { bg: '#fffbfe', fg: '#4a4458', title: '#6d4c9f', accent: '#d9739b', 'code-bg': '#f6eefc', 'code-fg': '#3b3049', font: ROUND, 'heading-weight': '700', 'cover-bg': 'linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)', rule: '#d9739b' } },
+  mono: { name: 'Kontrast', vars: { bg: '#ffffff', fg: '#111111', title: '#000000', accent: '#000000', 'code-bg': '#f2f2f2', 'code-fg': '#111111', font: GEO, 'heading-weight': '800', 'cover-bg': '#000000', 'cover-fg': '#ffffff', rule: '#000000' } },
+  neon: { name: 'Neon', dark: true, vars: { bg: '#0b0b1a', fg: '#d6d6f5', title: '#22d3ee', accent: '#f472b6', 'code-bg': '#15152e', 'code-fg': '#e0e0ff', font: MONO, 'cover-bg': 'radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)', 'cover-fg': '#f0abfc' } },
+  business: { name: 'Business', vars: { bg: '#ffffff', fg: '#27303f', title: '#ffffff', accent: '#b91c1c', 'code-bg': '#f3f4f6', 'code-fg': '#111827', font: SANS, bar: '#0b2545', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)', 'cover-fg': '#ffffff' } },
+}
+export const themeOf = id => THEMES[id] || THEMES.jbt
+
+// CSS variables of a theme as an inline style object (editor) or declaration text (export)
+// relative brightness 0..1 of a hex or rgb() colour
+// shortcut: colour names count as light (the editor only writes hex/rgb), use a canvas if names ever matter
+export function lightness(c = '') {
+  let h = /^#([\da-f]{3,8})$/i.exec(c.trim())?.[1]
+  if (h && h.length < 6) h = [...h.slice(0, 3)].map(x => x + x).join('')
+  const v = h ? [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)) : c.match(/[\d.]+/g)?.slice(0, 3).map(Number)
+  return v?.length === 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : 1
+}
+// a code block's background (own colour or the theme's) is dark: syntax colours switch to a dark scheme
+// a faint background (< 50 %) mostly shows the slide, so the slide's background decides
+export const codeDark = (el, id) => {
+  const v = themeOf(id).vars || {}
+  return lightness((el.fillAlpha ?? 100) >= 50 ? el.fill || v['code-bg'] || '#f5f5f5' : v.bg || '#ffffff') < 0.5
+}
+// element shadows, straight down: offset and blur in px, opacity of black (CSS drop-shadow, PPTX/ODP outer shadow)
+export const SHADOWS = { soft: { y: 2, blur: 6, a: 0.25 }, strong: { y: 6, blur: 14, a: 0.45 } }
+export const shadowCss = k => SHADOWS[k] && `drop-shadow(0 ${SHADOWS[k].y}px ${SHADOWS[k].blur}px rgb(0 0 0 / ${SHADOWS[k].a}))`
+export const themeStyle = id => Object.fromEntries(Object.entries(themeOf(id).vars || {}).map(([k, v]) => ['--' + k, v]))
+const decls = id => Object.entries(themeStyle(id)).map(([k, v]) => `${k}: ${v};`).join(' ')
+
+// Slidev layouts whose content is vertically centred (my-auto inside a grid)
+export const CENTERED = ['cover', 'intro', 'quiz', 'section', 'statement', 'fact', 'quote', 'center', 'end']
+
+// project-wide type sizes ({ text, title, code } in px) on top of any theme; R = slide selector,
+// L = layout class selector. Used by the editor (.slide) and the Slidev export (.slidev-layout).
+export function typoCss(R, t = {}, L = l => `.layout-${l}`) {
+  let css = ''
+  if (t.text) css += `${R} { font-size: ${t.text}px !important; }\n`
+  const plain = `${R}:not(${CENTERED.map(L).join(', ')})`
+  if (t.title) css += `${plain} h1 { font-size: ${t.title}px !important; line-height: ${t.titleLine ? t.titleLine + 'px' : 1.2} !important; }\n`
+  if (t.h2) css += `${plain} h2 { font-size: ${t.h2}px !important; }\n`
+  if (t.h3) css += `${plain} h3 { font-size: ${t.h3}px !important; }\n`
+  if (t.line) css += `${R} p { line-height: ${t.line} !important; }\n`
+  if (t.liLine) css += `${R} li { line-height: ${t.liLine} !important; }\n`
+  if (t.code) {
+    const line = t.codeLine || Math.round(t.code * 1.4 * 10) / 10
+    css += `${R} { --code-size: ${t.code}px !important; --code-line: ${line}px !important; --slidev-code-font-size: ${t.code}px !important; --slidev-code-line-height: ${line}px !important; }\n`
+  }
+  return css
+}
+// layouts offered in the editor; theme-specific ones only for that theme
+export const LAYOUTS = [
+  ['default', 'Inhalt'], ['cover', 'Titelfolie'], ['intro', 'Einleitung'], ['section', 'Abschnitt'],
+  ['statement', 'Aussage'], ['fact', 'Kennzahl'], ['quote', 'Zitat'], ['center', 'Zentriert'], ['end', 'Ende'],
+  ['quiz', 'Quiz', 'jbt'], ['hands-on', 'Hands-on', 'jbt'],
+]
+
+export function themeCss(R, L) {
+  const cover = CENTERED.map(n => R + L(n)).join(', ')
+  const content = `${R}:not(${CENTERED.map(L).join(', ')})`
+  return `
+${R} { background: var(--bg); color: var(--fg); }
+${R} :is(h1, h2, h3, h4) { font-family: var(--heading-font, inherit); color: var(--title); font-weight: var(--heading-weight, 600); }
+${R} h1 { font-size: 34px; line-height: 42px; letter-spacing: -0.01em; }
+${R} a { color: var(--accent); }
+${R} th { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+${R} blockquote { border-left-width: 4px; }
+${content} { background: var(--bar, none) 0 0 / 100% 85px no-repeat, var(--bg); }
+${content} h1 { color: var(--bar-fg, var(--title)); }
+${content} h1 { box-shadow: 0 3px 0 var(--rule, transparent); }
+${cover} { background: var(--cover-bg, var(--bg)); color: var(--cover-fg, var(--fg)); text-align: center; }
+${cover} :is(h1, h2, h3) { color: var(--cover-fg, var(--title)); }
+${R}${L('cover')} h1, ${R}${L('intro')} h1 { font-size: 56px; line-height: 64px; }
+${R}${L('cover')} h2, ${R}${L('intro')} h2 { font-size: 26px; line-height: 34px; font-weight: 400; opacity: 0.85; }
+${R}${L('section')} h1 { font-size: 52px; line-height: 60px; }
+${R}${L('statement')} h1 { font-size: 52px; line-height: 60px; }
+${R}${L('fact')} h1 { font-size: 96px; line-height: 1; font-weight: 800; color: var(--accent); }
+${R}${L('quote')} blockquote, ${R}${L('quote')} p { font-size: 30px; line-height: 40px; font-style: italic; background: none; border: 0; }
+${R}${L('cover')} .pageno, ${R}${L('intro')} .pageno { display: none; }`
+}
+
+// --- table presets ---
+export const TABLE_PRESETS = [
+  ['theme', 'Theme'], ['striped', 'Streifen'], ['minimal', 'Minimal'], ['grid', 'Raster'],
+  ['bold', 'Kräftig'], ['accent', 'Akzentspalte'], ['cards', 'Karten'], ['soft', 'Sanft'],
+]
+const TABLE_RULES = {
+  theme: '',
+  striped: `$ th { background: var(--accent); color: var(--accent-fg); font-weight: 600; border: 0; }
+$ td { background: transparent; border: 0; }
+@ tr:nth-child(even) > td { background: var(--stripe); }`,
+  minimal: `$ th { background: none; color: var(--title, inherit); font-weight: 700; border: 0; border-bottom: 2px solid currentColor; }
+$ td { background: none; border: 0; border-bottom: 1px solid var(--border); }`,
+  grid: `$ :is(td, th) { border: 1px solid var(--border); background: none; color: inherit; }
+$ th { background: var(--stripe); font-weight: 700; }`,
+  bold: `$ th { background: var(--fg); color: var(--bg); font-weight: 700; border: 0; }
+$ td { background: none; border: 0; border-bottom: 1px solid var(--border); }
+@ tr:nth-child(even) > td { background: var(--stripe); }`,
+  accent: `$ th { background: var(--accent); color: var(--accent-fg); border: 0; font-weight: 600; }
+$ td { background: none; border: 0; border-bottom: 1px solid var(--border); }
+$ td:first-child { background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 700; color: var(--accent); }`,
+  cards: `@ { border-collapse: separate; border-spacing: 0 6px; }
+$ th { background: none; color: inherit; opacity: 0.6; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; border: 0; }
+$ td { background: var(--stripe); border: 0; }
+$ td:first-child { border-radius: 8px 0 0 8px; }
+$ td:last-child { border-radius: 0 8px 8px 0; }`,
+  soft: `$ th { background: color-mix(in srgb, var(--accent) 16%, transparent); color: inherit; font-weight: 700; border: 0; }
+$ th:first-child { border-radius: 8px 0 0 0; }
+$ th:last-child { border-radius: 0 8px 0 0; }
+$ td { background: none; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); }`,
+}
+// '@' = the preset's table, '$' = its cells' row (`… table tr >`); this specificity wins over theme
+// rules like `tr:nth-child(even) td`
+export function tableCss(R, presets = Object.keys(TABLE_RULES)) {
+  return presets.map(p => (TABLE_RULES[p] || '').replaceAll('@', `${R} [data-table="${p}"] table`).replaceAll('$', `${R} [data-table="${p}"] table tr >`)).join('\n') + `
+${R} [data-table]:not([data-table="theme"]) table tr { border-bottom: 0; }
+${R} [data-table][data-firstcol] table tr > td:first-child { font-weight: 700; }
+${R} [data-table][data-compact] table tr > :is(td, th) { padding: 5px 8px; }
+${R} [data-table][data-borders] table :is(tr, tr > td, tr > th) { border: 0; }`
+}
+
+// --- callouts (Hinweis, Tipp, Warnung, Achtung) ---
+export const CALLOUTS = [['info', 'Hinweis', '#2563eb'], ['tip', 'Tipp', '#059669'], ['warn', 'Warnung', '#d97706'], ['danger', 'Achtung', '#dc2626']]
+export const calloutCss = R => `
+${R} [data-callout] { --c: #2563eb; padding: 12px 16px; border-radius: 8px; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+${R} [data-callout] > * { margin: 0; }
+${R} [data-callout] > * + * { margin-top: 6px; }
+${CALLOUTS.map(([k, , c]) => `${R} [data-callout="${k}"] { --c: ${c}; }`).join('\n')}`
+
+// all rules the editor needs (injected once)
+export const editorCss = () =>
+  themeCss('.slide:not(.theme-jbt)', n => `.layout-${n}`) + tableCss('.slide') + calloutCss('.slide')
+
+// style.css of an exported Slidev project using a generic theme
+export const slidevThemeCss = id => `/* Theme „${themeOf(id).name}“ – erzeugt von Slidecko */
+.slidev-layout { ${decls(id)} --accent-fg: #fff; --stripe: color-mix(in srgb, var(--fg) 6%, transparent); --border: color-mix(in srgb, var(--fg) 16%, transparent); font-family: var(--font, inherit); }
+${themeCss('.slidev-layout', n => `.${n}`)}
+`

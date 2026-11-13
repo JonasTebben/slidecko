@@ -1,0 +1,14 @@
+Slidecko
+Copyright 2026 Jonas Tebben
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party software bundled in the built app (dist/), each under its own licence:
+- Vue, UnoCSS, marked, PptxGenJS, Turndown, turndown-plugin-gfm, html-to-image: MIT
+- JSZip: MIT (dual-licensed MIT/GPLv3, used under MIT)
+- DOMPurify: Apache-2.0 (dual-licensed MPL-2.0/Apache-2.0, used under Apache-2.0)
+- highlight.js: BSD-3-Clause
+- PDF.js (pdfjs-dist): Apache-2.0, Copyright Mozilla Foundation
+
+Slidecko reads and writes the file format of Slidev (https://sli.dev, MIT).
+It does not contain Slidev code. "Slidev" is used only to name that format.
