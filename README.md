@@ -28,11 +28,12 @@ railway up --service slidecko --ci        # deployen (lädt den lokalen Ordner h
 railway logs --service slidecko
 ```
 
-## Fußzeile, Unterstützung, Datenschutzseite
+## Seiten, Fußzeile, Unterstützung, Datenschutz
 
-- **Fußzeile** (`src/AppFooter.vue`, in Editor und Projektübersicht): „Slidecko ist ein kostenloses Tool von Jonas Tebben“ mit Links zu `slidecko.tebben.dev` und `tebben.dev`, Impressum (`jonas-tebben.de/legal-notice/`), Datenschutz (`datenschutz.html`) und dem Sprachumschalter.
+- **Landing Page** `index.html` (Englisch, statisches HTML ohne Framework) unter `/`, mit Icon `public/icon.png` und Screenshots `public/shots/`. Die App selbst liegt unter `/app/` (`app/index.html`); `server.js` leitet `/app` auf `/app/` um. tools.tebben.dev verlinkt nur per Kachel hierher.
+- **Fußzeile** (`src/AppFooter.vue`, in Editor und Projektübersicht): „Slidecko ist ein kostenloses Tool von Jonas Tebben“ mit Links zu `slidecko.tebben.dev` und `tebben.dev`, Impressum (`jonas-tebben.de/legal-notice/`), Datenschutz (`../datenschutz.html`) und dem Sprachumschalter.
 - **Spendenlink (Stripe)**: Den Payment Link in `src/support.js` bei `SUPPORT_URL` eintragen (Stripe-Dashboard → Payment Links → „Kunde wählt den Preis“, SEPA-Lastschrift aktivieren). Ist er leer, fehlt der Kaffee-Link in der Fußzeile, und `vite.config.js` entfernt beim Build den Abschnitt zwischen `<!-- stripe -->` und `<!-- /stripe -->` aus `datenschutz.html`. Nach dem Eintragen neu bauen und deployen.
-- **Datenschutzseite** `datenschutz.html` (wird von Vite mitgebaut, nicht aus `public/` kopiert): die einzige Datenschutzseite von Slidecko. Sie gilt für `slidecko.tebben.dev`; die Produktseite auf tools.tebben.dev (nur Beschreibung und Screenshots) verlinkt auf sie. Die Abschnittsnummern zählt CSS, damit beim Weglassen von Stripe keine Lücke entsteht.
+- **Datenschutzseite** `datenschutz.html` (wird von Vite mitgebaut, nicht aus `public/` kopiert): die einzige Datenschutzseite von Slidecko. Sie gilt für `slidecko.tebben.dev`; Landing Page und App verlinken auf sie. Die Abschnittsnummern zählt CSS, damit beim Weglassen von Stripe keine Lücke entsteht.
 - **YouTube** lädt erst nach Klick auf „YouTube-Inhalte laden“ (`src/SlideView.vue`, Merker `ui.yt`, pro Tab im sessionStorage). Exporte blenden den Button aus (`src/exportFormats.js`).
 
 **Vor dem Livegang offen:**
@@ -111,6 +112,8 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 | `src/i18n.js`, `src/locales/` | Übersetzungen der Oberfläche (deutscher Text ist der Schlüssel) |
 | `server.js` | Bun-Server für Railway: liefert `dist/` aus, `/health` |
 | `src/AppFooter.vue`, `src/support.js` | Fußzeile, Stripe-Link |
+| `index.html` | Landing Page (`/`) |
+| `app/index.html` | Einstieg der App (`/app/`) |
 | `datenschutz.html` | Datenschutzseite für den Betrieb auf Railway |
 
 ## Bekannte Grenzen

@@ -17,9 +17,11 @@ export function handle(req) {
   const file = resolve(pathname)
   if (!file) return new Response('Bad Request', { status: 400 })
   const f = Bun.file(file)
-  return f.exists().then(ok => ok
+  return f.exists().then(async ok => ok
     ? new Response(f, { headers: { 'Cache-Control': pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache' } })
-    : new Response('Not Found', { status: 404 }))
+    : !pathname.endsWith('/') && await Bun.file(join(file, 'index.html')).exists()
+      ? Response.redirect(pathname + '/', 301) // /app → /app/, so relative asset paths resolve
+      : new Response('Not Found', { status: 404 }))
 }
 
 if (import.meta.main) {

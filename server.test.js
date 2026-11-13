@@ -13,3 +13,10 @@ test('health check answers without dist', async () => {
   const res = await handle(new Request('http://x/health'))
   expect(await res.text()).toBe('ok')
 })
+
+test.skipIf(!(await Bun.file(import.meta.dir + '/dist/app/index.html').exists()))('/app redirects to /app/ (needs a build)', async () => {
+  const res = await handle(new Request('http://x/app'))
+  expect(res.status).toBe(301)
+  expect(res.headers.get('location')).toBe('/app/')
+  expect((await handle(new Request('http://x/nope'))).status).toBe(404)
+})
