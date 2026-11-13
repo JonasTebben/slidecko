@@ -13,6 +13,9 @@ export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm')
 
 // the slide format of a Slidev headmatter: { aspectRatio: '4/3', canvasWidth: 980 } (keys only when set);
 // '4:3' and "'16/9'" become '4/3' / '16/9', numbers stay as written ('1.6')
+// HTML comments and per-slide <style> blocks are not content, but inside code fences and inline code they are
+export const stripNonContent = md => md.replace(/(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)|(`+)[^`\n][\s\S]*?\3|<!--[\s\S]*?-->|<style[\s\S]*?<\/style>/g,
+  m => (m.startsWith('<') ? '' : m))
 export function headFormat(md) {
   const fm = splitSlides(md).find(s => s.fm || s.body.some(l => l.trim()))?.fm // a leading `---` opens the headmatter
   const ar = fmGet(fm, 'aspectRatio')?.replace(/\s+/g, '').replace(':', '/'), cw = +fmGet(fm, 'canvasWidth')

@@ -85,6 +85,7 @@ export function shapeSvg(el) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="overflow:visible">${body}</svg>`
 }
 
+let curShapeFont = {} // toSlidev()'s shapeFont while it runs
 let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
 function elementMd(el) {
   switch (el.type) {
@@ -112,7 +113,7 @@ function elementMd(el) {
       return `<div ${data} style="${boxStyle(el)}">\n\n${tableMd(el)}\n\n</div>`
     }
     case 'shape':
-      return `<div data-shape="${el.shape}" data-fill="${el.fill}" data-stroke="${el.stroke}" data-sw="${el.strokeWidth || 0}" data-radius="${el.radius || 0}"${el.fillAlpha != null ? ` data-alpha="${el.fillAlpha}"` : ''} style="${boxStyle(el)}">${shapeSvg(el)}${el.html ? `<div class="shape-text" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;text-align:${el.align || 'center'}"><div>${el.html}</div></div>` : ''}</div>`
+      return `<div data-shape="${el.shape}" data-fill="${el.fill}" data-stroke="${el.stroke}" data-sw="${el.strokeWidth || 0}" data-radius="${el.radius || 0}"${el.fillAlpha != null ? ` data-alpha="${el.fillAlpha}"` : ''} style="${boxStyle(el)}">${shapeSvg(el)}${el.html ? `<div class="shape-text" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;text-align:${el.align || 'center'}"><div${curShapeFont[el.id] ? ` style="font-size:${curShapeFont[el.id]}"` : ''}>${el.html}</div></div>` : ''}</div>`
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: // text
@@ -155,11 +156,13 @@ export function slideToMarkdown(slide) {
 
 // returns { files: { path: text }, images: { path: assetId } }
 // projectFiles: the project's other files (theme, package.json …), written back unchanged
-export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth }, projectFiles = {}) {
+// shapeFont: element id -> font size the editor shrank its shape text to
+export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth }, projectFiles = {}, { shapeFont = {} } = {}) {
   entry ||= 'slides.md'
   const dir = entry.split('/').slice(0, -1).join('/')
   // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
   curTheme = theme
+  curShapeFont = shapeFont
   const { slidev: own, pkg } = themeOf(theme)
   // consecutive slides of the same file form one part
   const parts = []

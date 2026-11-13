@@ -552,7 +552,13 @@ export const exportAs = (format, file) => {
 }
 // zip with the Slidev project: entry file, deck files, images (and style.css for generic themes)
 export const slidev = () => run(async () => {
-  const { files, images } = toSlidev(deckData(), deck.files)
+  // text that shrinks to fit its shape (shrinkShapeText) keeps that size: Slidev cannot fit text itself
+  const shapeFont = {}
+  if (deck.slides.some(s => s.elements.some(e => e.type === 'shape' && e.html))) {
+    try { for (const c of (await renderOutput()).querySelectorAll('[data-el] > .shape-text > .content')) if (c.style.fontSize) shapeFont[c.closest('[data-el]').dataset.el] = c.style.fontSize }
+    finally { exportSlides.value = null }
+  }
+  const { files, images } = toSlidev(deckData(), deck.files, { shapeFont })
   const zip = new JSZip()
   for (const [path, text] of Object.entries(files)) if (!text.startsWith('data:')) zip.file(path, text)
   // images keep their project paths (Slidev serves the project root and public/ at /)

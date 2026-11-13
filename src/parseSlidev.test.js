@@ -192,3 +192,16 @@ test('slide format: headmatter aspectRatio/canvasWidth are read and written back
   assert.match(changed, /aspectRatio: 16\/10\ncanvasWidth: 1200\n/)
   assert.deepEqual(headFormat(changed), { aspectRatio: '16/10', canvasWidth: 1200 })
 })
+
+test('stripNonContent keeps comments and <style> inside code', async () => {
+  const { stripNonContent } = await import('./parseSlidev.js')
+  const md = '<!-- note -->\n# T\n<style>h1{color:red}</style>\nUse `<style></style>` here\n\n```html\n<!-- 2. Template -->\n<style>\nh1 { color: red; }\n</style>\n```\n<!-- end -->'
+  assert.equal(stripNonContent(md), '\n# T\n\nUse `<style></style>` here\n\n```html\n<!-- 2. Template -->\n<style>\nh1 { color: red; }\n</style>\n```\n')
+})
+
+test('toSlidev keeps the shrunken size of shape text', () => {
+  const el = { id: 's1', type: 'shape', shape: 'rect', x: 0, y: 0, w: 100, h: 40, fill: '#fff', stroke: '#000', html: 'Langer Text' }
+  const md = o => Object.values(toSlidev({ title: 'T', theme: 'hell', slides: [{ layout: 'default', elements: [el] }] }, {}, o).files).join('')
+  assert.match(md({ shapeFont: { s1: '9.5px' } }), /<div style="font-size:9.5px">Langer Text<\/div>/)
+  assert.match(md(), /<div>Langer Text<\/div>/)
+})

@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent } from './parseSlidev.js'
 import { imagePath } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
@@ -60,9 +60,8 @@ export async function importSlidev(path, files, theme) {
   // measured at the deck's own size; createProject() applies the returned format
   const format = headFormat(texts.get(path))
   const size = formatSize(parseRatio(format.aspectRatio) || 16 / 9, format.canvasWidth || 980)
-  // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML; comments and per-slide
-  // <style> blocks are not content
-  const htmls = parsed.map(s => marked.parse(s.md.replace(/<!--[\s\S]*?-->/g, '').replace(/<style[\s\S]*?<\/style>/g, '')))
+  // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML
+  const htmls = parsed.map(s => marked.parse(stripNonContent(s.md)))
   await applyUno(htmls.join('\n'))
 
   const host = document.body.appendChild(document.createElement('div'))
