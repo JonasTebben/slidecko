@@ -23,18 +23,18 @@ export const fontKey = stack => stack && Object.keys(FONTS).find(k => bare(FONTS
 
 const BUILTIN = {
   hell: { name: 'Klar', vars: { bg: '#ffffff', fg: '#1f2937', title: '#0f172a', accent: '#2563eb', 'code-bg': '#f1f5f9', 'code-fg': '#0f172a', font: SANS, 'cover-bg': 'linear-gradient(135deg, #eff6ff, #ffffff 60%)', rule: '#2563eb' } },
-  dunkel: { name: 'Nacht', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
+  dunkel: { name: 'Nacht', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'accent-fg': '#0f172a', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
   serif: { name: 'Papier', vars: { bg: '#fbf8f1', fg: '#3b342b', title: '#7c2d12', accent: '#a4452c', 'code-bg': '#f0e9da', 'code-fg': '#3b342b', font: SERIF, 'heading-weight': '400', 'cover-bg': '#f4ecdc' } },
   ozean: { name: 'Ozean', vars: { bg: '#ffffff', fg: '#16324f', title: '#0b2545', accent: '#0e7490', 'code-bg': '#ecfeff', 'code-fg': '#083344', font: SANS, bar: 'linear-gradient(90deg, #0b2545, #0e7490)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #0b2545, #0e7490 60%, #22d3ee)', 'cover-fg': '#ffffff' } },
   wald: { name: 'Wald', vars: { bg: '#fbfdf8', fg: '#22311f', title: '#1f4d2b', accent: '#3f7d3a', 'code-bg': '#eef5e9', 'code-fg': '#1f2a1c', font: HUMAN, 'cover-bg': 'linear-gradient(160deg, #1f4d2b, #3f7d3a)', 'cover-fg': '#f1f8ec', rule: '#8fbc5a' } },
-  sonne: { name: 'Abendrot', vars: { bg: '#fffaf6', fg: '#3d2a24', title: '#9a3412', accent: '#ea580c', 'code-bg': '#fff1e6', 'code-fg': '#3d2a24', font: ROUND, 'heading-weight': '700', bar: 'linear-gradient(90deg, #f97316, #db2777)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #f97316, #db2777 55%, #7c3aed)', 'cover-fg': '#ffffff' } },
-  nord: { name: 'Nord', vars: { bg: '#eceff4', fg: '#3b4252', title: '#2e3440', accent: '#5e81ac', 'code-bg': '#e5e9f0', 'code-fg': '#2e3440', font: SANS, 'cover-bg': '#2e3440', 'cover-fg': '#eceff4', rule: '#88c0d0' } },
+  sonne: { name: 'Abendrot', vars: { bg: '#fffaf6', fg: '#3d2a24', title: '#9a3412', accent: '#c74b0a', 'code-bg': '#fff1e6', 'code-fg': '#3d2a24', font: ROUND, 'heading-weight': '700', bar: 'linear-gradient(90deg, #c2410c, #be185d)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #c2410c, #be185d 55%, #7c3aed)', 'cover-fg': '#ffffff' } },
+  nord: { name: 'Nord', vars: { bg: '#eceff4', fg: '#3b4252', title: '#2e3440', accent: '#4d6d95', 'code-bg': '#e5e9f0', 'code-fg': '#2e3440', font: SANS, 'cover-bg': '#2e3440', 'cover-fg': '#eceff4', rule: '#88c0d0' } },
   dracula: { name: 'Dracula', dark: true, vars: { bg: '#282a36', fg: '#f8f8f2', title: '#ff79c6', accent: '#bd93f9', 'accent-fg': '#282a36', 'code-bg': '#1e1f29', 'code-fg': '#f8f8f2', font: SANS, 'cover-bg': 'linear-gradient(135deg, #282a36, #44475a)' } },
-  solarized: { name: 'Solarized', vars: { bg: '#fdf6e3', fg: '#586e75', title: '#cb4b16', accent: '#268bd2', 'code-bg': '#eee8d5', 'code-fg': '#073642', font: SANS, 'cover-bg': '#073642', 'cover-fg': '#fdf6e3' } },
-  pastell: { name: 'Pastell', vars: { bg: '#fffbfe', fg: '#4a4458', title: '#6d4c9f', accent: '#d9739b', 'code-bg': '#f6eefc', 'code-fg': '#3b3049', font: ROUND, 'heading-weight': '700', 'cover-bg': 'linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)', rule: '#d9739b' } },
+  solarized: { name: 'Solarized', vars: { bg: '#fdf6e3', fg: '#586e75', title: '#cb4b16', accent: '#2076b2', 'code-bg': '#eee8d5', 'code-fg': '#073642', font: SANS, 'cover-bg': '#073642', 'cover-fg': '#fdf6e3' } },
+  pastell: { name: 'Pastell', vars: { bg: '#fffbfe', fg: '#4a4458', title: '#6d4c9f', accent: '#cb3f76', 'code-bg': '#f6eefc', 'code-fg': '#3b3049', font: ROUND, 'heading-weight': '700', 'cover-bg': 'linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)', rule: '#d9739b' } },
   mono: { name: 'Kontrast', vars: { bg: '#ffffff', fg: '#111111', title: '#000000', accent: '#000000', 'code-bg': '#f2f2f2', 'code-fg': '#111111', font: GEO, 'heading-weight': '800', 'cover-bg': '#000000', 'cover-fg': '#ffffff', rule: '#000000' } },
-  neon: { name: 'Neon', dark: true, vars: { bg: '#0b0b1a', fg: '#d6d6f5', title: '#22d3ee', accent: '#f472b6', 'code-bg': '#15152e', 'code-fg': '#e0e0ff', font: MONO, 'cover-bg': 'radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)', 'cover-fg': '#f0abfc' } },
-  business: { name: 'Business', vars: { bg: '#ffffff', fg: '#27303f', title: '#ffffff', accent: '#b91c1c', 'code-bg': '#f3f4f6', 'code-fg': '#111827', font: SANS, bar: '#0b2545', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)', 'cover-fg': '#ffffff' } },
+  neon: { name: 'Neon', dark: true, vars: { bg: '#0b0b1a', fg: '#d6d6f5', title: '#22d3ee', accent: '#f472b6', 'accent-fg': '#0b0b1a', 'code-bg': '#15152e', 'code-fg': '#e0e0ff', font: MONO, 'cover-bg': 'radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)', 'cover-fg': '#f0abfc' } },
+  business: { name: 'Business', vars: { bg: '#ffffff', fg: '#27303f', title: '#0b2545', accent: '#b91c1c', 'code-bg': '#f3f4f6', 'code-fg': '#111827', font: SANS, bar: '#0b2545', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)', 'cover-fg': '#ffffff' } },
 }
 export const DEFAULT_THEME = 'hell'
 // built-in and own themes; reactive, so menus and the editor CSS follow edits
@@ -128,7 +128,10 @@ export const codeDark = (el, id) => {
 // element shadows, straight down: offset and blur in px, opacity of black (CSS drop-shadow, PPTX/ODP outer shadow)
 export const SHADOWS = { soft: { y: 2, blur: 6, a: 0.25 }, strong: { y: 6, blur: 14, a: 0.45 } }
 export const shadowCss = k => SHADOWS[k] && `drop-shadow(0 ${SHADOWS[k].y}px ${SHADOWS[k].blur}px rgb(0 0 0 / ${SHADOWS[k].a}))`
-export const themeStyle = id => Object.fromEntries(Object.entries(themeOf(id).vars || {}).map(([k, v]) => ['--' + k, v]))
+// the title bar is a background layer, where a plain colour is invalid (and drops the slide's whole
+// background); a colour becomes a one-colour gradient
+const barImage = v => (/\(/.test(v) && !/^\s*(rgba?|hsla?|color-mix|oklch|oklab|lab|lch|hwb|color)\(/i.test(v) ? v : `linear-gradient(${v}, ${v})`)
+export const themeStyle = id => Object.fromEntries(Object.entries(themeOf(id).vars || {}).map(([k, v]) => ['--' + k, k === 'bar' ? barImage(v) : v]))
 const decls = id => Object.entries(themeStyle(id)).map(([k, v]) => `${k}: ${v};`).join(' ')
 
 // Slidev layouts whose content is vertically centred (my-auto inside a grid)
@@ -173,12 +176,14 @@ ${content} h1 { color: var(--bar-fg, var(--title)); }
 ${content} h1 { box-shadow: 0 3px 0 var(--rule, transparent); }
 ${cover} { background: var(--cover-bg, var(--bg)); color: var(--cover-fg, var(--fg)); text-align: center; }
 :is(${cover}) :is(h1, h2, h3) { color: var(--cover-fg, var(--title)); }
+/* the accent often vanishes on the cover background (black on black in Kontrast); links take the cover's text colour, underlined */
+:is(${cover}) a { color: var(--cover-fg, var(--accent)); text-decoration: underline; }
 ${R}${L('cover')} h1, ${R}${L('intro')} h1 { font-size: 56px; line-height: 64px; }
 ${R}${L('cover')} h2, ${R}${L('intro')} h2 { font-size: 26px; line-height: 34px; font-weight: 400; opacity: 0.85; }
 ${R}${L('section')} h1 { font-size: 52px; line-height: 60px; }
 ${R}${L('statement')} h1 { font-size: 52px; line-height: 60px; }
-${R}${L('fact')} h1 { font-size: 96px; line-height: 1; font-weight: 800; color: var(--accent); }
-${R}${L('quote')} blockquote, ${R}${L('quote')} p { font-size: 30px; line-height: 40px; font-style: italic; background: none; border: 0; }
+${R}${L('fact')} h1 { font-size: 96px; line-height: 1; font-weight: 800; color: var(--cover-fg, var(--accent)); } /* the accent vanishes on a coloured cover background (Ozean, Wald, Kontrast) */
+${R}${L('quote')} blockquote, ${R}${L('quote')} p { font-size: 30px; line-height: 40px; font-style: italic; background: none; border: 0; color: inherit; } /* without the code box, the code colour would vanish on the quote background (dark on dark in Nord) */
 ${R}${L('cover')} .pageno, ${R}${L('intro')} .pageno { display: none; }`
 }
 

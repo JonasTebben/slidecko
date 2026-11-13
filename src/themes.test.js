@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { THEMES, cleanTheme, importTheme, saveTheme, deleteTheme, newThemeId, themeFile, themeIds, editorCss, slidevThemeCss, themeLayouts, isBuiltin } from './themes.js'
+import { THEMES, cleanTheme, importTheme, saveTheme, deleteTheme, newThemeId, themeFile, themeIds, editorCss, slidevThemeCss, themeLayouts, isBuiltin, themeStyle } from './themes.js'
 
 test('JBT is no built-in theme, its file imports with id, layouts and Slidev package', () => {
   assert.equal(isBuiltin('jbt'), false)
@@ -9,7 +9,7 @@ test('JBT is no built-in theme, its file imports with id, layouts and Slidev pac
   assert.equal(id, 'jbt')
   assert.deepEqual(themeIds(true), ['jbt'])
   assert.ok(!themeIds(false).includes('jbt'))
-  assert.equal(THEMES.jbt.pkg, 'github:JonasTebben/jbt-theme#v1.1.1')
+  assert.equal(THEMES.jbt.pkg, 'github:JonasTebben/jbt-theme#v1.1.4')
   assert.ok(themeLayouts('jbt').some(l => l[0] === 'quiz'))
   // every top-level rule of the theme file is the theme's own (&); general editor rules belong in slide.css
   const tops = THEMES.jbt.css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{[^{}]*\}/g, '{}').split('{}').map(x => x.trim()).filter(Boolean)
@@ -39,4 +39,9 @@ test('a copy of a built-in theme gets its own id; untrusted values are dropped',
   assert.match(out, /\.slidev-layout \{\n&\.cover h1/)
   assert.equal(themeFile('klar').format, 'slidecko-theme')
   assert.equal(cleanTheme({ name: '' }), null)
+})
+
+test('a plain-colour title bar becomes a gradient layer (a colour in a non-final background layer drops the whole background)', () => {
+  assert.equal(themeStyle('business')['--bar'], 'linear-gradient(#0b2545, #0b2545)')
+  assert.equal(themeStyle('ozean')['--bar'], 'linear-gradient(90deg, #0b2545, #0e7490)')
 })

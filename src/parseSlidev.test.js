@@ -141,7 +141,7 @@ test('project-wide font sizes are exported to style.css', () => {
   const loose = toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides }, {}).files
   assert.match(loose['slides.md'], /theme: jbt-theme/)
   assert.equal(loose['style.css'], undefined)
-  assert.equal(JSON.parse(loose['package.json']).dependencies['jbt-theme'], 'github:JonasTebben/jbt-theme#v1.1.1')
+  assert.equal(JSON.parse(loose['package.json']).dependencies['jbt-theme'], 'github:JonasTebben/jbt-theme#v1.1.4')
   // a project that still uses its own ./theme folder keeps it, and gets no theme dependency
   const legacy = [{ ...slides[0], fm: 'theme: ./theme' }]
   const old = toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides: legacy }, { 'package.json': '{"dependencies":{}}\n' }).files

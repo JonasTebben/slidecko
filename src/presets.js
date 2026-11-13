@@ -42,9 +42,9 @@ export const SLIDE_PRESETS = [
     el({ type: 'text', x: 60, y: 280, w: 860, h: 36, html: `<h2>${t('Untertitel')}</h2>` })] },
   { id: 'content', name: 'Titel & Inhalt', layout: 'default', make: () => [title(), list(56, 110, 868)] },
   { id: 'two', name: 'Zwei Spalten', layout: 'default', make: () => [title(), list(56, 110, 410), list(514, 110, 410)] },
-  { id: 'compare', name: 'Vergleich', layout: 'default', make: () => [title(t('Vergleich')),
-    el({ type: 'text', x: 56, y: 110, w: 410, h: 170, html: `<h3>${t('Vorher')}</h3><ul>${`<li>${t('Punkt')}</li>`.repeat(3)}</ul>`, fill: '#f1f5f9' }),
-    el({ type: 'text', x: 514, y: 110, w: 410, h: 170, html: `<h3>${t('Nachher')}</h3><ul>${`<li>${t('Punkt')}</li>`.repeat(3)}</ul>`, fill: '#ecfdf5' })] },
+  { id: 'compare', name: 'Vergleich', layout: 'default', make: () => [title(t('Vergleich')), // translucent fills: a solid light box would hide the light text of dark themes
+    el({ type: 'text', x: 56, y: 110, w: 410, h: 170, html: `<h3>${t('Vorher')}</h3><ul>${`<li>${t('Punkt')}</li>`.repeat(3)}</ul>`, fill: '#64748b', fillAlpha: 12 }),
+    el({ type: 'text', x: 514, y: 110, w: 410, h: 170, html: `<h3>${t('Nachher')}</h3><ul>${`<li>${t('Punkt')}</li>`.repeat(3)}</ul>`, fill: '#16a34a', fillAlpha: 12 })] },
   { id: 'three', name: 'Drei Spalten', layout: 'default', make: () => [title(), ...[56, 359, 662].map((x, i) => el({ type: 'text', x, y: 110, w: 262, h: 120, html: `<h3>${t('Punkt {0}', i + 1)}</h3><p>${t('Kurze Erklärung zu diesem Punkt.')}</p>` }))] },
   { id: 'code', name: 'Code & Erklärung', layout: 'default', make: () => [title(t('Beispiel')), el({ ...ELEMENTS.code(), x: 56, y: 110, w: 500, h: 200 }), list(590, 110, 334, [t('Was passiert hier?'), t('Warum so?'), t('Was ist wichtig?')])] },
   { id: 'table', name: 'Tabelle', layout: 'default', make: () => [title(t('Übersicht')), el({ ...ELEMENTS.table('striped'), w: 868 })] },
