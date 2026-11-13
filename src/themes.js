@@ -2,8 +2,11 @@
 // the editor and the exported Slidev project use the very same rules:
 //   root = '.slide' + layout(n) = '.layout-n'      in the editor
 //   root = '.slidev-layout' + layout(n) = '.n'     in Slidev (style.css / per-slide <style>)
-// A theme is a set of CSS variables; 'jbt' is the JBT Theme, a Slidev theme package (github.com/JonasTebben/jbt-theme)
-// mirrored in slide.css; the Slidev export names it as `theme:` and adds it to package.json.
+// A theme is a set of CSS variables, optionally with own CSS (`css`, nested under `.theme-<id>`, `&` = the slide).
+// Built-in themes live here; the user's own ones (custom: true) are kept in this browser and can be
+// exported/imported as .theme.json (e.g. themes/jbt.theme.json). A theme with `slidev`/`pkg` is a Slidev
+// theme package: the Slidev export names it as `theme:` and adds it to package.json.
+import { reactive, toRaw } from 'vue'
 
 const SANS = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 const SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif"
@@ -18,8 +21,7 @@ export const fontStack = k => (Object.hasOwn(FONTS, k) ? FONTS[k][1] : undefined
 const bare = s => s.replace(/["'\s]/g, '').toLowerCase()
 export const fontKey = stack => stack && Object.keys(FONTS).find(k => bare(FONTS[k][1]) === bare(stack))
 
-export const THEMES = {
-  jbt: { name: 'JBT Theme', slidev: 'jbt-theme', pkg: 'github:JonasTebben/jbt-theme#v1.1.1', swatch: ['#006b96', '#00b6ff', '#ffffff'] },
+const BUILTIN = {
   hell: { name: 'Klar', vars: { bg: '#ffffff', fg: '#1f2937', title: '#0f172a', accent: '#2563eb', 'code-bg': '#f1f5f9', 'code-fg': '#0f172a', font: SANS, 'cover-bg': 'linear-gradient(135deg, #eff6ff, #ffffff 60%)', rule: '#2563eb' } },
   dunkel: { name: 'Nacht', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
   serif: { name: 'Papier', vars: { bg: '#fbf8f1', fg: '#3b342b', title: '#7c2d12', accent: '#a4452c', 'code-bg': '#f0e9da', 'code-fg': '#3b342b', font: SERIF, 'heading-weight': '400', 'cover-bg': '#f4ecdc' } },
@@ -34,7 +36,79 @@ export const THEMES = {
   neon: { name: 'Neon', dark: true, vars: { bg: '#0b0b1a', fg: '#d6d6f5', title: '#22d3ee', accent: '#f472b6', 'code-bg': '#15152e', 'code-fg': '#e0e0ff', font: MONO, 'cover-bg': 'radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)', 'cover-fg': '#f0abfc' } },
   business: { name: 'Business', vars: { bg: '#ffffff', fg: '#27303f', title: '#ffffff', accent: '#b91c1c', 'code-bg': '#f3f4f6', 'code-fg': '#111827', font: SANS, bar: '#0b2545', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)', 'cover-fg': '#ffffff' } },
 }
-export const themeOf = id => THEMES[id] || THEMES.jbt
+export const DEFAULT_THEME = 'hell'
+// built-in and own themes; reactive, so menus and the editor CSS follow edits
+export const THEMES = reactive({ ...BUILTIN })
+export const themeOf = id => THEMES[id] || THEMES[DEFAULT_THEME]
+export const isBuiltin = id => Object.hasOwn(BUILTIN, id)
+// ids for menus: the built-in ones or the user's own (the editor's preview draft is neither)
+export const themeIds = own => Object.keys(THEMES).filter(id => !THEMES[id].draft && !!THEMES[id].custom === !!own)
+
+// --- own themes ---
+// the variables a theme may set (the editor offers these)
+export const THEME_VARS = ['bg', 'fg', 'title', 'accent', 'accent-fg', 'code-bg', 'code-fg', 'rule', 'bar', 'bar-fg', 'cover-bg', 'cover-fg', 'font', 'heading-font', 'heading-weight']
+export const validThemeId = id => typeof id === 'string' && /^[\w-]{1,40}$/.test(id)
+const THEME_KEY = 'slides-builder:themes'
+// a theme from storage or a file (untrusted): known variables only, values that cannot leave their declaration
+export function cleanTheme(th) {
+  const name = typeof th?.name === 'string' ? th.name.trim().slice(0, 60) : ''
+  if (!name) return null
+  const vars = Object.fromEntries(Object.entries(th.vars && typeof th.vars === 'object' ? th.vars : {})
+    .filter(([k, v]) => THEME_VARS.includes(k) && typeof v === 'string' && v.trim() && !/[;{}<>]/.test(v)).map(([k, v]) => [k, v.trim().slice(0, 1000)]))
+  const layouts = (Array.isArray(th.layouts) ? th.layouts : []).filter(l => Array.isArray(l) && /^[\w-]{1,30}$/.test(l[0]) && typeof l[1] === 'string').map(([id, n]) => [id, n.slice(0, 40)])
+  // no '<': the CSS also lands in the <style> of HTML exports
+  const css = typeof th.css === 'string' ? th.css.replace(/</g, '').trim().slice(0, 200_000) : ''
+  return {
+    name, custom: true, ...(th.dark === true && { dark: true }), vars, ...(css && { css }), ...(th.base === false && { base: false }),
+    ...(layouts.length && { layouts }), ...(/^[\w@/.-]{1,100}$/.test(th.slidev) && { slidev: th.slidev }), ...(/^[\w@/.:#+-]{1,200}$/.test(th.pkg) && { pkg: th.pkg }),
+  }
+}
+try {
+  const own = JSON.parse(globalThis.localStorage?.getItem(THEME_KEY) || '{}')
+  for (const [id, th] of Object.entries(own || {})) { const c = cleanTheme(th); if (c && validThemeId(id) && !isBuiltin(id)) THEMES[id] = c }
+} catch { /* private mode or broken entry: no own themes */ }
+const persistThemes = () => {
+  try { localStorage.setItem(THEME_KEY, JSON.stringify(Object.fromEntries(themeIds(true).map(id => [id, toRaw(THEMES[id])])))) } catch {}
+}
+// a free id for a theme name ('Mein Theme' -> 'mein-theme', 'mein-theme-2' …)
+export function newThemeId(name) {
+  const base = String(name).toLowerCase().normalize('NFKD').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'theme'
+  let id = base
+  for (let n = 2; THEMES[id]; n++) id = `${base}-${n}`
+  return id
+}
+// stores an own theme (new or changed); built-in ids stay built-in
+export function saveTheme(id, th) {
+  const c = cleanTheme(th)
+  if (!c || !validThemeId(id) || isBuiltin(id)) throw new Error('invalid theme')
+  THEMES[id] = c
+  persistThemes()
+  return id
+}
+export function deleteTheme(id) {
+  if (!THEMES[id]?.custom) return
+  delete THEMES[id]
+  persistThemes()
+}
+// the editor's live preview: an unsaved theme under its own id, never stored
+export const DRAFT = '_draft'
+export function setDraft(th) {
+  const c = th && cleanTheme(th)
+  if (c) THEMES[DRAFT] = { ...c, draft: true }
+  else delete THEMES[DRAFT]
+}
+// .theme.json: what an export writes and an import reads
+export function themeFile(id) {
+  const { custom, draft, ...th } = toRaw(THEMES[id])
+  return { format: 'slidecko-theme', version: 1, id, ...th }
+}
+// an imported theme keeps its id (so projects using it find it again) unless that is a built-in one
+export function importTheme(d) {
+  const c = cleanTheme(d)
+  if (!c) throw new Error('invalid theme')
+  const id = validThemeId(d.id) && !isBuiltin(d.id) && d.id !== DRAFT ? d.id : newThemeId(c.name)
+  return saveTheme(id, c)
+}
 
 // CSS variables of a theme as an inline style object (editor) or declaration text (export)
 // relative brightness 0..1 of a hex or rgb() colour
@@ -81,8 +155,8 @@ export function typoCss(R, t = {}, L = l => `.layout-${l}`) {
 export const LAYOUTS = [
   ['default', 'Inhalt'], ['cover', 'Titelfolie'], ['intro', 'Einleitung'], ['section', 'Abschnitt'],
   ['statement', 'Aussage'], ['fact', 'Kennzahl'], ['quote', 'Zitat'], ['center', 'Zentriert'], ['end', 'Ende'],
-  ['quiz', 'Quiz', 'jbt'], ['hands-on', 'Hands-on', 'jbt'],
 ]
+export const themeLayouts = id => [...LAYOUTS, ...(themeOf(id).layouts || [])]
 
 export function themeCss(R, L) {
   const cover = CENTERED.map(n => R + L(n)).join(', ')
@@ -98,7 +172,7 @@ ${content} { background: var(--bar, none) 0 0 / 100% 85px no-repeat, var(--bg); 
 ${content} h1 { color: var(--bar-fg, var(--title)); }
 ${content} h1 { box-shadow: 0 3px 0 var(--rule, transparent); }
 ${cover} { background: var(--cover-bg, var(--bg)); color: var(--cover-fg, var(--fg)); text-align: center; }
-${cover} :is(h1, h2, h3) { color: var(--cover-fg, var(--title)); }
+:is(${cover}) :is(h1, h2, h3) { color: var(--cover-fg, var(--title)); }
 ${R}${L('cover')} h1, ${R}${L('intro')} h1 { font-size: 56px; line-height: 64px; }
 ${R}${L('cover')} h2, ${R}${L('intro')} h2 { font-size: 26px; line-height: 34px; font-weight: 400; opacity: 0.85; }
 ${R}${L('section')} h1 { font-size: 52px; line-height: 60px; }
@@ -156,12 +230,20 @@ ${R} [data-callout] > * { margin: 0; }
 ${R} [data-callout] > * + * { margin-top: 6px; }
 ${CALLOUTS.map(([k, , c]) => `${R} [data-callout="${k}"] { --c: ${c}; }`).join('\n')}`
 
-// all rules the editor needs (injected once)
-export const editorCss = () =>
-  themeCss('.slide:not(.theme-jbt)', n => `.layout-${n}`) + tableCss('.slide') + calloutCss('.slide')
+// all rules the editor needs; themes with base: false bring all their rules in their own CSS
+const ownCss = (R, th) => th.css ? `${R} {\n${th.css}\n}\n` : ''
+export const editorCss = () => {
+  const own = Object.keys(THEMES).filter(id => THEMES[id].base === false).map(id => `.theme-${id}`)
+  return themeCss(own.length ? `.slide:not(${own.join(', ')})` : '.slide', n => `.layout-${n}`) + tableCss('.slide') + calloutCss('.slide') + '\n' +
+    Object.entries(THEMES).map(([id, th]) => ownCss(`.theme-${id}`, th)).join('')
+}
 
-// style.css of an exported Slidev project using a generic theme
-export const slidevThemeCss = id => `/* Theme „${themeOf(id).name}“ – erzeugt von Slidecko */
-.slidev-layout { ${decls(id)} --accent-fg: #fff; --stripe: color-mix(in srgb, var(--fg) 6%, transparent); --border: color-mix(in srgb, var(--fg) 16%, transparent); font-family: var(--font, inherit); }
-${themeCss('.slidev-layout', n => `.${n}`)}
-`
+// style.css of an exported Slidev project using a theme that is no Slidev package
+// shortcut: own CSS maps `.layout-x` to Slidev's `.x` by text, enough for selectors written like the editor's
+export const slidevThemeCss = id => {
+  const th = themeOf(id)
+  return `/* Theme „${th.name}“ – erzeugt von Slidecko */
+.slidev-layout { --accent-fg: #fff; --stripe: color-mix(in srgb, var(--fg) 6%, transparent); --border: color-mix(in srgb, var(--fg) 16%, transparent); ${decls(id)} font-family: var(--font, inherit); }
+${th.base === false ? '' : themeCss('.slidev-layout', n => `.${n}`)}
+${th.css ? ownCss('.slidev-layout', { css: th.css.replace(/\.layout-([\w-]+)/g, '.$1') }) : ''}`
+}

@@ -5,6 +5,7 @@ import { W, H, deck, ui, uid, cleanEl, cleanSlides, newSlide, storeImage, deckDa
 import { ELEMENTS, SLIDE_PRESETS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
 import { formatSize } from './format.js'
+import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
 import { importPptx, importOdp, importPdf } from './importOffice.js'
 import { toSlidev, slideToMarkdown, slideHash, imagePath } from './toSlidev.js'
@@ -323,7 +324,10 @@ async function importReport(r) {
 function detectTheme(md) {
   const head = md.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] || ''
   const t = head.match(/^theme:\s*['"]?([^'"\s]+)/m)?.[1] || 'default'
-  if (t === 'jbt-theme' || t.startsWith('.') || t.startsWith('/')) return 'jbt' // the JBT Theme package or a project-local theme
+  // a Slidev theme package one of the editor's themes stands for (e.g. an imported JBT Theme); a project-local theme: the first such theme
+  const pkg = Object.keys(THEMES).filter(id => THEMES[id].slidev && !THEMES[id].draft)
+  const hit = pkg.find(id => THEMES[id].slidev === t) || ((t.startsWith('.') || t.startsWith('/')) && pkg[0])
+  if (hit) return hit
   if (/seriph/.test(t)) return 'serif'
   return /colorSchema:\s*dark/.test(head) ? 'dunkel' : 'hell'
 }

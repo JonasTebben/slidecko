@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import AppFooter from './AppFooter.vue'
 import Menu from './Menu.vue'
 import { deck, library, ui, createProject, openProject, removeProject, duplicateProject, projectFile, renameProject } from './store.js'
-import { THEMES, themeOf, themeStyle } from './themes.js'
+import { THEMES, themeOf, themeStyle, themeIds, DEFAULT_THEME } from './themes.js'
 import { SLIDE_PRESETS } from './presets.js'
 import { importPresentations, IMPORT_ACCEPT, download, exportAllProjects } from './actions.js'
 import { t, lang } from './i18n.js'
@@ -81,7 +81,7 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
       <h1>{{ t('Präsentationen im Browser gestalten') }}</h1>
       <p class="lead">{{ t('Fang neu an oder zieh eine Präsentation auf diese Seite: PowerPoint, OpenDocument, PDF, Bilder oder ein Slidev-Projekt.') }}</p>
       <div class="start-grid">
-        <button class="start-card primary" @click="blank('jbt')"><Icon name="plus" :size="28" /><b>{{ t('Neue Präsentation') }}</b><small>{{ t('Leere Präsentation im aktuellen Standard-Theme') }}</small></button>
+        <button class="start-card primary" @click="blank(DEFAULT_THEME)"><Icon name="plus" :size="28" /><b>{{ t('Neue Präsentation') }}</b><small>{{ t('Leere Präsentation im aktuellen Standard-Theme') }}</small></button>
         <label class="start-card"><Icon name="folder" :size="28" /><b>{{ t('Slidev-Projekt öffnen') }}</b><small>{{ t('Ordner mit slides.md wählen – Foliensätze, Bilder und Theme werden übernommen') }}</small>
           <input type="file" webkitdirectory hidden @change="emit('import', [...$event.target.files]); $event.target.value = ''" /></label>
         <label class="start-card"><Icon name="upload" :size="28" /><b>{{ t('Markdown-Dateien öffnen') }}</b><small>{{ t('Einzelne .md-Foliensätze, z. B. von einer KI erzeugt') }}</small>
@@ -96,12 +96,15 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
 
     <section class="home-themes">
       <h2>{{ t('Mit Theme beginnen') }}</h2>
-      <div class="theme-strip">
-        <button v-for="(th, id) in THEMES" :key="id" class="home-theme" :style="themeStyle(id)" :title="t('Neue Präsentation im Theme {0}', t(th.name))" @click="blank(id)">
-          <span class="theme-cover"><b>{{ t('Titel') }}</b><i /></span>
-          <span class="theme-name">{{ t(th.name) }}</span>
-        </button>
-      </div>
+      <template v-for="own in [false, true]" :key="own">
+        <h3 v-if="themeIds(own).length" class="theme-group">{{ own ? t('Eigene Themes') : t('Vorgegebene Themes') }}</h3>
+        <div class="theme-strip">
+          <button v-for="id in themeIds(own)" :key="id" class="home-theme" :style="themeStyle(id)" :title="t('Neue Präsentation im Theme {0}', own ? THEMES[id].name : t(THEMES[id].name))" @click="blank(id)">
+            <span class="theme-cover"><b>{{ t('Titel') }}</b><i /></span>
+            <span class="theme-name">{{ own ? THEMES[id].name : t(THEMES[id].name) }}</span>
+          </button>
+        </div>
+      </template>
     </section>
 
     <section class="home-projects">

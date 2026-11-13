@@ -3,7 +3,7 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { listAt } from './lists.js'
 import Icon from './Icon.vue'
 import { deck, ui, SHAPES, deckOfSlide, clean, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches } from './store.js'
-import { LAYOUTS, TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
+import { themeLayouts, TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
 import { LANGS, codeOpts, withLines } from './hl.js'
 import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook } from './actions.js'
 import * as table from './tableOps.js'
@@ -27,7 +27,8 @@ const setBorder = mode => { const b = border.value; tbl(table.toggleBorder, mode
 const onSelection = () => { listKind.value = listAt(getSelection().anchorNode) }
 onMounted(() => document.addEventListener('selectionchange', onSelection))
 onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelection))
-const layouts = computed(() => LAYOUTS.filter(l => !l[2] || l[2] === deck.theme || l[0] === slide.value.layout))
+// the theme's own layouts join the common ones; a slide keeps a layout the theme does not know
+const layouts = computed(() => { const l = themeLayouts(deck.theme); return l.some(x => x[0] === slide.value.layout) ? l : [...l, [slide.value.layout, slide.value.layout]] })
 const langs = computed(() => (el.value?.lang && !LANGS.includes(el.value.lang) ? [el.value.lang, ...LANGS] : LANGS))
 // code backgrounds: light editor greys and the usual dark editor themes
 const CODE_BGS = ['#ffffff', '#f6f8fa', '#f1f5f9', '#fdf6e3', '#fef9c3', '#e0f2fe', '#0d1117', '#1e293b', '#282a36', '#002b36', '#2e3440', '#000000']

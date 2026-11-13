@@ -6,10 +6,11 @@ import Menu from './Menu.vue'
 import SlideView from './SlideView.vue'
 import Inspector from './Inspector.vue'
 import Home from './Home.vue'
+import ThemeEditor from './ThemeEditor.vue'
 import { t } from './i18n.js'
 import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides } from './store.js'
 import { parseRatio } from './format.js'
-import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle } from './themes.js'
+import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { SLIDE_PRESETS, PALETTE, FILLS } from './presets.js'
 import { shapeSvg } from './toSlidev.js'
 import { applyUno } from './uno.js'
@@ -187,7 +188,18 @@ function doExport() {
 const THUMB = computed(() => 176 / format.w)
 
 // theme, table and callout rules, generated from the same source as the Slidev export
-document.head.appendChild(Object.assign(document.createElement('style'), { textContent: editorCss() }))
+// (rebuilt when own themes change)
+const themeRules = document.head.appendChild(document.createElement('style'))
+watchEffect(() => { themeRules.textContent = editorCss() })
+// --- own themes: editor, import ---
+const themeEditor = ref()
+const themeName = id => (THEMES[id]?.custom ? THEMES[id].name : t(themeOf(id).name))
+async function importThemeFiles(files) {
+  for (const f of files) {
+    try { const id = importTheme(JSON.parse(await f.text())); setTheme(id); A.toast(t('Theme „{0}“ importiert', THEMES[id].name)) }
+    catch { A.toast(t('{0} ist keine gültige Theme-Datei', f.name)) }
+  }
+}
 // --- theme switch: keep the type sizes of the current theme, so boxes and line breaks stay put ---
 const keepSizes = ref((() => { try { return localStorage.getItem('slides-builder:keep-sizes') !== '0' } catch { return true } })())
 watch(keepSizes, v => { try { localStorage.setItem('slides-builder:keep-sizes', v ? '1' : '0') } catch {} })
@@ -483,7 +495,8 @@ const commands = computed(() => [
   [t('Alle Befehle und Tastenkürzel'), openPalette, 'mod+k'],
   [t('Diese Folie auf Import-Stand zurücksetzen'), () => A.revertSlides([slide.value])],
   [t('Alle geänderten Folien auf Import-Stand zurücksetzen'), () => ask(t('{0} geänderte importierte Folien zurücksetzen? Änderungen daran gehen verloren.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Zurücksetzen'))],
-  ...Object.entries(THEMES).map(([id, th]) => [`Theme: ${th.name}`, () => setTheme(id)]),
+  ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),
+  [t('Theme bearbeiten …'), () => themeEditor.value.open(deck.theme)], [t('Theme importieren …'), () => document.querySelector('[data-theme-import]')?.click()],
 ])
 const KEY_NAMES = { arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→', backspace: '⌫', enter: '↵' }
 const keyLabel = spec => spec && spec.split('+').map(k => ({ mod: isMac ? '⌘' : t('Strg+'), shift: '⇧', alt: isMac ? '⌥' : 'Alt+' }[k] || KEY_NAMES[k] || k.toUpperCase())).join('')
@@ -736,14 +749,22 @@ function onClipboard(e) {
 
       <div class="right">
         <button class="tb icon" :title="`${t('Befehle suchen')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
-        <Menu icon="palette" :label="THEMES[deck.theme].name" title="Theme" wide>
-          <div class="theme-grid">
-            <button v-for="(th, id) in THEMES" :key="id" class="theme-card" :class="{ on: deck.theme === id }" @click="setTheme(id)">
-              <span class="mini-slide"><SlideView :slide="THEME_PREVIEW" :index="0" :theme="id" :style="{ transform: 'scale(0.13)' }" inert /></span>
-              {{ th.name }}
-            </button>
+        <Menu icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
+          <template v-for="own in [false, true]" :key="own">
+            <h4 class="mh">{{ own ? t('Eigene Themes') : t('Vorgegebene Themes') }}</h4>
+            <div class="theme-grid">
+              <button v-for="id in themeIds(own)" :key="id" class="theme-card" :class="{ on: deck.theme === id }" @click="setTheme(id)">
+                <span class="mini-slide"><SlideView :slide="THEME_PREVIEW" :index="0" :theme="id" :style="{ transform: 'scale(0.13)' }" inert /></span>
+                {{ themeName(id) }}
+              </button>
+            </div>
+            <p v-if="own && !themeIds(true).length" class="mh-note">{{ t('Noch keine – bearbeite ein Theme oder importiere eine .theme.json.') }}</p>
+          </template>
+          <div class="mi-row theme-actions">
+            <button class="mi" @click="themeEditor.open(deck.theme)"><Icon name="text" />{{ THEMES[deck.theme]?.custom ? t('Theme bearbeiten …') : t('Als eigenes Theme anpassen …') }}</button>
+            <label class="mi"><Icon name="upload" />{{ t('Importieren …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
           </div>
-          <label class="check keep-sizes" data-keep :title="t('Das neue Theme übernimmt Farben und Schriften, aber die Schriftgrößen des bisherigen – so verschiebt sich kein Layout')"><input v-model="keepSizes" type="checkbox" /> {{ t('Schriftgrößen beim Wechsel beibehalten') }}<small v-if="deck.typo.from">{{ t('aktuell: Größen von „{0}“', THEMES[deck.typo.from]?.name) }}</small></label>
+          <label class="check keep-sizes" data-keep :title="t('Das neue Theme übernimmt Farben und Schriften, aber die Schriftgrößen des bisherigen – so verschiebt sich kein Layout')"><input v-model="keepSizes" type="checkbox" /> {{ t('Schriftgrößen beim Wechsel beibehalten') }}<small v-if="deck.typo.from">{{ t('aktuell: Größen von „{0}“', themeName(deck.typo.from)) }}</small></label>
         </Menu>
         <Menu ref="formatMenu" icon="fullscreen" :label="ratioLabel(deck.aspectRatio)" :title="t('Folienformat (Seitenverhältnis)')">
           <h4 class="mh">Format</h4>
@@ -1031,6 +1052,7 @@ function onClipboard(e) {
     <div v-if="ui.status" class="toast" role="status">{{ ui.status }}<button class="tb icon small" :aria-label="t('Schließen')" @click="ui.status = ''"><Icon name="x" :size="14" /></button></div>
 
     <!-- dialogs -->
+    <ThemeEditor ref="themeEditor" @saved="id => { setTheme(id); A.toast(t('Theme „{0}“ gespeichert', THEMES[id].name)) }" @deleted="id => A.toast(t('Theme gelöscht'))" />
     <dialog ref="dupDialog" @close="dupChoice">
       <form method="dialog">
         <h2>{{ t('Projekt bereits vorhanden') }}</h2>

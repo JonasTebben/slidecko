@@ -394,3 +394,27 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 
 /* format painter: the next click on an element takes the copied format */
 .slide.painting .el { cursor: copy; }
+
+/* themes: groups in menu and home, theme editor */
+.mh-note { margin: 0 10px 6px; font-size: 12px; color: var(--ui-muted); max-width: 540px; }
+.theme-actions { margin: 6px 4px 2px; }
+.theme-actions .mi { gap: 6px; }
+.home .theme-group { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ui-muted); margin: 14px 0 8px; }
+dialog.theme-editor { width: min(940px, calc(100vw - 32px)); }
+.te-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; max-height: min(64vh, 620px); }
+.te-fields { overflow: auto; padding-right: 6px; display: flex; flex-direction: column; gap: 6px; }
+.te-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 12.5px; }
+.te-row > input, .te-row > select { height: 30px !important; }
+.te-color { display: flex; gap: 6px; }
+.te-color input[type=color] { width: 34px; height: 30px; padding: 2px; border: 1px solid var(--ui-line); border-radius: 6px; background: none; flex: none; cursor: pointer; }
+.te-color input:not([type]) { flex: 1; min-width: 0; height: 30px; font-family: ui-monospace, monospace; font-size: 11.5px; }
+.te-css { margin-top: 6px; font-size: 12.5px; }
+.te-css summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.te-css p { font-size: 12px; margin: 4px 0 6px; }
+.te-css textarea { width: 100%; box-sizing: border-box; font: 11.5px/1.45 ui-monospace, monospace; padding: 8px; border: 1px solid var(--ui-line); border-radius: 6px; resize: vertical; margin-bottom: 6px; }
+.te-preview { display: flex; flex-direction: column; gap: 12px; }
+.te-mini { position: relative; display: block; width: calc(980px * 0.34); height: calc(552px * 0.34); overflow: hidden; border-radius: 6px; box-shadow: 0 0 0 1px var(--ui-line); }
+.te-mini > .slide { position: absolute; left: 0; top: 0; pointer-events: none; }
+dialog.theme-editor menu .te-gap { flex: 1; }
+dialog.theme-editor menu button.danger { color: var(--ui-danger); }
+@media (max-width: 760px) { .te-body { grid-template-columns: 1fr; max-height: none; } .te-preview { display: none; } }

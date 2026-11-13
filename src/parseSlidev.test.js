@@ -1,7 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { parseSlidev, headFormat } from './parseSlidev.js'
 import { toSlidev, slideHash, slideToMarkdown } from './toSlidev.js'
+import { importTheme } from './themes.js'
+
+// the JBT Theme is no built-in theme: the tests use it the way a user does, imported from its file
+importTheme(JSON.parse(readFileSync(new URL('../themes/jbt.theme.json', import.meta.url), 'utf8')))
 
 const md = `---
 theme: ./theme

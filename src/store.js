@@ -1,7 +1,7 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { slideHash } from './toSlidev.js'
-import { THEMES, fontStack, SHADOWS } from './themes.js'
+import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile } from './themes.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
 
@@ -33,7 +33,7 @@ export function setFormat(aspectRatio = '16/9', canvasWidth = 980) {
 // assets: { id: dataURL } – kept out of the slides so undo snapshots and duplicates stay small.
 // files: other files of the Slidev project (theme/, package.json, global components …) as text or
 // data URL, written back unchanged on export so the project keeps working.
-export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: 'jbt', aspectRatio: '16/9', canvasWidth: 980, entry: 'slides.md', slides: [], assets: {}, files: {} })
+export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, entry: 'slides.md', slides: [], assets: {}, files: {} })
 // sel: selected element ids (last = primary); editing: id of the element being typed in
 export const ui = reactive({ slide: 0, sel: [], editing: null, status: '', cell: null, cellEnd: null, cellFill: false, crop: null, cropRatio: null, look: null, painting: false, home: false, save: 'saved', yt: false }) // save: saving | saved | failed; yt: YouTube content allowed in this tab (privacy: nothing loads from Google before a click; kept in sessionStorage)
 export const library = reactive({ list: [] }) // [{ id, title, theme, slides, decks, updated }]
@@ -147,11 +147,14 @@ export function loadDeck(d) {
   if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && !k.includes('..')))
   deck.title = String(d.title || t('Präsentation')).slice(0, 200)
   deck.source = typeof d.source === 'string' ? d.source.slice(0, 200) : '' // Slidev folder it was imported from
-  deck.theme = d.theme in THEMES ? d.theme : 'jbt'
+  // an own theme the project file carries joins this browser's unless one with that id exists already;
+  // an unknown id stays (shown in the default theme), so importing that theme later brings the look back
+  if (d.themeDef && validThemeId(d.theme) && !THEMES[d.theme]) try { importTheme({ ...d.themeDef, id: d.theme }) } catch { /* broken definition: default look */ }
+  deck.theme = validThemeId(d.theme) ? d.theme : DEFAULT_THEME
   setFormat(d.aspectRatio, d.canvasWidth)
   // project-wide type sizes in px (text, title, code); anything else is dropped
   // (from: the theme whose sizes were kept on a theme switch; line/liLine are unitless ratios)
-  deck.typo = Object.fromEntries(Object.entries(d.typo || {}).filter(([k, v]) => k === 'from' ? v in THEMES
+  deck.typo = Object.fromEntries(Object.entries(d.typo || {}).filter(([k, v]) => k === 'from' ? validThemeId(v)
     : ['text', 'title', 'titleLine', 'h2', 'h3', 'code', 'codeLine'].includes(k) ? Number.isFinite(v) && v >= 4 && v <= 160
       : ['line', 'liLine'].includes(k) && Number.isFinite(v) && v > 0.5 && v < 4))
   deck.entry = /^[\w./-]+\.md$/.test(d.entry) ? d.entry.replace(/^\/+/, '') : 'slides.md'
@@ -198,6 +201,8 @@ export const STYLE_PROPS = ['fontSize', 'font', 'color', 'fill', 'align', 'valig
 export const blockTag = el => el.html?.match(/<(h[1-6]|p|blockquote|pre)\b/i)?.[1].toLowerCase()
 export const styleMatches = (p, el) => el.type === 'text' && blockTag(el) === p.tag && STYLE_PROPS.every(k => (p[k] ?? undefined) === (el[k] ?? undefined))
 // only the styles the slides use go into a project file
+// an own theme rides along in the project file, so another browser shows it too
+const themeDef = id => (THEMES[id]?.custom ? themeFile(id) : undefined)
 const usedStyles = slides => toRaw(textStyles.list).filter(p => slides.some(s => s.elements.some(e => styleMatches(p, e))))
 // styles from a file join the browser's; one with a name already taken here keeps the browser's version
 export function mergeTextStyles(list) {
@@ -208,7 +213,7 @@ export function mergeTextStyles(list) {
 const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, entry: deck.entry, slides: deck.slides })
 export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
-export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides) })
+export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
 
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const readDataUrl = blob => new Promise((res, rej) => {
@@ -352,7 +357,7 @@ export async function projectFile(id) {
   if (!json) throw new Error(t('Projekt nicht gefunden'))
   const updated = library.list.find(p => p.id === id)?.updated
   const d = JSON.parse(json)
-  return JSON.stringify({ format: 'slides-builder', version: 1, id, updated, ...d, assets: assets || {}, files: files || {}, styles: usedStyles(d.slides) })
+  return JSON.stringify({ format: 'slides-builder', version: 1, id, updated, ...d, assets: assets || {}, files: files || {}, styles: usedStyles(d.slides), themeDef: themeDef(d.theme) })
 }
 // a .slides.json goes back into the project it was saved from (id) instead of a copy next to it;
 // a backup older than the browser copy must not overwrite newer work: it comes in as a separate copy
