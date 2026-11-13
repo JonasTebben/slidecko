@@ -30,10 +30,10 @@ railway logs --service slidecko
 
 ## Seiten, Fußzeile, Unterstützung, Datenschutz
 
-- **Landing Page** `index.html` (Englisch, statisches HTML ohne Framework) unter `/`, mit Icon `public/icon.png` und Screenshots `public/shots/`. Die App selbst liegt unter `/app/` (`app/index.html`); `server.js` leitet `/app` auf `/app/` um. tools.tebben.dev verlinkt nur per Kachel hierher.
-- **Fußzeile** (`src/AppFooter.vue`, in Editor und Projektübersicht): „Slidecko ist ein kostenloses Tool von Jonas Tebben“ mit Links zu `slidecko.tebben.dev` und `tebben.dev`, Impressum (`jonas-tebben.de/legal-notice/`), Datenschutz (`../datenschutz.html`) und dem Sprachumschalter.
-- **Spendenlink (Stripe)**: Den Payment Link in `src/support.js` bei `SUPPORT_URL` eintragen (Stripe-Dashboard → Payment Links → „Kunde wählt den Preis“, SEPA-Lastschrift aktivieren). Ist er leer, fehlt der Kaffee-Link in der Fußzeile, und `vite.config.js` entfernt beim Build den Abschnitt zwischen `<!-- stripe -->` und `<!-- /stripe -->` aus `datenschutz.html`. Nach dem Eintragen neu bauen und deployen.
-- **Datenschutzseite** `datenschutz.html` (wird von Vite mitgebaut, nicht aus `public/` kopiert): die einzige Datenschutzseite von Slidecko. Sie gilt für `slidecko.tebben.dev`; Landing Page und App verlinken auf sie. Die Abschnittsnummern zählt CSS, damit beim Weglassen von Stripe keine Lücke entsteht.
+- **Landing Page** `index.html` und **Impressum/Datenschutz** `legal.html`: statisches HTML ohne Framework, Deutsch und Englisch in derselben Datei (`data-l="de|en"`), gemeinsames `public/site.css` und `public/site.js` (Sprachumschalter, Screenshot-Dialog, Anschrift/E-Mail rückwärts im HTML). Die Sprache steht unter demselben Schlüssel wie in der App (`slides-builder:lang`) und gilt deshalb für Seiten und App. Icon `public/icon.png` (aus tebben.dev `packages/brand`, `bun run icons`), Screenshots `public/shots/`. Die App selbst liegt unter `/app/` (`app/index.html`); `server.js` leitet `/app` auf `/app/` um. tools.tebben.dev verlinkt nur per Kachel hierher.
+- **Fußzeile** (`src/AppFooter.vue`, in Editor und Projektübersicht): „Slidecko ist ein kostenloses Tool von Jonas Tebben“ mit Links zu `slidecko.tebben.dev` und `tebben.dev`, Impressum (`../legal.html#impressum`), Datenschutz (`../legal.html#privacy`) und dem Sprachumschalter.
+- **Spendenlink (Stripe)**: Den Payment Link in `src/support.js` bei `SUPPORT_URL` eintragen (Stripe-Dashboard → Payment Links → „Kunde wählt den Preis“, SEPA-Lastschrift aktivieren). Ist er leer, fehlt der Kaffee-Link in der Fußzeile, und `vite.config.js` entfernt beim Build den Abschnitt zwischen `<!-- stripe -->` und `<!-- /stripe -->` aus `legal.html`. Nach dem Eintragen neu bauen und deployen.
+- **Impressum und Datenschutz** `legal.html` (wird von Vite mitgebaut, nicht aus `public/` kopiert): die einzige Rechtsseite von Slidecko, Deutsch verbindlich, Englisch Übersetzung. Sie gilt für `slidecko.tebben.dev`; Landing Page und App verlinken auf sie.
 - **YouTube** lädt erst nach Klick auf „YouTube-Inhalte laden“ (`src/SlideView.vue`, Merker `ui.yt`, pro Tab im sessionStorage). Exporte blenden den Button aus (`src/exportFormats.js`).
 
 **Vor dem Livegang offen:**
@@ -52,17 +52,17 @@ Die Oberfläche gibt es auf Deutsch und Englisch (`src/i18n.js`). Ohne gespeiche
 
 ## Datenschutz beim eigenen Hosting
 
-Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklärung. `datenschutz.html` nennt Jonas Tebben als Verantwortlichen und Railway als Hoster; beides muss angepasst werden (oder die Seite ersetzt und der Link in `src/AppFooter.vue` geändert). Was die App selbst tut, steht hier; Hosting, Server-Logs usw. kommen vom jeweiligen Betreiber dazu.
+Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklärung. `legal.html` nennt Jonas Tebben als Verantwortlichen und Railway als Hoster; beides muss angepasst werden (oder die Seite ersetzt und der Link in `src/AppFooter.vue` geändert). Was die App selbst tut, steht hier; Hosting, Server-Logs usw. kommen vom jeweiligen Betreiber dazu.
 
 | Wo | Was | Wie lange |
 |---|---|---|
 | IndexedDB `slides-builder` | Projekte (Folien, Bilder, Projektdateien), Projektliste | bis zum Löschen des Projekts („Entfernen“) oder der Website-Daten |
-| localStorage `slides-builder:*` | zuletzt geöffnetes Projekt (`last`), Sprache (`lang`), Exportformat (`export`), „Schriftgrößen beibehalten“ (`keep-sizes`), eigene Textstile (`text-presets`), Suchoptionen ohne Suchbegriff (`find`) | dauerhaft |
+| localStorage `slides-builder:*` | zuletzt geöffnetes Projekt (`last`), Sprache (`lang`), Exportformat (`export`), „Schriftgrößen beibehalten“ (`keep-sizes`), eigene Textstile (`text-presets`), importierte Themes (`themes`), Suchoptionen ohne Suchbegriff (`find`) | dauerhaft (Sprache gilt auch für Landing Page und `legal.html`) |
 | sessionStorage `slides-builder:session` | Ansicht des Tabs (Projekt, Folie, Auswahl, eingeklappte Foliensätze, Scrollposition), Suchbegriff, YouTube-Freigabe | bis der Tab geschlossen wird |
 
 - Die App setzt keine Cookies, nutzt kein Tracking und lädt keine Daten hoch. Importe werden im Browser gelesen, Exporte im Browser erzeugt.
 - YouTube wird erst nach einem Klick auf „YouTube-Inhalte laden“ geladen: Vorschaubilder von `i.ytimg.com`, der Player von `www.youtube-nocookie.com`. Dabei gehen Daten an Google. Rechtsgrundlage ist die Einwilligung durch den Klick. Die Freigabe gilt pro Tab.
-- Ändert sich, was die App speichert (`src/session.js`, `src/store.js`, `src/i18n.js`), müssen diese Tabelle und `datenschutz.html` mitgezogen werden.
+- Ändert sich, was die App speichert (`src/session.js`, `src/store.js`, `src/i18n.js`), müssen diese Tabelle und `legal.html` (beide Sprachen) mitgezogen werden.
 
 ## Was es kann
 
@@ -115,7 +115,7 @@ Wer Slidecko selbst öffentlich betreibt, braucht eine eigene Datenschutzerklär
 | `src/AppFooter.vue`, `src/support.js` | Fußzeile, Stripe-Link |
 | `index.html` | Landing Page (`/`) |
 | `app/index.html` | Einstieg der App (`/app/`) |
-| `datenschutz.html` | Datenschutzseite für den Betrieb auf Railway |
+| `legal.html` | Impressum und Datenschutz (DE/EN) für den Betrieb auf Railway |
 
 ## Bekannte Grenzen
 
