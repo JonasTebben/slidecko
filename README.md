@@ -42,7 +42,7 @@ railway logs --service slidecko
 
 ## Sprachen
 
-Die Oberfläche gibt es auf Deutsch und Englisch (`src/i18n.js`). Ohne gespeicherte Wahl gilt die Browsersprache (Deutsch, sonst Englisch); die Wahl steht im localStorage (`slides-builder:lang`). Der Wechsel über die Fußzeile wirkt sofort, ohne Neuladen.
+Die Oberfläche gibt es auf Deutsch und Englisch (`src/i18n.js`). Ohne gespeicherte Wahl gilt die Browsersprache (Deutsch, sonst Englisch); die Wahl steht im localStorage (`slides-builder:lang`). Ein Link mit `?lang=de` oder `?lang=en` (in der App, auf der Landing Page und in `legal.html`, dort auch ein englischer Anker wie `#privacy-en`) wählt die Sprache und speichert sie ebenso. Der Wechsel über die Fußzeile wirkt sofort, ohne Neuladen.
 
 - Im Code steht der deutsche Text: `t('Folie {0} von {1}', a, b)`. Das Wörterbuch `src/locales/en.js` ordnet ihm die Übersetzung zu; fehlt sie, erscheint der deutsche Text.
 - Neue UI-Texte immer in `t()` setzen und in `src/locales/en.js` eintragen. Labels in Konstanten (z. B. `presets.js`, `themes.js`) bleiben deutsch und werden erst beim Anzeigen mit `t(x.name)` übersetzt.
