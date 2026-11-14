@@ -39,9 +39,11 @@ function nearest(edges, lines) {
   return best
 }
 function track(e, move, done) {
-  const up = ev => { removeEventListener('pointermove', move); guides.value = { x: null, y: null }; done?.(ev) }
+  // a touch the browser takes over (scrolling, a system gesture) ends with pointercancel instead of pointerup
+  const up = ev => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); guides.value = { x: null, y: null }; done?.(ev) }
   addEventListener('pointermove', move)
-  addEventListener('pointerup', up, { once: true })
+  addEventListener('pointerup', up)
+  addEventListener('pointercancel', up)
 }
 
 function down(e, el) {
@@ -53,6 +55,17 @@ function down(e, el) {
   if (e.shiftKey || e.metaKey || e.ctrlKey) {
     ui.sel = selected(el) ? ui.sel.filter(id => id !== el.id) : [...ui.sel, el.id]
     return
+  }
+  // touch: tapping the selected box again starts typing (a double tap is easy to miss on a small slide)
+  if (e.pointerType === 'touch' && ui.sel.length === 1 && selected(el) && el.type !== 'image') {
+    const at = { currentTarget: e.currentTarget, target: e.target, clientX: e.clientX, clientY: e.clientY }
+    addEventListener('pointerup', ev => {
+      if (Math.hypot(ev.clientX - at.clientX, ev.clientY - at.clientY) >= 8) return
+      // focus right in the gesture, or iOS keeps the keyboard closed; edit() then places the caret
+      const c = at.currentTarget.querySelector('.content')
+      if (c && el.type !== 'table') { c.contentEditable = 'true'; c.focus() }
+      edit(at, el)
+    }, { once: true })
   }
   if (!selected(el)) ui.sel = [el.id]
   else ui.sel = [...ui.sel.filter(id => id !== el.id), el.id] // primary = the one being dragged

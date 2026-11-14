@@ -70,7 +70,7 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
 </script>
 
 <template>
-  <div class="home" :class="{ dragging }" @dragover="over" @dragleave.self="dragging = false" @drop.prevent="onDrop">
+  <main class="home" :class="{ dragging }" @dragover="over" @dragleave.self="dragging = false" @drop.prevent="onDrop">
     <div v-if="dragging" class="drop-hint" aria-hidden="true"><Icon name="upload" :size="36" /><b>{{ t('Loslassen zum Öffnen') }}</b><small>{{ t('Slidev-Ordner, .md, .slides.json, .pptx, .odp, .pdf, .html oder Bilder') }}</small></div>
     <header class="home-head">
       <span class="brand"><Icon name="slides" :size="24" /> Slidecko</span>
@@ -149,5 +149,5 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
     </section>
 
     <AppFooter class="in-home" />
-  </div>
+  </main>
 </template>

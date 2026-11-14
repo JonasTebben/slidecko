@@ -45,12 +45,12 @@ defineExpose({
 </script>
 
 <template>
-  <button v-if="label || icon" ref="btn" class="tb" :class="{ primary }" :popovertarget="id" :title="title" aria-haspopup="menu">
+  <button v-if="label || icon" ref="btn" class="tb" :class="{ primary }" :popovertarget="id" :title="title" :aria-label="label || title">
     <Icon v-if="icon" :name="icon" />
     <span v-if="label">{{ label }}</span>
     <Icon name="chevron" :size="14" class="chev" />
   </button>
-  <div :id="id" ref="pop" :popover="manual ? 'manual' : 'auto'" class="menu" :class="{ wide }" role="menu" @mousedown="keep && $event.preventDefault()" @toggle="place" @click="clicked" @keydown="keys">
+  <div :id="id" ref="pop" :popover="manual ? 'manual' : 'auto'" class="menu" :class="{ wide }" @mousedown="keep && $event.preventDefault()" @toggle="place" @click="clicked" @keydown="keys">
     <slot />
   </div>
 </template>

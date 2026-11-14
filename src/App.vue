@@ -299,7 +299,11 @@ watch([() => ui.home, ready], async () => {
   if (stage.value) new ResizeObserver(([e]) => { stageBox = e.contentRect; fitStage() }).observe(stage.value)
 })
 let stageBox
-const fitStage = () => { if (stageBox) scale.value = Math.max(0.1, Math.min((stageBox.width - 64) / format.w, (stageBox.height - 64) / format.h)) }
+const fitStage = () => {
+  if (!stageBox) return
+  const pad = stageBox.width < 600 ? 24 : 64 // phones: the slide takes the width
+  scale.value = Math.max(0.1, Math.min((stageBox.width - pad) / format.w, (stageBox.height - pad) / format.h))
+}
 watch(format, () => { fitStage(); fitPresenter() })
 watch(() => ui.slide, () => { ui.sel = []; ui.editing = null })
 async function showView(v) {
@@ -445,7 +449,8 @@ function addVideo() {
 
 // --- presenting ---
 const fitPresenter = () => {
-  presentScale.value = presenterView.value ? Math.min((innerWidth * 0.62) / format.w, (innerHeight * 0.7) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
+  const narrow = innerWidth < 760 // phones: presenter view stacks slide, next slide and notes
+  presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
 }
 async function present(from = ui.slide) {
   ui.sel = []
@@ -476,7 +481,7 @@ function presentClick(e) {
   const a = e.target.closest('a[href]')
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (e.target.closest('iframe, .pv-side, .pv-bar')) return
-  A.go(ui.slide + 1)
+  A.go(ui.slide + (e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
@@ -732,6 +737,7 @@ function onClipboard(e) {
         </div>
       </div>
 
+      <div class="bar">
       <div class="tools">
         <Menu icon="plus" :label="t('Folie')" :title="t('Neue Folie (N)')" wide>
           <div class="preset-grid">
@@ -793,7 +799,7 @@ function onClipboard(e) {
         </Menu>
         <Menu ref="formatMenu" icon="fullscreen" :label="ratioLabel(deck.aspectRatio)" :title="t('Folienformat (Seitenverhältnis)')">
           <h4 class="mh">Format</h4>
-          <button v-for="r in formats" :key="r" class="mi" role="menuitemradio" :aria-checked="deck.aspectRatio === r" @click="setFormat(r, deck.canvasWidth)">
+          <button v-for="r in formats" :key="r" class="mi" :aria-pressed="deck.aspectRatio === r" @click="setFormat(r, deck.canvasWidth)">
             <Icon name="check" :style="{ visibility: deck.aspectRatio === r ? null : 'hidden' }" />{{ ratioLabel(r) }}
           </button>
           <hr />
@@ -810,6 +816,7 @@ function onClipboard(e) {
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Einzelnen Foliensatz exportieren …') }}</button>
         </Menu>
         <button class="tb primary" :title="t('Präsentieren (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Präsentieren') }}</span></button>
+      </div>
       </div>
     </header>
 
@@ -841,22 +848,22 @@ function onClipboard(e) {
                 <button class="mi danger" @click="ask(t('Foliensatz „{0}“ mit {1} Folien entfernen?', g.name, g.count), () => A.removeDeck(g.file))"><Icon name="trash" />{{ t('Entfernen') }}</button>
               </Menu>
             </header>
-            <template v-if="!collapsed.has(g.file)">
+            <div v-if="!collapsed.has(g.file)" class="thumbs">
               <div v-for="(s, j) in g.slides" :key="s.id" class="thumb-row" @dragover.prevent @drop.prevent="drop($event, g.start + j, g.file)">
                 <span class="num">{{ g.start + j + 1 }}</span>
                 <button class="thumb" :style="{ height: Math.round(format.h * THUMB) + 4 + 'px' }" :aria-current="g.start + j === ui.slide" :aria-label="t('Folie {0}', g.start + j + 1)" draggable="true"
                   @click="ui.slide = g.start + j" @dblclick="present(g.start + j)" @contextmenu="onThumbContext($event, g.start + j)" @dragstart="dragStart($event, g.start + j)">
-                  <SlideView :slide="s" :index="g.start + j" :style="{ transform: `scale(${THUMB})` }" inert />
+                  <SlideView :slide="s" :index="g.start + j" :style="{ transform: `scale(${THUMB})` }" inert aria-hidden="true" />
                   <span v-if="findOpen && hitsOn[g.start + j]" class="find-badge" :title="t('{0} Treffer', hitsOn[g.start + j])">{{ hitsOn[g.start + j] }}</span>
                 </button>
               </div>
-            </template>
+            </div>
           </section>
           <button class="add-slide" @click="A.addSlide()"><Icon name="plus" :size="16" /> {{ t('Neue Folie') }}</button>
         </div>
       </nav>
 
-      <section ref="stage" class="stage" @dragover.prevent @drop.prevent="A.addImages([...$event.dataTransfer.files])" @pointerdown.self="ui.sel = []">
+      <section ref="stage" class="stage" :aria-label="t('Folie {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="A.addImages([...$event.dataTransfer.files])" @pointerdown.self="ui.sel = []">
         <Teleport defer :to="mdOpen ? '.md-wrap' : '.stage'">
         <dialog ref="findDialog" class="find" :class="{ replacing }" :aria-label="t('Suchen und ersetzen')" @keydown.esc.stop.prevent="closeFind" @keydown="findKey" @close="findOpen = false">
           <button type="button" class="tb icon small find-fold" :title="replacing ? t('Ersetzen ausblenden') : t('Ersetzen einblenden')" :aria-expanded="replacing" @click="replacing = !replacing"><Icon :name="replacing ? 'chevron' : 'chevronR'" :size="14" /></button>
@@ -894,7 +901,7 @@ function onClipboard(e) {
           </div>
         </dialog>
         </Teleport>
-        <div class="frame" :style="{ width: format.w * scale + 'px', height: format.h * scale + 'px' }" @contextmenu="onContext">
+        <div class="frame" :style="{ width: format.w * scale + 'px', height: format.h * scale + 'px', '--s': scale }" @contextmenu="onContext">
           <SlideView ref="view" :key="slide.id" :slide="slide" :index="ui.slide" editable :scale="scale" :style="{ transform: `scale(${scale})` }" />
         </div>
         <Menu ref="ctx" manual>
@@ -1170,9 +1177,9 @@ function onClipboard(e) {
     </dialog>
 
     <dialog ref="paletteDialog" class="palette" @keydown="paletteKey">
-      <input v-model="paletteQuery" class="palette-input" :placeholder="t('Befehl suchen … (z. B. „tabelle“, „pdf“, „theme“)')" :aria-label="t('Befehl suchen')" autofocus @input="paletteIndex = 0" />
-      <ul role="listbox">
-        <li v-for="(c, i) in filtered" :key="c[0]" role="option" :aria-selected="i === paletteIndex" @click="runCommand(c)" @mousemove="paletteIndex = i">
+      <input v-model="paletteQuery" class="palette-input" :placeholder="t('Befehl suchen … (z. B. „tabelle“, „pdf“, „theme“)')" :aria-label="t('Befehl suchen')" autofocus role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="palette-list" :aria-activedescendant="filtered.length ? 'cmd-' + paletteIndex : null" @input="paletteIndex = 0" />
+      <ul id="palette-list" role="listbox" :aria-label="t('Befehle')">
+        <li v-for="(c, i) in filtered" :id="'cmd-' + i" :key="c[0]" role="option" :aria-selected="i === paletteIndex" @click="runCommand(c)" @mousemove="paletteIndex = i">
           {{ c[0] }}<kbd v-if="c[2]">{{ keyLabel(c[2]) }}</kbd>
         </li>
         <li v-if="!filtered.length" class="empty">{{ t('Kein Befehl gefunden') }}</li>

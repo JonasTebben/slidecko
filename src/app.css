@@ -1,7 +1,7 @@
 /* Editor chrome — the slides themselves are styled in slide.css / themes.js */
 :root {
   --ui-bg: #f4f5f7; --ui-panel: #fff; --ui-line: #e3e5ea; --ui-line-strong: #cfd3da;
-  --ui-fg: #1d2330; --ui-muted: #6b7280; --ui-hover: #f0f2f5; --ui-active: #e6ecf7;
+  --ui-fg: #1d2330; --ui-muted: #646b78; --ui-hover: #f0f2f5; --ui-active: #e6ecf7;
   --ui-accent: #2f6fed; --ui-accent-soft: #e8f0fe; --ui-danger: #d93a3a; --ui-sel: #2f6fed;
   --ui-radius: 8px; --ui-shadow: 0 1px 2px #1018280d, 0 8px 24px #10182814;
   --ui-pop: 0 12px 40px #10182829, 0 2px 6px #1018281a;
@@ -15,7 +15,7 @@
     --ui-fg: #e4e6eb; --ui-muted: #9ba2ae; --ui-hover: #282c35; --ui-active: #2b3954;
     --ui-accent: #6b9bff; --ui-accent-soft: #243352; --ui-danger: #f07171; --ui-sel: #6b9bff;
     --ui-shadow: 0 1px 2px #0006, 0 8px 24px #0005; --ui-pop: 0 12px 40px #0009, 0 2px 6px #0006;
-    --ui-fill: #3b6ff0; --ui-fill-hover: #5584f5; --ui-accent-line: #3d5a99; --ui-dots: #2a2e37; --ui-toast: #2d323d;
+    --ui-fill: #3466e8; --ui-fill-hover: #2a5bd6; --ui-accent-line: #3d5a99; --ui-dots: #2a2e37; --ui-toast: #2d323d;
     color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -62,11 +62,12 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .menubar { display: flex; }
 .menubar .tb { height: 24px; padding: 0 7px; color: var(--ui-muted); font-size: 12.5px; }
 .menubar .chev { display: none; }
+.bar { display: contents; } /* phones: tools and right side share one scrolling row */
 .tools { display: flex; align-items: center; gap: 2px; margin: 0 auto; }
 .right { display: flex; align-items: center; gap: 4px; }
 @media (max-width: 1180px) { .tools .tb > span, .right .tb:not(.primary) > span { display: none; } }
 
-main { flex: 1; display: flex; min-height: 0; }
+.app > main { flex: 1; display: flex; min-height: 0; }
 .app-foot { padding: 8px 12px; background: var(--ui-panel); border-top: 1px solid var(--ui-line); color: var(--ui-muted); font-size: 12.5px; text-align: center; }
 /* language and light/dark: quiet selects in the footer line */
 .app-foot :is(.lang, .scheme) { padding: 1px 4px; font-size: inherit; border-color: transparent; background: none; color: inherit; cursor: pointer; }
@@ -105,10 +106,11 @@ main { flex: 1; display: flex; min-height: 0; }
 /* editing affordances (only inside the stage) */
 .stage .el { cursor: move; touch-action: none; }
 .stage .el:hover:not(.selected) { outline: 1px solid #2f6fed80; }
-.stage .el.selected { outline: 1.5px solid var(--ui-sel); }
-.stage .el.editing { cursor: text; outline: 1.5px dashed var(--ui-sel); }
+.stage .el.selected { outline: calc(1.5px / var(--s, 1)) solid var(--ui-sel); }
+.stage .el.editing { cursor: text; outline: calc(1.5px / var(--s, 1)) dashed var(--ui-sel); }
 .stage .el.image { user-select: none; }
-.handle { position: absolute; z-index: 3; width: 10px; height: 10px; margin: -5px; background: #fff; border: 1.5px solid var(--ui-sel); border-radius: 3px; box-shadow: 0 1px 2px #0003; }
+/* handles and frames keep their screen size at any zoom: --s is the stage scale */
+.handle { --h: 10px; position: absolute; z-index: 3; width: calc(var(--h) / var(--s, 1)); height: calc(var(--h) / var(--s, 1)); margin: calc(var(--h) / -2 / var(--s, 1)); background: #fff; border: calc(1.5px / var(--s, 1)) solid var(--ui-sel); border-radius: calc(3px / var(--s, 1)); box-shadow: 0 1px 2px #0003; }
 .handle.nw { left: 0; top: 0; cursor: nwse-resize; }
 .handle.n { left: 50%; top: 0; cursor: ns-resize; }
 .handle.ne { left: 100%; top: 0; cursor: nesw-resize; }
@@ -121,7 +123,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .crop-ghost { position: absolute; z-index: 40; opacity: 0.35; cursor: move; outline: 1px dashed #0006; }
 .crop-ghost img { width: 100%; height: 100%; display: block; pointer-events: none; }
 .slide .el.cropping { z-index: 41; cursor: move; outline: 2px solid var(--ui-sel); }
-.handle.crop-handle { width: 14px; height: 14px; margin: -7px; background: #111; border: 2px solid #fff; border-radius: 2px; }
+.handle.crop-handle { --h: 14px; background: #111; border-color: #fff; }
 .guide { position: absolute; background: #ff2d8a; pointer-events: none; z-index: 10; }
 .guide.x { top: 0; bottom: 0; width: 1px; }
 .guide.y { left: 0; right: 0; height: 1px; }
@@ -135,6 +137,7 @@ main { flex: 1; display: flex; min-height: 0; }
 /* inspector */
 .inspector { width: 272px; flex: none; overflow-y: auto; background: var(--ui-panel); border-left: 1px solid var(--ui-line); padding-bottom: 24px; }
 .inspector section { padding: 12px 14px; border-bottom: 1px solid var(--ui-line); display: flex; flex-direction: column; gap: 8px; }
+.inspector section > * { flex-shrink: 0; }
 .inspector h3 { margin: 0 0 2px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ui-muted); }
 .inspector .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ui-muted); }
 .inspector .field > select, .inspector .field > input, .inspector .field > textarea { color: var(--ui-fg); }
@@ -177,7 +180,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .slide.mini .pageno, .slide.mini-tbl .pageno { display: none; }
 
 /* menus (popover) */
-.menu { margin: 0; padding: 6px; min-width: 220px; max-height: min(78vh, 640px); overflow-y: auto; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-panel); box-shadow: var(--ui-pop); color: var(--ui-fg); }
+.menu { margin: 0; padding: 6px; min-width: 220px; max-width: calc(100vw - 16px); max-height: min(78vh, 640px); overflow-y: auto; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-panel); box-shadow: var(--ui-pop); color: var(--ui-fg); }
 .menu.wide { min-width: 0; }
 .menu:popover-open { animation: pop 0.12s ease-out; }
 @keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
@@ -319,13 +322,14 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .pv-main { position: relative; overflow: hidden; }
 .pv-main > .slide { position: absolute; left: 0; top: 0; }
 .presenter.pv { grid-template-columns: auto 1fr; gap: 24px; padding: 24px; background: #111317; align-items: start; justify-items: start; color: #e8eaed; }
-.pv-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: calc(100vh - 80px); }
+.pv-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: calc(100dvh - 80px); }
 .pv-next small { display: block; color: #9aa0a6; margin-bottom: 6px; }
 .pv-next > div { position: relative; overflow: hidden; border-radius: 4px; }
 .pv-next .slide { position: absolute; left: 0; top: 0; }
 .pv-notes { flex: 1; overflow-y: auto; white-space: pre-wrap; font-size: 20px; line-height: 1.5; padding: 16px; background: #1c1f24; border-radius: 10px; }
 .pv-bar { position: fixed; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 14px; border-radius: 18px; background: #0009; color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.2s; }
-.presenter:hover .pv-bar, .presenter.pv .pv-bar { opacity: 1; }
+.presenter:hover .pv-bar, .presenter.pv .pv-bar, .pv-bar:focus-within { opacity: 1; }
+@media (hover: none) { .pv-bar { opacity: 1; } } /* touch: no hover to reveal the way out */
 .pv-bar .tb { color: #fff; }
 .pv-bar .tb:hover { background: #fff2 !important; }
 .pv-progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--ui-accent); transition: width 0.2s; }
@@ -372,7 +376,8 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .style-btn.custom { display: flex; }
 .style-apply { flex: 1; min-width: 0; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
 .style-del { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--ui-panel); color: var(--ui-muted); cursor: pointer; opacity: 0; box-shadow: 0 1px 2px #0003; }
-.style-btn.custom:hover .style-del { opacity: 1; }
+.style-btn.custom:hover .style-del, .style-del:focus-visible { opacity: 1; }
+@media (hover: none) { .style-del { opacity: 1; } } /* touch: nothing reveals them */
 .style-del:hover { color: var(--ui-danger); }
 .slide.mini.style-prev { display: block; width: 100% !important; padding: 6px 10px !important; background: var(--bg, #fff) !important; font-size: 15px !important; text-align: left; }
 .slide.mini.style-prev > * { zoom: 0.6; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
@@ -442,3 +447,55 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 [data-scheme="dark"] dialog::backdrop { background: #000a; }
 [data-scheme="dark"] .export-card em.b-edit { background: #1e2e52; color: #9dbcff; }
 [data-scheme="dark"] .export-card em.b-exact { background: #173524; color: #7ddc9f; }
+
+/* touch screens: fingers need bigger targets (WCAG 2.5.8) */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; } /* iOS zooms into fields under 16px */
+  /* a long press opens our menu, not iOS's text selection or image preview */
+  .stage .el:not(.editing), .thumbs, .deck-head, .project-open, .project-meta b { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .tb { height: 40px; } .tb.icon { width: 40px; }
+  .tb.small, .menubar .tb, .deck-head .tb { height: 36px; } .tb.icon.small, .deck-head .tb.icon, .deck-head .menu-wrap .tb { width: 36px; }
+  .mi { height: 44px; }
+  .inspector .ib { height: 40px; min-width: 40px; }
+  .swatches .sw { width: 32px; height: 32px; }
+  .find-toggle { height: 28px; min-width: 28px; }
+  .find-field input:not([type]) { height: 34px; padding-right: 96px; }
+  .handle { --h: 18px; }
+  .handle.crop-handle { --h: 22px; }
+}
+
+/* phones: one column that scrolls as a page; the slide stays on top while the panels scroll below it */
+@media (max-width: 760px) {
+  .app { height: auto; min-height: 100%; }
+  .topbar { flex-wrap: wrap; gap: 4px 8px; padding: 6px 8px; }
+  .doc { flex: 1; }
+  .doc-title { max-width: 100%; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px; width: 100%; }
+  .tools { margin: 0; }
+  .app > main { flex-direction: column; }
+  .stage { order: -1; position: sticky; top: 0; z-index: 4; flex: none; height: min(62vw, 50dvh); border-bottom: 1px solid var(--ui-line); }
+  .stage-info { display: none; }
+  .slides-panel { width: auto; border-right: 0; border-bottom: 1px solid var(--ui-line); }
+  .panel-head { padding: 6px 12px 0; }
+  .slide-list { display: flex; align-items: flex-start; gap: 14px; overflow: auto hidden; padding: 0 12px 10px; }
+  .deck-group { flex: none; }
+  .deck-group + .deck-group { margin-top: 0; }
+  .deck-head { left: 0; max-width: 80vw; }
+  .thumbs { display: flex; gap: 8px; }
+  .thumb-row { flex-direction: column; align-items: center; gap: 2px; }
+  .num { width: auto; padding: 0; }
+  .thumb { zoom: 0.55; }
+  .add-slide { flex: none; width: auto; height: 56px; margin: 28px 0 0; padding: 0 14px; }
+  .inspector { width: auto; border-left: 0; overflow: visible; }
+  .presenter.pv { grid-template-columns: 1fr; align-content: start; padding: 16px; overflow-y: auto; }
+  .pv-side { height: auto; }
+  .preset-grid, .theme-grid { grid-template-columns: repeat(2, 132px); }
+  .te-row { grid-template-columns: 1fr; gap: 4px; }
+  dialog { padding: 18px 16px; }
+  dialog menu { flex-wrap: wrap; }
+  .home { padding: 0 16px 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; transition: none !important; }
+}

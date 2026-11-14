@@ -271,6 +271,8 @@ const db = new Promise((res, rej) => {
   r.onsuccess = () => res(r.result)
   r.onerror = () => rej(r.error)
 })
+// Safari otherwise clears site storage after 7 days without a visit
+globalThis.navigator?.storage?.persist?.().catch(() => {})
 const idb = (mode, fn) => db.then(d => new Promise((res, rej) => {
   const rq = fn(d.transaction('kv', mode).objectStore('kv'))
   rq.onsuccess = () => res(rq.result)
@@ -388,18 +390,27 @@ export async function restore(session = {}) {
   }
   if (!deck.id || session.home) ui.home = true
 
-  let timer
+  let timer, due = null
+  const flush = () => {
+    clearTimeout(timer)
+    const json = due
+    due = null
+    if (json === null || !deck.id) return
+    if (json !== history[at]) {
+      history.splice(at + 1, Infinity, json) // a new change discards the redo states
+      if (history.length > 200) history.shift()
+      at = history.length - 1
+    }
+    persist(json)
+  }
   watch(snapshot, json => {
     clearTimeout(timer)
-    timer = setTimeout(() => {
-      if (!deck.id) return
-      if (json !== history[at]) {
-        history.splice(at + 1, Infinity, json) // a new change discards the redo states
-        if (history.length > 200) history.shift()
-        at = history.length - 1
-      }
-      persist(json)
-    }, 300)
+    due = json
+    timer = setTimeout(flush, 300)
   })
+  // iOS shows no warning when a tab closes and freezes hidden pages: save the moment the page goes away
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush() })
+  addEventListener('pagehide', flush)
+  addEventListener('beforeunload', flush, true) // runs before the warning check above, so it sees the write as pending
   watch(() => Object.keys(deck.assets).length, persistAssets)
 }

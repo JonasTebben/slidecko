@@ -166,12 +166,12 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
     <template v-else-if="el">
       <section v-if="el.type === 'text'">
         <h3>{{ t('Text') }}</h3>
-        <div class="styles" role="listbox" :aria-label="t('Textstil')" @mousedown.prevent>
-          <button v-for="[tag, n] in STYLES" :key="tag" class="style-btn" :class="{ on: curTag === tag }" :aria-selected="curTag === tag" :title="t(typing ? 'Absatz als {0}' : 'Ganzes Textfeld als {0}', t(n))" @click="applyStyle(tag)">
+        <div class="styles" role="group" :aria-label="t('Textstil')" @mousedown.prevent>
+          <button v-for="[tag, n] in STYLES" :key="tag" class="style-btn" :class="{ on: curTag === tag }" :aria-pressed="curTag === tag" :title="t(typing ? 'Absatz als {0}' : 'Ganzes Textfeld als {0}', t(n))" @click="applyStyle(tag)">
             <span class="slide mini style-prev layout-center" :class="`theme-${deck.theme}`" :style="themeStyle(deck.theme)"><component :is="tag">{{ t(n) }}</component></span>
           </button>
           <div v-for="p in textStyles.list" :key="p.name" class="style-btn custom" :class="{ on: isCustom(p) }">
-            <button class="style-apply" :title="t('Eigener Stil „{0}“ anwenden', p.name)" @click="applyCustom(p)">
+            <button class="style-apply" :aria-pressed="isCustom(p)" :title="t('Eigener Stil „{0}“ anwenden', p.name)" @click="applyCustom(p)">
               <span class="slide mini style-prev layout-center" :class="`theme-${deck.theme}`" :style="{ ...themeStyle(deck.theme), background: p.fill || null }">
                 <component :is="p.tag" :style="{ fontSize: p.fontSize ? p.fontSize + 'px' : null, color: p.color || null, textAlign: p.align || null, fontFamily: fontStack(p.font) || null }">{{ p.name }}</component>
               </span>
