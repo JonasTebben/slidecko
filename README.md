@@ -24,7 +24,7 @@ bun test         # parser, export and server tests
 - **Themes**: 13 built-in themes and a theme editor (colours, fonts, own CSS) whose themes can be exported and imported as `.theme.json`.
 - **Markdown**: insert slides from Slidev Markdown (e.g. written by an AI) or edit one slide as Markdown.
 - **Present** in full screen or with a presenter view (notes, next slide, timer).
-- **Phone and tablet** layout, long press for context menus, light/dark mode, German and English interface, accessible controls (4.5:1 contrast, named controls, reduced motion).
+- **Phone and tablet** layout, long press for context menus, light/dark mode, English and German interface, accessible controls (4.5:1 contrast, named controls, reduced motion).
 
 The full behaviour is described in [docs/features.md](docs/features.md).
 

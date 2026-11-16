@@ -3,7 +3,7 @@
 import { ref, watch, watchEffect } from 'vue'
 import en from './locales/en.js'
 
-export const LOCALES = { de: { name: 'Deutsch', dict: {} }, en: { name: 'English', dict: en } }
+export const LOCALES = { en: { name: 'English', dict: en }, de: { name: 'Deutsch', dict: {} } } // English first in the switch
 const KEY = 'slides-builder:lang'
 
 const pick = () => {

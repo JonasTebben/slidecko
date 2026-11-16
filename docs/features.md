@@ -81,7 +81,7 @@ The interface follows the system or is fixed to light or dark (sun/moon switch i
 
 ## Languages
 
-German and English. Without a stored choice the browser language decides (German, otherwise English). A link with `?lang=de` or `?lang=en` picks the language and stores it like the switch does (under `slides-builder:lang`, so pages on the same site can share it). Switching in the footer works at once, without reloading.
+English and German. Without a stored choice the browser language decides: German for German browsers, English otherwise. A link with `?lang=de` or `?lang=en` picks the language and stores it like the switch does (under `slides-builder:lang`, so pages on the same site can share it). Switching in the footer works at once, without reloading.
 
 ## View in the URL
 
