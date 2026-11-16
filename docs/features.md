@@ -4,6 +4,8 @@
 
 Everything is read in the browser and opens as a new project (from the start page or by drag and drop).
 
+Dropped into the open editor instead, images land on the slide, `.md` files become decks, and PowerPoint, OpenDocument, PDF and `.slides.json` files are inserted after the current slide (scaled to the project's slide size). Copy and paste of elements keeps their images, also into another project.
+
 - **Slidev project**: pick a folder. Loading starts from `slides.md`, like in Slidev. Decks included with `src:`, images (also from `public/`), the theme, components and `package.json` come along. Slides are rendered and measured with Slidev's layout and UnoCSS rules, so they look as they do in Slidev. Opening the same folder again asks whether to open the existing project, make a copy or overwrite it.
 - **PowerPoint (`.pptx`/`.potx`)**, also exports from Google Slides and Keynote, and **OpenDocument (`.odp`/`.otp`)** from LibreOffice Impress:
   - Text boxes, lists, tables, shapes, images, backgrounds, master and layout elements and speaker notes become editable elements at their position.
@@ -21,7 +23,7 @@ Loose `.md` files each become a deck, sorted by name. Decks can be moved by drag
 
 From the Export menu or the export dialog (⌘E), for the whole project or one deck.
 
-- **Slidev (`.zip`)**: a main `slides.md` with `src:` references, one `.md` per deck, images at their original paths. Unchanged slides stay byte for byte (blank lines included); edited ones are written as positioned HTML blocks. Themes that stand for a Slidev theme package (such as `themes/jbt.theme.json`) are added as a package dependency; all others ship as `style.css`. The export message names images that the Markdown references but that were not uploaded.
+- **Slidev (`.zip`)**: a main `slides.md` with `src:` references, one `.md` per deck, images at their original paths. Unchanged slides stay byte for byte (blank lines included); edited ones are written as positioned HTML blocks (a `{{` in their text is wrapped in `<span v-pre>` so Slidev does not read it as Vue; code keeps it as is). Themes that stand for a Slidev theme package (such as `themes/jbt.theme.json`) are added as a package dependency; all others ship as `style.css`. The export message names images that the Markdown references but that were not uploaded.
 - **PDF**: through the print dialog, one page per slide, text stays selectable. Backgrounds with CSS blend modes that print engines cannot draw are replaced by an image first.
 - **PowerPoint (`.pptx`)**: editable text in the font actually used, clickable links, native tables and shapes, images and speaker notes.
   - Line breaks come from the editor (soft breaks in the same paragraph). Nested lists become real outline levels, numbering keeps its start value, columns (flex/grid) become separate text boxes.
@@ -31,7 +33,7 @@ From the Export menu or the export dialog (⌘E), for the whole project or one d
 - **Google Slides (`.pptx`)**: the same file with line spacing as multiples. Google Slides enlarges fixed spacing by 1.2 and Keynote handles multiples differently, hence two variants.
 - **PowerPoint exact (`.pptx`)**: each slide as a 1960 × 1104 px image, with notes. Looks exactly like the editor in every program.
 - **OpenDocument (`.odp`)**: editable, for LibreOffice Impress, OpenOffice and Collabora. Comes from the same layout pass as the PPTX.
-- **HTML presentation (`.html`)**: one file with all slides, images and fonts. Runs offline in any browser (arrow keys, swipe, F for full screen, `#12` jumps to slide 12, printable).
+- **HTML presentation (`.html`)**: one file with all slides, images and fonts. Runs offline in any browser (arrow keys, swipe, F for full screen where the browser allows it, `#12` jumps to slide 12, printable; on touch screens the previous/next buttons stay visible).
 - **HTML presentation (ZIP)**: the same as `index.html` with images and fonts as separate files. Smaller, good for web servers and learning platforms.
 - **Images (`.zip`)**: one PNG per slide.
 
@@ -46,12 +48,13 @@ From the Export menu or the export dialog (⌘E), for the whole project or one d
   - Cell colours for a cell, row or column. Cell borders for a cell, row, column or the table (all, outside, inside or single sides, with width, style and colour); the buttons show existing lines and a second click removes them. Kept in all exports.
 - **Text styles** with a live preview in the theme, and your own style presets. Text boxes and code blocks grow with their content.
 - **Font for all slides**: with nothing selected, the inspector sets the sizes for text, titles and code across the project, in every theme and in the Slidev export (`style.css`).
-- **Layout tools**: snapping guides (Alt turns snapping off), format painter (⌘⌥C / ⌘⌥V: only what both elements have), multi-selection (common font, size, alignment, colours; "Mixed" shows differing values), outlines and shadows (in all exports), position lock (kept in the Slidev project), background opacity, align and distribute, horizontal and vertical text alignment, copy and paste, undo and redo.
+- **Layout tools**: snapping guides (Alt turns snapping off), format painter (⌘⌥C / ⌘⌥V: only what both elements have), multi-selection (common font, size, alignment, colours; "Mixed" shows differing values), outlines and shadows (in all exports), position lock (kept in the Slidev project), background opacity, align and distribute, horizontal and vertical text alignment, copy and paste, undo and redo (an undo jumps to the slide it changes and selects the changed elements).
 - **Slide presets** and **13 built-in themes**.
 - **Keep font sizes when switching themes** (on by default): the new theme takes colours and fonts but keeps the previous sizes, so boxes and line breaks stay. Switching back undoes it. A theme switch never changes stored box sizes.
 - **Reset to the imported state**: an imported slide (or all changed ones) is re-rendered from its original Markdown and is then exported unchanged again.
-- **Markdown**: "Insert slides from Markdown" (⇧M) takes Slidev Markdown, for example generated by an AI. "Edit this slide's Markdown" (M) edits one slide as text, with syntax highlighting.
+- **Markdown**: "Insert slides from Markdown" (⇧M) takes Slidev Markdown, for example generated by an AI. "Edit this slide's Markdown" (M) edits one slide as text, with syntax highlighting. ⌘/Ctrl+Enter applies; Esc after edits asks before discarding them. Raw HTML in the Markdown is sanitized (no scripts, event handlers or `<style>` blocks).
 - **Sidebars** can be folded away with the arrows at the canvas edges, from the View menu or with ⌥B (slide list) and ⌥E (properties).
+- **Zoom**: ⌘= and ⌘− zoom the canvas, ⌘0 or ⇧1 fit it to the window, ⇧0 shows 100 %. ⌘/Ctrl+scroll (or a trackpad pinch) zooms at the pointer; the % at the bottom right cycles fit, 100 % and 200 %. A zoomed slide scrolls.
 - **Shortcuts**: ⌘K or `?` lists every command with its shortcut.
 
 ## Theme editor
@@ -62,11 +65,14 @@ Colours, fonts and your own CSS (`&` is the slide) with a live preview. Built-in
 
 Full screen (P or F5) and a presenter view with notes, the next slide and a timer (⌥P). Links are clickable and videos play.
 
+While presenting: type a slide number and Enter to jump there, B or . turns the screen black and W or , white (any slide change ends it), R or a click on the timer resets the timer.
+
 ## Phone and tablet
 
-- Under 760 px wide the app becomes one column: the slide stays on top, the slide strip (horizontal) and the properties follow, the toolbar wraps into two rows.
-- On touch screens buttons and handles are larger (handles keep their screen size at any zoom). A second tap on the selected element starts typing, a long press opens the context menu (also on iPhone and iPad, where Safari has none).
-- When presenting, a tap on the left edge goes back one slide and the controls stay visible.
+- Up to 760 px wide the app becomes one column: the slide stays on top, the slide strip (horizontal) and the properties follow, the toolbar wraps into two rows.
+- On touch screens buttons and handles are larger (handles keep their screen size at any zoom). Two fingers pinch-zoom the slide (a pinch started while dragging puts the element back), a double tap beside the slide fits it again. A second tap on the selected element starts typing, a long press opens the context menu (also on iPhone and iPad, where Safari has none).
+- When presenting, a swipe changes the slide, a tap on the left edge goes back one slide, double taps do not zoom and the controls stay visible.
+- Phones held sideways (up to 500 px high) get the phone layout too; content stays clear of the notch.
 - Form fields are 16 px on touch screens so iOS does not zoom in.
 - The app asks the browser to keep its storage. Safari otherwise deletes site data after 7 days without a visit; add Slidecko to the home screen or save projects as files to be safe.
 - Pending changes are saved the moment the page is hidden or closed, because iOS freezes hidden tabs and has no leave warning.

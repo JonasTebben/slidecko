@@ -1,16 +1,22 @@
 import { toggleList } from './lists.js'
 import { computed, nextTick, ref } from 'vue'
-import JSZip from 'jszip'
-import { W, H, deck, ui, uid, cleanEl, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject } from './store.js'
+import { W, H, deck, ui, uid, cleanEl, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath } from './store.js'
 import { ELEMENTS, SLIDE_PRESETS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
-import { formatSize } from './format.js'
+import { formatSize, parseRatio } from './format.js'
 import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
-import { importPptx, importOdp, importPdf } from './importOffice.js'
 import { toSlidev, slideToMarkdown, slideHash, imagePath } from './toSlidev.js'
-import { exportPptx } from './exportPptx.js'
-import { slideImages, htmlDeck, htmlZip, flattenBackgrounds } from './exportFormats.js'
+// import/export libraries load on first use, so they stay out of the startup bundle
+const loadZip = async () => (await import('jszip')).default
+const importPptx = async (...a) => (await import('./importOffice.js')).importPptx(...a)
+const importOdp = async (...a) => (await import('./importOffice.js')).importOdp(...a)
+const importPdf = async (...a) => (await import('./importOffice.js')).importPdf(...a)
+const exportPptx = async (...a) => (await import('./exportPptx.js')).exportPptx(...a)
+const slideImages = async (...a) => (await import('./exportFormats.js')).slideImages(...a)
+const htmlDeck = async (...a) => (await import('./exportFormats.js')).htmlDeck(...a)
+const htmlZip = async (...a) => (await import('./exportFormats.js')).htmlZip(...a)
+const flattenBackgrounds = async (...a) => (await import('./exportFormats.js')).flattenBackgrounds(...a)
 
 // Everything the UI can do. Menus, keyboard shortcuts, the command palette and the inspector all
 // call these, so behaviour is the same wherever an action is triggered.
@@ -381,7 +387,7 @@ export const importPresentations = files => run(async () => {
     if (ext === 'json') { restored(f.name, [await restoreProject(JSON.parse(await f.text()))]); continue }
     if (ext === 'html' || ext === 'htm' || ext === 'zip') {
       // HTML export, or its ZIP variant (index.html + images/): images are read back from the ZIP
-      const zip = ext === 'zip' && await JSZip.loadAsync(f)
+      const zip = ext === 'zip' && await (await loadZip()).loadAsync(f)
       const page = zip ? Object.values(zip.files).find(z => /(^|\/)index\.html$/.test(z.name)) : null
       // backup of all projects (exportAllProjects): one .slides.json per project
       const saved = zip && !page && Object.values(zip.files).filter(z => z.name.endsWith('.slides.json'))
@@ -425,6 +431,34 @@ export const importPresentations = files => run(async () => {
   }
   await createProject({ title: images.length === 1 ? images[0].name.replace(/\.\w+$/, '') : t('Images'), theme: 'hell', slides, assets })
   toast(t('{0} created from images', n(slides.length, 'Slide', 'Slides')), 8000)
+})
+// presentations dropped into the editor: their slides go in after the current one, in its deck.
+// .pptx/.odp/.pdf/.slides.json are appended; HTML exports and ZIPs open as their own project, as on Home
+export const appendPresentations = files => run(async () => {
+  const read = { pptx: importPptx, potx: importPptx, odp: importOdp, otp: importOdp, pdf: importPdf, json: async f => JSON.parse(await f.text()) }
+  let pos = ui.slide + 1
+  for (const f of files) {
+    const ext = f.name.split('.').pop().toLowerCase()
+    if (!read[ext]) { await importPresentations([f]); continue }
+    toast(t('Importing {0} …', f.name), 0)
+    const r = await read[ext](f, (i, k) => toast(t('{0}: page {1} of {2} …', f.name, i, k), 0))
+    if (!Array.isArray(r?.slides)) throw new Error(t('Not a valid project file'))
+    for (const [k, v] of Object.entries(r.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:image\//.test(v)) deck.assets[k] = v
+    const file = deck.slides[pos - 1]?.file
+    const slides = cleanSlides(r.slides).map(s => ({ ...s, file }))
+    // another slide size: scaled to fit and centred
+    // shortcut: font sizes set inside the text markup do not scale; fine for the usual 4:3 into 16:9
+    const src = formatSize(parseRatio(r.aspectRatio) || 16 / 9, +r.canvasWidth || 980)
+    const k = Math.min(W / src.w, H / src.h), dx = (W - src.w * k) / 2, dy = (H - src.h * k) / 2
+    if (Math.abs(k - 1) > 0.001 || dx || dy) for (const e of slides.flatMap(s => s.elements)) {
+      Object.assign(e, { x: Math.round(e.x * k + dx), y: Math.round(e.y * k + dy), w: Math.round(e.w * k), h: Math.round(e.h * k) })
+      if (e.fontSize) e.fontSize = Math.round(e.fontSize * k)
+    }
+    deck.slides.splice(pos, 0, ...slides)
+    ui.slide = pos
+    pos += slides.length
+    toast(t('{0} imported from {1}', n(slides.length, 'Slide', 'Slides'), f.name) + (ext === 'pdf' ? ' ' + t('(as images)') : ''), 8000)
+  }
 })
 // loose markdown files (no slides.md): a new project with one deck per file, in name order
 export const importDecksAsProject = (files, paths) => run(async () => {
@@ -531,7 +565,7 @@ export const FORMATS = {
   html: ['HTML presentation', 'html', (out, name, slides) => htmlDeck(out, name, slides)],
   'html-zip': ['HTML presentation (ZIP)', 'zip', (out, name, slides) => htmlZip(out, name, slides)],
   png: ['Images', 'zip', async (out, name) => {
-    const zip = new JSZip()
+    const zip = new (await loadZip())()
     const images = await slideImages(out, 2, progress)
     images.forEach((d, i) => zip.file(`${name}-${String(i + 1).padStart(3, '0')}.png`, d.split(',')[1], { base64: true }))
     return zip.generateAsync({ type: 'blob' })
@@ -545,7 +579,7 @@ export const exportAs = (format, file) => {
     toast(t('Creating {0} …', t(label)), 0)
     try {
       const out = await renderOutput(file)
-      download(await build(out, scopeName(file), exportSlides.value), `${scopeName(file)}${format === 'png' ? '-bilder' : format === 'html-zip' ? '-html' : format === 'pptx-google' ? '-google' : ''}.${ext}`)
+      download(await build(out, scopeName(file), exportSlides.value), `${scopeName(file)}${format === 'png' ? '-images' : format === 'html-zip' ? '-html' : format === 'pptx-google' ? '-google' : ''}.${ext}`)
     } finally { exportSlides.value = null }
     toast(t('{0} exported.', t(label)))
   })
@@ -559,11 +593,13 @@ export const slidev = () => run(async () => {
     finally { exportSlides.value = null }
   }
   const { files, images } = toSlidev(deckData(), deck.files, { shapeFont })
-  const zip = new JSZip()
-  for (const [path, text] of Object.entries(files)) if (!text.startsWith('data:')) zip.file(path, text)
+  const zip = new (await loadZip())()
+  // nothing may unzip outside the project folder: no absolute paths, no '..' segments
+  const inside = p => safePath(p) === p
+  for (const [path, text] of Object.entries(files)) if (inside(path) && !text.startsWith('data:')) zip.file(path, text)
   // images keep their project paths (Slidev serves the project root and public/ at /)
-  for (const [path, id] of Object.entries(images)) if (deck.assets[id] && !files[path]) zip.file(path, deck.assets[id].split(',')[1], { base64: true })
-  for (const [path, text] of Object.entries(files)) if (text.startsWith('data:')) zip.file(path, text.split(',')[1], { base64: true })
+  for (const [path, id] of Object.entries(images)) if (inside(path) && deck.assets[id] && !files[path]) zip.file(path, deck.assets[id].split(',')[1], { base64: true })
+  for (const [path, text] of Object.entries(files)) if (inside(path) && text.startsWith('data:')) zip.file(path, text.split(',')[1], { base64: true })
   download(await zip.generateAsync({ type: 'blob' }), safe(deck.title) + '-slidev.zip')
   // images the Markdown refers to but the project lacks (e.g. loose .md files without public/): slidev build stops on them
   // relative paths resolve against their .md file; http(s), data: and //host links are skipped
@@ -581,14 +617,14 @@ export const slidev = () => run(async () => {
 // every stored project as .slides.json in one ZIP; importPresentations reads it back
 export const exportAllProjects = () => run(async () => {
   toast(t('Saving all projects …'), 0)
-  const zip = new JSZip(), names = new Set()
+  const zip = new (await loadZip())(), names = new Set()
   for (const p of library.list) {
     let name = safe(p.title) + '.slides.json'
     for (let i = 2; names.has(name); i++) name = `${safe(p.title)} (${i}).slides.json`
     names.add(name)
     zip.file(name, await projectFile(p.id))
   }
-  download(await zip.generateAsync({ type: 'blob' }), `Slidecko-Projekte-${new Date().toISOString().slice(0, 10)}.zip`)
+  download(await zip.generateAsync({ type: 'blob' }), `Slidecko-projects-${new Date().toISOString().slice(0, 10)}.zip`)
   toast(t('{0} saved.', n(library.list.length, 'project', 'projects')))
 })
 // id + time: loading the file again updates this project instead of adding a copy (restoreProject)

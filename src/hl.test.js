@@ -24,3 +24,11 @@ test('withLines switches numbering and keeps the rest', () => {
   assert.equal(withLines('{2}{startLine:5}', true), '{2}{lines:true,startLine:5}')
   assert.equal(withLines('{2}{lines:true,startLine:5}', false), '{2}{startLine:5}')
 })
+test('hlLines memo returns the same lines and stays bounded', () => {
+  const a = hlLines('const x = 1\nlog(x)', 'js')
+  assert.equal(hlLines('const x = 1\nlog(x)', 'js'), a)
+  assert.notEqual(hlLines('const x = 1\nlog(x)', 'ts'), a) // the language is part of the key
+  for (let i = 0; i < 300; i++) hlLines('x' + i, 'js')
+  assert.notEqual(hlLines('const x = 1\nlog(x)', 'js'), a) // evicted, computed again
+  assert.deepEqual(hlLines('const x = 1\nlog(x)', 'js'), a)
+})

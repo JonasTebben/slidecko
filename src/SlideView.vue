@@ -9,6 +9,7 @@ import TableEl from './TableEl.vue'
 import { pasteHtml } from './paste.js'
 import { toggleList, undoList, typed, indent, autoList } from './lists.js'
 import { t } from './i18n.js'
+import { longPressFired } from './longpress.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
@@ -38,16 +39,21 @@ function nearest(edges, lines) {
   for (const e of edges) for (const l of lines) if (Math.abs(l - e) < best.dist) best = { d: l - e, line: l, dist: Math.abs(l - e) }
   return best
 }
-function track(e, move, done) {
+function track(e, move, done, cancel) {
   // a touch the browser takes over (scrolling, a system gesture) ends with pointercancel instead of pointerup
-  const up = ev => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); guides.value = { x: null, y: null }; done?.(ev) }
-  addEventListener('pointermove', move)
+  // only the pointer that started it moves the box; a second finger (a pinch zoom) stops the gesture and calls cancel
+  const mv = ev => ev.pointerId === e.pointerId && move(ev)
+  const stop = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('pointerdown', second, true); guides.value = { x: null, y: null } }
+  const up = ev => { if (ev.pointerId !== e.pointerId) return; stop(); done?.(ev) }
+  const second = ev => { if (ev.pointerId === e.pointerId) return; stop(); cancel ? cancel() : done?.({ type: 'pointercancel' }) }
+  addEventListener('pointermove', mv)
   addEventListener('pointerup', up)
   addEventListener('pointercancel', up)
+  addEventListener('pointerdown', second, true)
 }
 
 function down(e, el) {
-  if (!props.editable || e.button || ui.editing === el.id) return
+  if (!props.editable || e.button || !e.isPrimary || ui.editing === el.id) return
   if (ui.crop === el.id) return panCrop(e, el)
   if (ui.crop) endCrop()
   if (ui.editing) document.activeElement?.blur()
@@ -59,13 +65,17 @@ function down(e, el) {
   // touch: tapping the selected box again starts typing (a double tap is easy to miss on a small slide)
   if (e.pointerType === 'touch' && ui.sel.length === 1 && selected(el) && el.type !== 'image') {
     const at = { currentTarget: e.currentTarget, target: e.target, clientX: e.clientX, clientY: e.clientY }
-    addEventListener('pointerup', ev => {
-      if (Math.hypot(ev.clientX - at.clientX, ev.clientY - at.clientY) >= 8) return
+    const tap = ev => {
+      if (ev.pointerId !== e.pointerId) return
+      removeEventListener('pointerup', tap); removeEventListener('pointercancel', tap)
+      if (ev.type === 'pointercancel' || longPressFired() || Math.hypot(ev.clientX - at.clientX, ev.clientY - at.clientY) >= 8) return
       // focus right in the gesture, or iOS keeps the keyboard closed; edit() then places the caret
-      const c = at.currentTarget.querySelector('.content')
-      if (c && el.type !== 'table') { c.contentEditable = 'true'; c.focus() }
+      const c = el.type === 'table' ? at.target.closest?.('[data-r]') : at.currentTarget.querySelector('.content')
+      if (c) { c.contentEditable = 'true'; c.focus() }
       edit(at, el)
-    }, { once: true })
+    }
+    addEventListener('pointerup', tap)
+    addEventListener('pointercancel', tap)
   }
   if (!selected(el)) ui.sel = [el.id]
   else ui.sel = [...ui.sel.filter(id => id !== el.id), el.id] // primary = the one being dragged
@@ -84,7 +94,10 @@ function drag(e, el, dir = '') {
     ys.push(other.y, other.y + other.h / 2, other.y + other.h)
   }
   const ratio = o.w / o.h
+  let held = e.pointerType === 'touch' // a finger wobbles: a tap must not move the box (nor add an undo step)
   track(e, ev => {
+    if (held && (longPressFired() || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= 6)) return
+    held = false
     const dx = (ev.clientX - e.clientX) / props.scale, dy = (ev.clientY - e.clientY) / props.scale
     let l = o.x, r = o.x + o.w, t = o.y, b = o.y + o.h
     const Wd = !dir || dir.includes('w'), Ed = !dir || dir.includes('e'), Nd = !dir || dir.includes('n'), Sd = !dir || dir.includes('s')
@@ -115,7 +128,7 @@ function drag(e, el, dir = '') {
     if (dir) Object.assign(el, { x: Math.round(l), y: Math.round(t), w: Math.round(r - l), h: Math.round(b - t) })
     else for (const [g, s] of start) Object.assign(g, { x: Math.round(s.x + l - o.x), y: Math.round(s.y + t - o.y) })
     guides.value = { x: sx.line ?? null, y: sy.line ?? null }
-  })
+  }, null, () => { for (const [g, p] of start) Object.assign(g, p) }) // back where it started: the same state, so no undo step
 }
 
 // --- image crop mode: the handles move the visible box inside the picture, dragging moves the picture ---
@@ -182,23 +195,36 @@ const cropVars = el => {
 const cropEl = () => props.editable && ui.crop && props.slide.elements.find(o => o.id === ui.crop)
 
 // rubber-band selection on the empty slide
+// touch: nothing changes until the finger moves (marquee) or lifts (tap), so scrolling the page keeps the selection
 function backgroundDown(e) {
-  if (!props.editable || e.button) return
-  if (ui.crop) endCrop()
-  if (ui.editing) document.activeElement?.blur()
+  if (!props.editable || e.button || !e.isPrimary) return
+  const touch = e.pointerType === 'touch'
+  const leave = () => { if (ui.crop) endCrop(); if (ui.editing) document.activeElement?.blur() }
   const box = root.value.getBoundingClientRect()
   const p = ev => ({ x: (ev.clientX - box.left) / props.scale, y: (ev.clientY - box.top) / props.scale })
   const a = p(e)
   const additive = e.shiftKey || e.metaKey
-  const before = additive ? [...ui.sel] : []
-  ui.sel = before
+  const prev = [...ui.sel]
+  const before = additive ? prev : []
+  let still = touch
+  if (!touch) { leave(); ui.sel = before }
   track(e, ev => {
+    if (still) {
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 8) return
+      still = false
+      leave()
+    }
     const b = p(ev)
     const m = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }
     marquee.value = m
     const hit = props.slide.elements.filter(o => o.x < m.x + m.w && o.x + o.w > m.x && o.y < m.y + m.h && o.y + o.h > m.y).map(o => o.id)
     ui.sel = [...new Set([...before, ...hit])]
-  }, () => { marquee.value = null })
+  }, ev => {
+    marquee.value = null
+    if (!touch) return
+    if (ev.type === 'pointercancel') ui.sel = prev // the page scrolled after all
+    else if (still) { leave(); ui.sel = before }
+  })
 }
 
 // --- editing in place ---
@@ -322,7 +348,7 @@ onBeforeUnmount(() => ro.disconnect())
 // a fill with its opacity (fillAlpha in %, undefined = opaque)
 const fillCss = el => (el.fill && el.fillAlpha != null ? `color-mix(in srgb, ${el.fill} ${el.fillAlpha}%, transparent)` : el.fill || null)
 // a line number padded to the widest one, as text (so exports keep it)
-const lineNo = (el, i) => { const s = codeOpts(el.meta).start; return String(s + i).padStart(String(s + el.code.split('\n').length - 1).length) + '  ' }
+const lineNo = (el, i, s) => String(s + i).padStart(String(s + el.code.split('\n').length - 1).length) + '  '
 const codeDarkOf = el => codeDark(el, props.theme || deck.theme)
 const codeVars = el => ({
   '--code-bg': el.fill || null, '--code-alpha': el.fillAlpha != null ? el.fillAlpha + '%' : null, '--code-radius': el.radius != null ? el.radius + 'px' : null,
@@ -374,7 +400,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
       />
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
-        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }"><code><span v-for="(l, i) in hlLines(el.code, el.lang)" :key="i" class="line" :class="{ dim: codeOpts(el.meta).marked && !codeOpts(el.meta).marked.has(i + 1) }"><span v-if="codeOpts(el.meta).lines" class="ln">{{ lineNo(el, i) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(el.code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
       </template>
       <img v-else-if="el.type === 'image'" :src="deck.assets[el.asset]" :class="el.cls" alt="" draggable="false" :style="{ borderRadius: el.radius && !el.crop ? el.radius + 'px' : null }" />
       <TableEl v-else-if="el.type === 'table'" :el="el" :editing="editable && ui.editing === el.id" :selected="editable && ui.sel.length === 1 && ui.sel[0] === el.id" :scale="scale" />

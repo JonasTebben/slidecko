@@ -66,3 +66,13 @@ test('shapes keep text colour and alignment; lines and blank text get no text', 
   assert.equal(cleanEl({ type: 'shape', shape: 'line', x: 0, y: 0, w: 100, h: 50, html: 'x' }).html, undefined)
   assert.equal(cleanEl({ type: 'shape', shape: 'rect', x: 0, y: 0, w: 100, h: 50, html: '  ' }).html, undefined)
 })
+
+test('slide files and project file keys cannot climb out of the project; real names survive', async () => {
+  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
+  globalThis.indexedDB ??= { open: () => ({}) }
+  const { cleanSlides, safePath } = await import('./store.js')
+  const files = ['....//evil.md', '../x.md', 'a/%2e%2e/x.md', 'a\\..\\x.md', 'a/./x.md', 'x\0.md', 'Größe (1).md', '/pages/my%20deck.md']
+  assert.deepEqual(cleanSlides(files.map(file => ({ file }))).map(s => s.file),
+    [undefined, undefined, undefined, undefined, undefined, undefined, 'Größe (1).md', 'pages/my%20deck.md'])
+  assert.equal(safePath('theme/../../etc'), undefined)
+})

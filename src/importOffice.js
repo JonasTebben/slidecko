@@ -783,24 +783,30 @@ export async function importOdp(file) {
 export async function importPdf(file, progress = () => {}) {
   const pdfjs = await import('pdfjs-dist')
   pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise
-  const assets = {}, slides = []
-  const first = (await pdf.getPage(1)).getViewport({ scale: 1 })
-  const { format, W, H } = slideFormat(first.width, first.height) // pages of another size are fitted and centred
-  for (let i = 1; i <= pdf.numPages; i++) {
-    progress(i, pdf.numPages)
-    const page = await pdf.getPage(i)
-    const v = page.getViewport({ scale: 1 })
-    const vp = page.getViewport({ scale: (W * 2) / v.width })
-    const canvas = Object.assign(document.createElement('canvas'), { width: Math.ceil(vp.width), height: Math.ceil(vp.height) })
-    await page.render({ canvas, viewport: vp }).promise
-    const id = uid()
-    assets[id] = canvas.toDataURL('image/jpeg', 0.92)
-    const kk = Math.min(W / v.width, H / v.height), w = Math.round(v.width * kk), h = Math.round(v.height * kk)
-    const text = (await page.getTextContent()).items.map(t => t.str + (t.hasEOL ? '\n' : '')).join('').trim()
-    slides.push({ layout: 'default', notes: text, elements: [{ type: 'image', asset: id, src: `/images/seite-${i}.jpg`, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h }] })
-    page.cleanup()
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false /* CSP: no eval */ })
+  const pdf = await task.promise
+  try {
+    const assets = {}, slides = []
+    const first = (await pdf.getPage(1)).getViewport({ scale: 1 })
+    const { format, W, H } = slideFormat(first.width, first.height) // pages of another size are fitted and centred
+    for (let i = 1; i <= pdf.numPages; i++) {
+      progress(i, pdf.numPages)
+      const page = await pdf.getPage(i)
+      const v = page.getViewport({ scale: 1 })
+      const vp = page.getViewport({ scale: (W * 2) / v.width })
+      const canvas = Object.assign(document.createElement('canvas'), { width: Math.ceil(vp.width), height: Math.ceil(vp.height) })
+      await page.render({ canvas, viewport: vp }).promise
+      const id = uid()
+      assets[id] = canvas.toDataURL('image/jpeg', 0.92)
+      canvas.width = canvas.height = 0 // Safari keeps canvas memory until GC otherwise
+      const kk = Math.min(W / v.width, H / v.height), w = Math.round(v.width * kk), h = Math.round(v.height * kk)
+      const text = (await page.getTextContent()).items.map(t => t.str + (t.hasEOL ? '\n' : '')).join('').trim()
+      slides.push({ layout: 'default', notes: text, elements: [{ type: 'image', asset: id, src: `/images/page-${i}.jpg`, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h }] })
+      page.cleanup()
+    }
+    const title = (await pdf.getMetadata().catch(() => null))?.info?.Title?.trim()
+    return { title: title || file.name.replace(/\.\w+$/, ''), slides, assets, ...format }
+  } finally {
+    await task.destroy() // frees the worker and its page memory (pdfjs 6: the document proxy has no destroy)
   }
-  const title = (await pdf.getMetadata().catch(() => null))?.info?.Title?.trim()
-  return { title: title || file.name.replace(/\.\w+$/, ''), slides, assets, ...format }
 }

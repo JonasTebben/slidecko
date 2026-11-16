@@ -18,3 +18,11 @@ test.skipIf(!(await Bun.file(import.meta.dir + '/dist/index.html').exists()))('s
   expect((await handle(new Request('http://x/'))).status).toBe(200)
   expect((await handle(new Request('http://x/nope'))).status).toBe(404)
 })
+
+test('NUL bytes are a bad request, // paths never redirect off-site', async () => {
+  expect(resolve('/%00')).toBeNull()
+  expect((await handle(new Request('http://x/%00'))).status).toBe(400)
+  const res = await handle(new Request('http://x//evil.com'))
+  expect(res.status).toBe(404)
+  expect(res.headers.get('location')).toBeNull()
+})

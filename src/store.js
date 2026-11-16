@@ -40,7 +40,8 @@ export const library = reactive({ list: [] }) // [{ id, title, theme, slides, de
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 // Slidev's click animations are kept in the markup so they survive a round trip
-export const clean = html => DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth'] })
+// <style> is dropped: its rules would apply to the whole app, not just the box (remote url() in style attributes stays)
+export const clean = html => DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth'], FORBID_TAGS: ['style'] })
 
 // --- decks (Foliensätze) ---
 export const fileOf = s => s.file || deck.entry
@@ -59,6 +60,14 @@ export const deckOfSlide = i => decks.value.find(d => i >= d.start && i < d.star
 
 // --- validation of untrusted data (files, IndexedDB, clipboard, import) ---
 const str = v => (typeof v === 'string' ? v : undefined)
+// a project-relative path (deck file, project file) or undefined: no empty or dots-only segment ('.', '..', also %2e%2e;
+// Windows drops trailing dots, so '....' counts too), no backslash or NUL
+export function safePath(v) {
+  if (typeof v !== 'string' || /[\\\0]/.test(v)) return undefined
+  const p = v.replace(/^\/+/, '')
+  const seg = x => { try { return decodeURIComponent(x) } catch { return x } }
+  return p && !p.split('/').some(x => /^[.\s]*$/.test(seg(x))) ? p : undefined
+}
 const num = (v, min = -1e4, max = 1e4) => Math.min(max, Math.max(min, Number(v) || 0))
 const COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%/]+\)|[a-z]{3,20}|none|transparent)$/i
 const color = v => (typeof v === 'string' && COLOR.test(v.trim()) ? v.trim() : undefined)
@@ -94,7 +103,7 @@ export function cleanEl(e) {
       ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(e.radius != null && { radius: num(e.radius, 0, 60) }),
     }
     case 'image': return deck.assets[e.asset] ? {
-      ...base, asset: e.asset, src: str(e.src) || '/images/bild.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),
+      ...base, asset: e.asset, src: str(e.src) || '/images/image.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),
       ...(e.radius && { radius: num(e.radius, 0, 500) }), ...(cleanCrop(e.crop) && { crop: cleanCrop(e.crop) }),
     } : null
     case 'table': {
@@ -129,9 +138,9 @@ export function cleanEl(e) {
 function cleanSlide(s) {
   return {
     id: uid(),
-    layout: /^[\w-]+$/.test(s.layout) ? s.layout : 'default',
+    layout: /^[\w-]+$/.test(str(s.layout) ?? '') ? s.layout : 'default', // test(undefined) would pass: it tests the string 'undefined'
     // Slidev source of the slide: frontmatter, original markdown, file it belongs to, speaker notes
-    fm: str(s.fm), md: str(s.md), file: str(s.file)?.replace(/^\/+|\.\.\//g, ''), notes: str(s.notes) || '',
+    fm: str(s.fm), md: str(s.md), file: safePath(s.file), notes: str(s.notes) || '',
     hash: Number.isInteger(s.hash) ? s.hash : undefined,
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
@@ -144,7 +153,7 @@ export function loadDeck(d) {
   if (!Array.isArray(d?.slides)) throw new Error(t('Not a valid project file'))
   if (d.styles) mergeTextStyles(d.styles)
   for (const [k, v] of Object.entries(d.assets || {})) if (/^data:image\//.test(v)) deck.assets[k] = v
-  if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && !k.includes('..')))
+  if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && safePath(k)).map(([k, v]) => [safePath(k), v]))
   deck.title = String(d.title || t('Presentation')).slice(0, 200)
   deck.source = typeof d.source === 'string' ? d.source.slice(0, 200) : '' // Slidev folder it was imported from
   // an own theme the project file carries joins this browser's unless one with that id exists already;
@@ -172,7 +181,7 @@ export function newSlide(layout = 'default', elements) {
   }
 }
 
-const usedAssets = (slides = deck.slides) => {
+export const usedAssets = (slides = deck.slides) => {
   const used = new Set()
   for (const s of slides) for (const e of s.elements) {
     if (e.asset) used.add(e.asset)
@@ -237,7 +246,7 @@ export async function storeImage(file) {
   const size = await imageSize(data)
   const id = uid()
   deck.assets[id] = data
-  let path = '/images/' + (file.name || 'bild.png').replace(/[^\w.-]+/g, '_')
+  let path = '/images/' + (file.name || 'image.png').replace(/[^\w.-]+/g, '_')
   if (deck.slides.some(s => s.elements.some(e => e.src === path))) path = path.replace(/([^/]+)$/, id + '-$1')
   return { id, path, size }
 }
@@ -245,13 +254,49 @@ export async function storeImage(file) {
 // --- undo/redo: snapshots of everything except assets ---
 const history = []
 let at = -1 // position of the current state in history
+// a change is written (history + IndexedDB) 300 ms after the last edit; flush() writes it now.
+// The watch only sets `due`: the snapshot (JSON of the whole deck) is built here, not on every pointermove
+let timer, due = false
+// used assets of the last asset write: images come and go with edits and undo, so a changed set is written again
+let assetKey = null
+let quiet = false // undo/redo just set the deck to a history state
+const usedKey = () => Object.keys(usedAssets()).sort().join('\0')
+function flush() {
+  clearTimeout(timer)
+  if (!due || !deck.id) { due = false; return }
+  due = false
+  const json = snapshot()
+  if (json !== history[at]) {
+    history.splice(at + 1, Infinity, json) // a new change discards the redo states
+    if (history.length > 200) history.shift()
+    at = history.length - 1
+  }
+  persist(json)
+  if (usedKey() !== assetKey) persistAssets()
+}
+const dirty = () => due // an edit not yet in history (may turn out to change nothing)
 export function undo(step = -1) {
+  flush() // an edit of the last 300 ms is its own step
   if (!history[at + step]) return
   at += step
-  const { title, theme, aspectRatio, canvasWidth, entry, slides } = JSON.parse(history[at])
-  Object.assign(deck, { title, theme, entry, slides })
-  setFormat(aspectRatio, canvasWidth)
-  Object.assign(ui, { slide: Math.min(ui.slide, slides.length - 1), sel: [], editing: null })
+  const d = JSON.parse(history[at])
+  // show what changed: the first slide that differs, with its changed elements selected
+  const old = deck.slides.map(s => JSON.stringify(s))
+  let i = 0
+  while (i < Math.max(old.length, d.slides.length) && JSON.stringify(d.slides[i]) === old[i]) i++
+  const changed = i < Math.max(old.length, d.slides.length)
+  i = Math.max(0, Math.min(changed ? i : ui.slide, d.slides.length - 1))
+  const before = deck.slides[i], after = d.slides[i]
+  const prev = new Map(before?.id === after?.id ? before.elements.map(e => [e.id, JSON.stringify(e)]) : [])
+  const sel = changed && prev.size ? after.elements.filter(e => JSON.stringify(e) !== prev.get(e.id)).map(e => e.id) : []
+  for (const k of ['title', 'source', 'typo', 'theme', 'entry', 'slides']) if (k in d) deck[k] = d[k]
+  setFormat(d.aspectRatio, d.canvasWidth)
+  Object.assign(ui, { slide: i, sel, editing: null })
+  // saved right away; the watch must not count this as a new edit (it would grey out Redo for 300 ms)
+  persist(history[at])
+  if (usedKey() !== assetKey) persistAssets()
+  quiet = true
+  Promise.resolve().then(() => { quiet = false }) // after Vue's watcher flush, which was queued by the changes above
 }
 export const redo = () => undo(1)
 // a freshly opened project: its loaded state is the first entry, so the first change can be undone.
@@ -261,8 +306,8 @@ function startHistory() {
   history.push(snapshot())
   at = 0
 }
-export const canUndo = () => at > 0
-export const canRedo = () => at < history.length - 1
+export const canUndo = () => at > 0 || dirty()
+export const canRedo = () => !dirty() && at < history.length - 1
 
 // --- persistence: IndexedDB (images blow past localStorage's ~5 MB) ---
 const db = new Promise((res, rej) => {
@@ -287,43 +332,105 @@ const remember = id => { try { localStorage.setItem('slides-builder:last', id) }
 function meta() {
   return { id: deck.id, title: deck.title, source: deck.source, theme: deck.theme, slides: deck.slides.length, decks: decks.value.filter(d => d.file !== deck.entry).length, updated: Date.now() }
 }
-async function saveList() {
-  await put('projects', JSON.stringify(library.list))
+// The project list is shared by all tabs: each write merges into the stored list in one transaction,
+// adding what this tab created and dropping what it deleted. Entries this tab only has in memory are
+// never written back, so a project deleted in another tab stays deleted.
+const added = new Set(), removed = new Set()
+// stored ∪ added − removed; own(id): this tab's meta replaces the stored one (open or renamed project)
+export function mergeList(stored, mine, { added, removed, own }) {
+  const have = new Set(stored.map(p => p?.id))
+  return [
+    ...[...added].filter(id => id && !have.has(id) && mine.has(id) && !removed.has(id)).map(id => mine.get(id)),
+    ...stored.filter(p => p && !removed.has(p.id)).map(p => (own(p.id) && mine.has(p.id) ? mine.get(p.id) : p)),
+  ].sort((a, b) => (b.updated || 0) - (a.updated || 0))
 }
-let saving = Promise.resolve(), pending = 0
-// every write goes through here: the title bar shows whether the browser copy is up to date
-const queue = job => {
+async function saveList(changed) { // changed: meta of a project this tab renamed
+  const d = await db
+  await new Promise((res, rej) => {
+    const tx = d.transaction('kv', 'readwrite'), store = tx.objectStore('kv'), rq = store.get('projects')
+    rq.onsuccess = () => {
+      let stored
+      try { stored = JSON.parse(rq.result || '[]') } catch { stored = [] }
+      if (!Array.isArray(stored)) stored = []
+      const mine = new Map(library.list.map(p => [p.id, p]))
+      if (changed) mine.set(changed.id, changed)
+      const list = mergeList(stored, mine, { added: new Set([...added, deck.id]), removed, own: id => id === deck.id || id === changed?.id })
+      const written = [...added]
+      // deleted in another tab while still open here: its images and files were deleted too
+      const revived = deck.id && !added.has(deck.id) && !removed.has(deck.id) && !stored.some(p => p?.id === deck.id)
+      store.put(JSON.stringify(list), 'projects')
+      tx.oncomplete = () => {
+        if (revived) persistAssets()
+        for (const id of written) added.delete(id)
+        const now = library.list.find(p => p.id === deck.id) // may be newer than the one just written
+        library.list = list.map(p => (p.id === deck.id && now) || p)
+        res()
+      }
+    }
+    tx.onerror = tx.onabort = () => rej(tx.error || rq.error)
+  })
+}
+const reloadList = async () => { try { library.list = JSON.parse((await get('projects')) || '[]') } catch {} }
+let saving = Promise.resolve(), pending = 0, assetsFailed = false
+// every write goes through here: the title bar shows whether the browser copy is up to date.
+// A failed image write stays visible until a later image write succeeds (a slide save does not cover it)
+const queue = (job, assets) => {
   pending++
   ui.save = 'saving'
-  saving = saving.then(job).then(() => { if (!--pending) ui.save = 'saved' }, e => { pending--; saveFailed(e) })
+  saving = saving.then(job).then(() => {
+    if (assets) assetsFailed = false
+    if (!--pending) ui.save = assetsFailed ? 'failed' : 'saved'
+  }, e => {
+    pending--
+    if (assets) { assetsFailed = true; assetKey = null } // written again with the next change
+    saveFailed(e)
+  })
 }
 // closing the tab while a write is still running would lose it
 globalThis.addEventListener?.('beforeunload', e => { if (pending) e.preventDefault() })
 function persist(json) {
   if (!deck.id) return
-  const m = meta()
-  library.list = [m, ...library.list.filter(p => p.id !== m.id)]
-  queue(() => Promise.all([put('p:' + deck.id, json), saveList()]))
+  const m = meta(), id = m.id // the job may run after a switch to another project
+  library.list = [m, ...library.list.filter(p => p.id !== id)]
+  queue(() => Promise.all([put('p:' + id, json), saveList(m)]))
 }
-const persistAssets = () => { if (deck.id) queue(() => Promise.all([put('a:' + deck.id, usedAssets()), put('f:' + deck.id, toRaw(deck.files))])) }
+function persistAssets() {
+  if (!deck.id) return
+  const assets = usedAssets(), id = deck.id, files = toRaw(deck.files)
+  assetKey = Object.keys(assets).sort().join('\0')
+  queue(() => Promise.all([put('a:' + id, assets), put('f:' + id, files)]), true)
+}
 
 // opens a stored project
+// returns false (and drops it from the list) when the project is gone, e.g. deleted in another tab
 export async function openProject(id) {
+  flush() // the last 300 ms of edits belong to the project being left
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
-  if (!json) throw new Error(t('Project not found'))
+  if (!json) {
+    library.list = library.list.filter(p => p.id !== id)
+    removed.add(id)
+    ui.status = t('Project not found')
+    await saveList().catch(saveFailed)
+    return false
+  }
   deck.assets = {}
   deck.files = {}
   deck.id = id
   loadDeck({ ...JSON.parse(json), assets, files })
   startHistory()
+  assetKey = usedKey() // what a: holds
   ui.home = false
   remember(id)
+  return true
 }
 // creates a project from deck data (import, file, template); replace: id of a project to overwrite
 export async function createProject(d, replace) {
+  flush()
   deck.assets = {}
   deck.files = {}
   deck.id = replace || uid()
+  added.add(deck.id)
+  removed.delete(deck.id)
   loadDeck(d)
   startHistory()
   ui.home = false
@@ -333,14 +440,24 @@ export async function createProject(d, replace) {
   await saving
 }
 export async function removeProject(id) {
+  if (deck.id === id) {
+    // no pending or running write may bring it back after the delete
+    clearTimeout(timer)
+    due = false
+    deck.id = ''
+    ui.home = true
+    await saving
+  }
   library.list = library.list.filter(p => p.id !== id)
+  removed.add(id)
+  added.delete(id)
   await Promise.all([del('p:' + id), del('a:' + id), del('f:' + id), saveList()])
-  if (deck.id === id) { deck.id = ''; ui.home = true }
 }
 export async function duplicateProject(id) {
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
+  if (!json) throw new Error(t('Project not found'))
   const d = JSON.parse(json)
-  await createProject({ ...d, title: d.title + ' (Kopie)', assets, files })
+  await createProject({ ...d, title: t('{0} (copy)', d.title || t('Presentation')), assets, files })
 }
 
 // renames a stored project without opening it (the open one: through deck.title, saved as usual)
@@ -350,8 +467,9 @@ export async function renameProject(id, title) {
   if (id === deck.id) { deck.title = title; return }
   const json = await get('p:' + id)
   if (!json) throw new Error(t('Project not found'))
-  library.list = library.list.map(p => (p.id === id ? { ...p, title, updated: Date.now() } : p))
-  await Promise.all([put('p:' + id, JSON.stringify({ ...JSON.parse(json), title })), saveList()])
+  const m = { ...library.list.find(p => p.id === id), id, title, updated: Date.now() }
+  library.list = library.list.map(p => (p.id === id ? m : p))
+  await Promise.all([put('p:' + id, JSON.stringify({ ...JSON.parse(json), title })), saveList(m)])
 }
 // the same .slides.json as deckFile(), read straight from storage without opening the project
 export async function projectFile(id) {
@@ -367,7 +485,7 @@ export async function restoreProject(d) {
   const id = typeof d?.id === 'string' && /^[\w-]{1,64}$/.test(d.id) ? d.id : null
   const have = id && library.list.find(p => p.id === id)
   const older = have && !(d.updated >= have.updated)
-  await createProject(older ? { ...d, title: d.title + ' ' + t('(older backup)') } : d, older ? undefined : id || undefined)
+  await createProject(older ? { ...d, title: (d.title || t('Presentation')) + ' ' + t('(older backup)') } : d, older ? undefined : id || undefined)
   return have ? (older ? 'copy' : 'replaced') : 'new'
 }
 
@@ -384,33 +502,22 @@ export async function restore(session = {}) {
     let last
     try { last = localStorage.getItem('slides-builder:last') } catch {}
     const open = [session.project, last].find(id => id && library.list.some(p => p.id === id))
-    if (!deck.id && open) await openProject(open)
+    if (!deck.id && open && !(await openProject(open))) ui.status = '' // gone: the overview, no message on startup
   } catch (e) {
     ui.status = t('Saved projects could not be loaded: {0}', e.message)
   }
   if (!deck.id || session.home) ui.home = true
 
-  let timer, due = null
-  const flush = () => {
+  // only marks the change: serializing the deck on every drag frame would be too slow (flush does it)
+  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.entry, deck.slides], () => {
+    if (quiet) return
     clearTimeout(timer)
-    const json = due
-    due = null
-    if (json === null || !deck.id) return
-    if (json !== history[at]) {
-      history.splice(at + 1, Infinity, json) // a new change discards the redo states
-      if (history.length > 200) history.shift()
-      at = history.length - 1
-    }
-    persist(json)
-  }
-  watch(snapshot, json => {
-    clearTimeout(timer)
-    due = json
+    due = true
     timer = setTimeout(flush, 300)
-  })
+  }, { deep: true })
   // iOS shows no warning when a tab closes and freezes hidden pages: save the moment the page goes away
-  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush() })
+  // back on the overview: other tabs may have added or deleted projects meanwhile
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); else if (ui.home) reloadList() })
   addEventListener('pagehide', flush)
   addEventListener('beforeunload', flush, true) // runs before the warning check above, so it sees the write as pending
-  watch(() => Object.keys(deck.assets).length, persistAssets)
 }

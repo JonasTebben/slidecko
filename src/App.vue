@@ -7,8 +7,8 @@ import SlideView from './SlideView.vue'
 import Inspector from './Inspector.vue'
 import Home from './Home.vue'
 import ThemeEditor from './ThemeEditor.vue'
-import { t } from './i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides } from './store.js'
+import { t, lang } from './i18n.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets } from './store.js'
 import { parseRatio } from './format.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { SLIDE_PRESETS, PALETTE, FILLS } from './presets.js'
@@ -22,7 +22,9 @@ import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, pa
 
 const { slide, selection, primary } = A
 const ready = ref(false)
-const stage = ref(), view = ref(), scale = ref(1)
+const stage = ref(), view = ref(), fitScale = ref(1)
+// canvas zoom: null = fit the stage; SlideView divides pointer movement by scale either way
+const zoom = ref(null), scale = computed(() => zoom.value ?? fitScale.value)
 const presenter = ref(), presenting = ref(false), presenterView = ref(false), presentScale = ref(1), started = ref(0), now = ref(Date.now())
 const linkDialog = ref(), linkUrl = ref('')
 const importDialog = ref(), importFiles = ref([]), importEntries = ref([]), importPick = ref([]), importMode = ref('project')
@@ -31,6 +33,8 @@ const paletteDialog = ref(), paletteQuery = ref(''), paletteIndex = ref(0)
 const deckDialog = ref(), deckNameInput = ref(''), deckRenaming = ref(null)
 const confirmDialog = ref(), confirmText = ref(''), confirmAction = ref(null)
 const ytDialog = ref(), ytUrl = ref('')
+// returnValue keeps the last button pressed: cleared, so Esc (no button) never repeats a previous OK
+const openDlg = d => { d.returnValue = ''; d.showModal() }
 
 const collapsed = ref(new Set()) // decks folded in the slide list
 // sidebars folded away (wide screens only: the phone layout stacks them and ignores this)
@@ -66,6 +70,7 @@ function inScope(i) {
   return true
 }
 const hits = computed(() => {
+  if (!findOpen.value && !mdOpen.value) return [] // closed: no search on every edit
   if (!mdOpen.value) return find(deck.slides, rx.value, findKinds).filter(h => inScope(h.slide))
   const [h] = find([{ notes: mdText.value, elements: [] }], rx.value)
   return h ? [{ ...h, obj: mdText, key: 'value', md: true, notes: false, slide: -1 }] : []
@@ -182,7 +187,7 @@ const exportDialog = ref(), exportScope = ref(''), exportFormat = ref(localStora
 function openExport(scope = '', format) {
   exportScope.value = scope
   if (format) exportFormat.value = format
-  exportDialog.value.showModal()
+  openDlg(exportDialog.value)
 }
 function doExport() {
   if (exportDialog.value.returnValue !== 'ok') return
@@ -190,6 +195,8 @@ function doExport() {
   A.exportAs(exportFormat.value, exportScope.value || undefined)
 }
 const THUMB = computed(() => 176 / format.w)
+// one style object for all thumbnails: a new object per render would re-render every thumbnail
+const thumbStyle = computed(() => ({ transform: `scale(${THUMB.value})` }))
 
 // theme, table and callout rules, generated from the same source as the Slidev export
 // (rebuilt when own themes change)
@@ -247,10 +254,12 @@ const typoStyle = document.head.appendChild(document.createElement('style'))
 watchEffect(() => { typoStyle.textContent = typoCss('.slide', deck.typo) })
 // utility classes (Slidev's UnoCSS) of everything on the slides
 let unoTimer
-watch(() => deck.slides, () => {
+// keyed on the markup only: moving or resizing elements does not touch it
+const unoKey = () => deck.slides.map(s => s.elements.map(e => (e.html || '') + '\x01' + (e.cls ? `class="${e.cls}"` : '') + '\x01' + (e.rows ? e.rows.map(r => r.join('\x02')).join('\x02') : '')).join('\0')).join('\0')
+watch(unoKey, markup => {
   clearTimeout(unoTimer)
-  unoTimer = setTimeout(() => applyUno(JSON.stringify(deck.slides.map(s => s.elements.map(e => [e.html, e.cls, e.rows]))).replace(/\\"/g, '"')), 200)
-}, { deep: true, immediate: true })
+  unoTimer = setTimeout(() => applyUno(markup), 200)
+}, { immediate: true })
 watchEffect(() => { document.title = ui.home ? 'Slidecko' : `${deck.title} – Slidecko` })
 const sessionState = () => ({ project: deck.id, slide: ui.slide, sel: selIndexes(deck.slides[ui.slide], ui.sel), collapsed: [...collapsed.value], find: findQ.value, yt: ui.yt, listTop: document.querySelector('.slide-list')?.scrollTop || 0 })
 
@@ -294,28 +303,91 @@ onMounted(async () => {
   addEventListener('pagehide', () => saveSession(sessionState())) // the list's scroll position is not reactive
   addEventListener('keydown', onKey)
   for (const type of ['copy', 'cut', 'paste']) addEventListener(type, onClipboard)
+  addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault() })
+  addEventListener('drop', onWindowDrop)
   addEventListener('resize', fitPresenter)
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) presenting.value = false })
   setInterval(() => { now.value = Date.now() }, 1000)
 })
+const stageObserver = new ResizeObserver(([e]) => { stageBox = e.contentRect; fitStage() })
 watch([() => ui.home, ready], async () => {
   await nextTick()
-  if (stage.value) new ResizeObserver(([e]) => { stageBox = e.contentRect; fitStage() }).observe(stage.value)
+  stageObserver.disconnect() // the stage is a new element after each visit to the overview
+  if (stage.value) stageObserver.observe(stage.value)
 })
 let stageBox
 const fitStage = () => {
   if (!stageBox) return
   const pad = stageBox.width < 600 ? 24 : 64 // phones: the slide takes the width
-  scale.value = Math.max(0.1, Math.min((stageBox.width - pad) / format.w, (stageBox.height - pad) / format.h))
+  fitScale.value = Math.max(0.1, Math.min((stageBox.width - pad) / format.w, (stageBox.height - pad) / format.h))
 }
-watch(format, () => { fitStage(); fitPresenter() })
-watch(() => ui.slide, () => { ui.sel = []; ui.editing = null })
+watch(format, () => { zoom.value = null; fitStage(); fitPresenter() })
+watch(() => deck.id, () => { zoom.value = null })
+// z: the new zoom (null = fit); the point at clientX/Y (default: the stage's centre) stays where it is
+const scroller = ref()
+async function setZoom(z, cx, cy) {
+  if (z != null) z = Math.min(4, Math.max(0.25, z))
+  const el = scroller.value, frame = el?.firstElementChild, old = scale.value
+  zoom.value = z
+  if (!frame || z == null) return
+  const box = el.getBoundingClientRect(), f = frame.getBoundingClientRect()
+  cx ??= box.left + box.width / 2; cy ??= box.top + box.height / 2
+  const u = (cx - f.left) / old, v = (cy - f.top) / old // that point in slide units
+  await nextTick()
+  const g = frame.getBoundingClientRect()
+  el.scrollLeft += g.left + u * z - cx
+  el.scrollTop += g.top + v * z - cy
+}
+const zoomBy = (k, cx, cy) => setZoom(scale.value * k, cx, cy)
+const cycleZoom = () => setZoom(zoom.value == null ? 1 : zoom.value === 1 ? 2 : null)
+function stageWheel(e) {
+  if (!e.ctrlKey && !e.metaKey) return
+  e.preventDefault() // not the browser's page zoom (trackpad pinch arrives as Ctrl+wheel too)
+  zoomBy(Math.exp(-Math.max(-25, Math.min(25, e.deltaY)) * 0.01), e.clientX, e.clientY) // a wheel notch ≈ ×1.25, a trackpad pinch stays smooth
+}
+// touch: two fingers pinch the slide; a second finger cancels an element drag (SlideView's track)
+const fingers = new Map()
+let pinch = null
+const spread = () => { const [a, b] = [...fingers.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
+function fingerDown(e) {
+  if (e.pointerType !== 'touch') return
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (fingers.size === 2) pinch = { d: spread().d || 1, z: scale.value }
+}
+function fingerMove(e) {
+  if (!fingers.has(e.pointerId)) return
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (!pinch || fingers.size !== 2) return
+  const m = spread()
+  setZoom(pinch.z * m.d / pinch.d, m.x, m.y)
+}
+function fingerUp(e) {
+  fingers.delete(e.pointerId)
+  if (fingers.size < 2) pinch = null
+}
+// another slide: its elements only (undo selects what it changed on the slide it jumps to)
+watch(() => ui.slide, () => { ui.sel = ui.sel.filter(id => slide.value?.elements.some(e => e.id === id)); ui.editing = null })
+// beside the slide: a mouse clears the selection at once; a finger only on a tap, so scrolling keeps it
+let lastTap = 0
+function stageDown(e) {
+  if (!e.isPrimary) return
+  if (e.pointerType !== 'touch') { ui.sel = []; return }
+  const up = ev => {
+    if (ev.pointerId !== e.pointerId) return
+    removeEventListener('pointerup', up); removeEventListener('pointercancel', up)
+    if (ev.type !== 'pointerup' || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) >= 8) return
+    ui.sel = []
+    if (ev.timeStamp - lastTap < 350) { zoom.value = null; lastTap = 0 } else lastTap = ev.timeStamp // double tap: fit again
+  }
+  addEventListener('pointerup', up)
+  addEventListener('pointercancel', up)
+}
 async function showView(v) {
   if (!v) return
   if (v.home) { ui.home = true; return }
   if (v.project !== deck.id) {
     if (!library.list.some(p => p.id === v.project)) return // deleted or from another browser: stay where we are
-    try { await openProject(v.project) } catch { return }
+    try { if (!(await openProject(v.project))) return } catch { return }
   }
   ui.home = false
   ui.slide = Math.max(0, Math.min(v.slide, deck.slides.length - 1))
@@ -364,7 +436,7 @@ function openLink() {
   if (a) s.selectAllChildren(a)
   linkRange = s.getRangeAt(0).cloneRange() // the dialog takes the focus, and with it the selection
   linkUrl.value = a?.getAttribute('href') || 'https://'
-  linkDialog.value.showModal()
+  openDlg(linkDialog.value)
 }
 let linkRange
 function applyLink() {
@@ -376,12 +448,14 @@ function applyLink() {
   else if (s.isCollapsed) A.format('insertHTML', `<a href="${url.replace(/"/g, '%22')}">${url.replace(/</g, '&lt;')}</a>`)
   else A.format('createLink', url)
 }
-const confirmLabel = ref('')
-function ask(text, action, label = t('Remove')) {
+const confirmLabel = ref(''), confirmUndo = ref(true)
+// undoable: the note that Undo brings it back (not for things outside the project, like unsaved Markdown)
+function ask(text, action, label = t('Remove'), undoable = true) {
   confirmLabel.value = label
+  confirmUndo.value = undoable
   confirmText.value = text
   confirmAction.value = action
-  confirmDialog.value.showModal()
+  openDlg(confirmDialog.value)
 }
 
 async function pickImport(files, mode) {
@@ -393,7 +467,7 @@ async function pickImport(files, mode) {
     dupOf.value = source && library.list.find(p => p.source === source)
     if (!dupOf.value) return A.importProject(files, 'slides.md')
     importFiles.value = files
-    return dupDialog.value.showModal()
+    return openDlg(dupDialog.value)
   }
   importFiles.value = files
   // loose .md files: each becomes a deck of a new project (or of the open one), in name order
@@ -401,7 +475,7 @@ async function pickImport(files, mode) {
   importEntries.value = (mode === 'project' ? await A.entryCandidates(files) : paths).sort(A.byName)
   importPick.value = [...importEntries.value]
   if (mode === 'project' && importEntries.value.length === 1) return A.importDecksAsProject(files, importPick.value)
-  importDialog.value.showModal()
+  openDlg(importDialog.value)
 }
 const dupDialog = ref(), dupOf = ref(null)
 function dupChoice() {
@@ -409,6 +483,24 @@ function dupChoice() {
   if (v === 'open') A.run(() => openProject(dupOf.value.id))
   else if (v === 'copy') A.importProject(importFiles.value, 'slides.md')
   else if (v === 'replace') A.importProject(importFiles.value, 'slides.md', dupOf.value.id)
+}
+// files dropped anywhere in the editor: images onto the slide, presentations appended, Markdown as decks
+const PRESENTATION = /\.(pptx|potx|odp|otp|pdf|md|json|zip|html?)$/i // what Home accepts besides images
+function dropFiles(files) {
+  const images = files.filter(f => f.type.startsWith('image/')), rest = files.filter(f => !images.includes(f))
+  const md = rest.filter(f => /\.md$/i.test(f.name)), pres = rest.filter(f => PRESENTATION.test(f.name) && !md.includes(f))
+  if (images.length) A.addImages(images)
+  if (md.length) pickImport(md, 'decks')
+  if (pres.length) A.appendPresentations(pres)
+  if (rest.length > md.length + pres.length) A.toast(t('This file type cannot be inserted.'))
+}
+const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files') // slide and deck drags carry no files
+function onWindowDrop(e) {
+  if (!hasFiles(e)) return
+  const done = e.defaultPrevented // the stage, thumbnails, decks or Home handled it
+  e.preventDefault() // never let the browser open the file instead of the app
+  if (done || ui.home || !ready.value) return
+  dropFiles([...e.dataTransfer.files])
 }
 function doImport() {
   if (importDialog.value.returnValue !== 'ok' || !importPick.value.length) return
@@ -420,12 +512,19 @@ function openMarkdown(target = 'slide') {
   mdTarget.value = target
   mdText.value = target === 'slide' ? A.currentSlideMarkdown() : t('---\nlayout: cover\n---\n\n# Title\n\n## Subtitle\n\n---\n\n# First slide\n\n- Item one\n- Item two\n')
   mdOpen.value = true
-  mdDialog.value.showModal()
+  mdStart = mdText.value
+  openDlg(mdDialog.value)
+}
+let mdStart = '' // the text the Markdown dialog opened with: Esc after edits asks first
+function mdCancel(e) {
+  if (mdText.value === mdStart) return
+  e.preventDefault()
+  ask(t('Discard your Markdown changes?'), () => mdDialog.value.close(), t('Discard'), false)
 }
 const applyMarkdown = () => A.run(async () => {
   mdOpen.value = false
   if (mdDialog.value.returnValue !== 'ok') return
-  const file = mdTarget.value === 'slide' ? fileOf(slide.value) : `${String(decks.value.length).padStart(2, '0')}_Neu.md`
+  const file = mdTarget.value === 'slide' ? fileOf(slide.value) : `${String(decks.value.length).padStart(2, '0')}_New.md`
   const slides = await A.markdownToSlides(mdText.value, file)
   if (!slides.length) return A.toast(t('No slide content found.'))
   if (mdTarget.value === 'slide') {
@@ -438,8 +537,8 @@ const applyMarkdown = () => A.run(async () => {
   A.toast(t(slides.length > 1 ? '{0} slides applied.' : '{0} slide applied.', slides.length))
 })
 
-function newDeck() { deckRenaming.value = null; deckNameInput.value = ''; deckDialog.value.showModal() }
-function renameDeckAsk(d) { deckRenaming.value = d.file; deckNameInput.value = d.name; deckDialog.value.showModal() }
+function newDeck() { deckRenaming.value = null; deckNameInput.value = ''; openDlg(deckDialog.value) }
+function renameDeckAsk(d) { deckRenaming.value = d.file; deckNameInput.value = d.name; openDlg(deckDialog.value) }
 function applyDeck() {
   if (deckDialog.value.returnValue !== 'ok' || !deckNameInput.value.trim()) return
   if (deckRenaming.value) A.renameDeck(deckRenaming.value, deckNameInput.value)
@@ -452,8 +551,10 @@ function addVideo() {
 }
 
 // --- presenting ---
+// the same query as the phone layout in app.css: narrow screens and phones held sideways
+const phone = matchMedia('(max-width: 760px), (max-height: 500px) and (pointer: coarse)')
 const fitPresenter = () => {
-  const narrow = innerWidth < 760 // phones: presenter view stacks slide, next slide and notes
+  const narrow = phone.matches // phones: presenter view stacks slide, next slide and notes
   presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
 }
 async function present(from = ui.slide) {
@@ -461,6 +562,8 @@ async function present(from = ui.slide) {
   ui.editing = null
   A.go(from)
   presenting.value = true
+  blank.value = null
+  jump.value = ''
   started.value = Date.now()
   await nextTick()
   presenter.value.focus()
@@ -471,21 +574,57 @@ function stopPresenting() {
   presenting.value = false
   if (document.fullscreenElement) document.exitFullscreen()
 }
+const blank = ref(null) // 'black' | 'white': the screen goes blank while the audience should look at the speaker
+const jump = ref('') // typed slide number, Enter jumps there
+let jumpTimer = 0
+const presentGo = i => { blank.value = null; jump.value = ''; A.go(i) }
+const resetTimer = () => { started.value = Date.now(); now.value = started.value }
 function presentKey(e) {
+  const plain = !e.metaKey && !e.ctrlKey && !e.altKey
+  if (plain && /^[0-9]$/.test(e.key)) {
+    jump.value += e.key
+    clearTimeout(jumpTimer)
+    jumpTimer = setTimeout(() => { jump.value = '' }, 2000)
+    return e.preventDefault()
+  }
+  if (e.key === 'Enter' && jump.value) { clearTimeout(jumpTimer); presentGo(+jump.value - 1); return e.preventDefault() }
+  const k = e.key.toLowerCase()
+  if (plain && (k === 'b' || k === '.' || k === 'w' || k === ',')) {
+    const want = k === 'b' || k === '.' ? 'black' : 'white'
+    blank.value = blank.value === want ? null : want
+    return e.preventDefault()
+  }
+  if (plain && k === 'r') { resetTimer(); return e.preventDefault() }
   const d = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1, Enter: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1, Backspace: -1 }[e.key]
-  if (d) A.go(ui.slide + d)
-  else if (e.key === 'Home') A.go(0)
-  else if (e.key === 'End') A.go(deck.slides.length - 1)
+  if (d) presentGo(ui.slide + d)
+  else if (e.key === 'Home') presentGo(0)
+  else if (e.key === 'End') presentGo(deck.slides.length - 1)
   else if (e.key === 'Escape') stopPresenting()
   else if (e.key.toLowerCase() === 'p') { presenterView.value = !presenterView.value; fitPresenter() }
   else return
   e.preventDefault()
 }
+// touch: a horizontal swipe changes the slide, and the click that may follow it does not advance again
+let swipe = null, swiped = false
+function swipeDown(e) {
+  swiped = false
+  swipe = e.pointerType === 'touch' && e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 } : null
+}
+function swipeMove(e) { if (swipe?.id === e.pointerId) Object.assign(swipe, { dx: e.clientX - swipe.x, dy: e.clientY - swipe.y }) }
+function swipeUp(e) {
+  if (swipe?.id !== e.pointerId) return
+  const { dx, dy } = swipe
+  swipe = null
+  if (Math.abs(dx) <= 40 || Math.abs(dx) <= Math.abs(dy)) return
+  swiped = true
+  presentGo(ui.slide + (dx < 0 ? 1 : -1))
+}
 function presentClick(e) {
+  if (swiped) { swiped = false; return }
   const a = e.target.closest('a[href]')
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (e.target.closest('iframe, .pv-side, .pv-bar')) return
-  A.go(ui.slide + (e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
+  presentGo(ui.slide + (e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
@@ -493,6 +632,9 @@ const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - s
 // [label, action, shortcut]: shortcuts are spelled 'mod+shift+alt+key' (mod = ⌘ on Mac, Strg elsewhere);
 // the same list drives the command palette, its hints and the keyboard handling
 // what the theme gallery shows: big enough to read at 13 %
+// menu previews: built once (again on a language switch), not on every render
+const PREVIEW_STYLE = { transform: 'scale(0.13)' }
+const PRESET_PREVIEWS = computed(() => (lang.value, SLIDE_PRESETS.map(p => ({ layout: p.layout, elements: p.make() }))))
 const THEME_PREVIEW = computed(() => ({ layout: 'default', elements: [
   { id: 't', type: 'text', title: true, x: 56, y: 30, w: 868, h: 60, html: `<h1>${t('Title')}</h1>`, fontSize: 30 },
   { id: 'l', type: 'text', x: 56, y: 130, w: 520, h: 300, html: `<ul><li>${t('Item one')}</li><li>${t('Item')} <a href="#">${t('two')}</a></li><li><code>code</code></li></ul>`, fontSize: 40 },
@@ -510,13 +652,15 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; ytDialog.value.showModal() }, 'y'],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'],
   [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
   [t('Show/hide slide list'), () => (panels.slides = !panels.slides), 'alt+b'], [t('Show/hide properties'), () => (panels.props = !panels.props), 'alt+e'],
   [t('Undo'), () => undo(), 'mod+z'], [t('Redo'), redo, 'mod+shift+z'],
+  [t('Zoom in'), () => zoomBy(1.25), 'mod+='], [t('Zoom out'), () => zoomBy(1 / 1.25), 'mod+-'], [t('Zoom to 100 %'), () => setZoom(1), 'shift+0'],
+  [t('Fit slide to window'), () => setZoom(null), 'mod+0'], [t('Zoom to fit'), () => setZoom(null), 'shift+1'],
   [t('Find'), () => openFind(), 'mod+f'], [t('Replace'), () => openFind(true), 'mod+alt+f'],
   [t('Select all'), A.selectAll, 'mod+a'], [t('Copy formatting'), A.copyLook, 'mod+alt+c'], [t('Paste formatting'), () => A.pasteLook(), 'mod+alt+v'], [t('Duplicate'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'mod+d'],
   [t('Bring forward'), () => A.order('forward'), 'mod+arrowup'], [t('Send backward'), () => A.order('backward'), 'mod+arrowdown'],
@@ -541,7 +685,7 @@ const filtered = computed(() => {
   if (!q.length) return [...commands.value].sort((a, b) => !a[2] - !b[2])
   return commands.value.filter(([n, , k]) => q.every(w => n.toLowerCase().includes(w) || keyLabel(k)?.toLowerCase() === w)).slice(0, 30)
 })
-function openPalette() { paletteQuery.value = ''; paletteIndex.value = 0; paletteDialog.value.showModal() }
+function openPalette() { paletteQuery.value = ''; paletteIndex.value = 0; openDlg(paletteDialog.value) }
 function paletteKey(e) {
   if (e.key === 'ArrowDown') paletteIndex.value = Math.min(filtered.value.length - 1, paletteIndex.value + 1)
   else if (e.key === 'ArrowUp') paletteIndex.value = Math.max(0, paletteIndex.value - 1)
@@ -560,7 +704,8 @@ function onKey(e) {
   if (presenting.value || ui.home) return
   const k = e.key.toLowerCase(), cmd = e.metaKey || e.ctrlKey
   // letters by position: Alt/Option changes e.key (⌥P = π)
-  const name = /^Key[A-Z]$/.test(e.code) ? e.code[3].toLowerCase() : k
+  // digits by position too (Shift+0 is ")" or "="), and "+" as "=" (⌘+ on German keyboards)
+  const name = /^Key[A-Z]$/.test(e.code) ? e.code[3].toLowerCase() : /^Digit\d$/.test(e.code) ? e.code[5] : k === '+' ? '=' : k
   if (cmd && k === 'k' && ui.editing) { e.preventDefault(); return openLink() }
   // crop mode: Enter or Esc finishes it (before anything else uses those keys)
   if (ui.crop && (k === 'escape' || k === 'enter') && !inField(e)) { e.preventDefault(); return A.endCrop() }
@@ -674,15 +819,20 @@ function onClipboard(e) {
   if (presenting.value || ui.home || inField(e)) return
   if (e.type !== 'paste') {
     if (!selection.value.length) return
-    e.clipboardData.setData(CLIP, JSON.stringify(selection.value))
+    // the images ride along, so pasting into another project keeps them (also those inside text)
+    e.clipboardData.setData(CLIP, JSON.stringify({ elements: selection.value, assets: usedAssets([{ elements: selection.value }]) }))
     e.clipboardData.setData('text/plain', selection.value.map(el => el.code || el.html?.replace(/<[^>]+>/g, '') || '').join('\n'))
     if (e.type === 'cut') A.remove()
   } else if (e.clipboardData.getData(CLIP)) {
-    const list = JSON.parse(e.clipboardData.getData(CLIP))
     A.run(() => {
+      const d = JSON.parse(e.clipboardData.getData(CLIP)) // untrusted: an old array of elements or { elements, assets }
+      const list = Array.isArray(d) ? d : Array.isArray(d?.elements) ? d.elements : []
+      // only images this project lacks, and only image data (the loadDeck rule)
+      for (const [k, v] of Object.entries(Array.isArray(d) ? {} : d?.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:image\//.test(v)) deck.assets[k] = v
       const els = cleanSlides([{ elements: list }])[0].elements.map(el => ({ ...el, x: el.x + 16, y: el.y + 16 }))
       slide.value.elements.push(...els)
       ui.sel = els.map(el => el.id)
+      if (els.length < list.length) A.toast(t('{0} elements could not be pasted.', list.length - els.length))
     })
   } else if ([...e.clipboardData.files].some(f => f.type.startsWith('image/'))) {
     A.addImages([...e.clipboardData.files])
@@ -690,7 +840,7 @@ function onClipboard(e) {
     const text = e.clipboardData.getData('text/plain')
     if (!text.trim()) return
     // markdown pasted onto the canvas becomes slides when it looks like Slidev, otherwise text
-    if (/^---\s*$/m.test(text) || /^#\s/m.test(text)) { mdTarget.value = 'new'; mdText.value = text; mdOpen.value = true; mdDialog.value.showModal() }
+    if (/^---\s*$/m.test(text) || /^#\s/m.test(text)) { mdTarget.value = 'new'; mdText.value = mdStart = text; mdOpen.value = true; openDlg(mdDialog.value) }
     else A.addElement({ type: 'text', x: 120, y: 140, w: 600, h: 40, html: text.split(/\n{2,}/).map(p => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>')}</p>`).join('') })
   }
   e.preventDefault()
@@ -747,10 +897,10 @@ function onClipboard(e) {
 
       <div class="bar">
       <div class="tools">
-        <Menu icon="plus" :label="t('Slide')" :title="t('New slide (N)')" wide>
+        <Menu v-slot="{ open }" icon="plus" :label="t('Slide')" :title="t('New slide (N)')" wide>
           <div class="preset-grid">
-            <button v-for="p in SLIDE_PRESETS" :key="p.id" class="preset-card" @click="A.addSlide(p)">
-              <span class="mini-slide"><SlideView :slide="{ layout: p.layout, elements: p.make() }" :index="0" :style="{ transform: 'scale(0.13)' }" inert /></span>
+            <button v-for="(p, k) in SLIDE_PRESETS" :key="p.id" class="preset-card" @click="A.addSlide(p)">
+              <span class="mini-slide"><SlideView v-if="open" :slide="PRESET_PREVIEWS[k]" :index="0" :style="PREVIEW_STYLE" inert /></span>
               {{ t(p.name) }}
             </button>
           </div>
@@ -778,7 +928,7 @@ function onClipboard(e) {
             </button>
           </div>
           <hr />
-          <button class="mi" @click="ytUrl = ''; ytDialog.showModal()"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
           <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>⇧M</kbd></button>
         </Menu>
         <span class="divider" />
@@ -788,12 +938,12 @@ function onClipboard(e) {
 
       <div class="right">
         <button class="tb icon" :title="`${t('Search commands')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
-        <Menu icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
+        <Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
           <template v-for="own in [false, true]" :key="own">
             <h4 class="mh">{{ own ? t('Own themes') : t('Built-in themes') }}</h4>
             <div class="theme-grid">
               <button v-for="id in themeIds(own)" :key="id" class="theme-card" :class="{ on: deck.theme === id }" @click="setTheme(id)">
-                <span class="mini-slide"><SlideView :slide="THEME_PREVIEW" :index="0" :theme="id" :style="{ transform: 'scale(0.13)' }" inert /></span>
+                <span class="mini-slide"><SlideView v-if="open" :slide="THEME_PREVIEW" :index="0" :theme="id" :style="PREVIEW_STYLE" inert /></span>
                 {{ themeName(id) }}
               </button>
             </div>
@@ -861,7 +1011,7 @@ function onClipboard(e) {
                 <span class="num">{{ g.start + j + 1 }}</span>
                 <button class="thumb" :style="{ height: Math.round(format.h * THUMB) + 4 + 'px' }" :aria-current="g.start + j === ui.slide" :aria-label="t('Slide {0}', g.start + j + 1)" draggable="true"
                   @click="ui.slide = g.start + j" @dblclick="present(g.start + j)" @contextmenu="onThumbContext($event, g.start + j)" @dragstart="dragStart($event, g.start + j)">
-                  <SlideView :slide="s" :index="g.start + j" :style="{ transform: `scale(${THUMB})` }" inert aria-hidden="true" />
+                  <SlideView :slide="s" :index="g.start + j" :style="thumbStyle" inert aria-hidden="true" />
                   <span v-if="findOpen && hitsOn[g.start + j]" class="find-badge" :title="t('{0} matches', hitsOn[g.start + j])">{{ hitsOn[g.start + j] }}</span>
                 </button>
               </div>
@@ -871,7 +1021,9 @@ function onClipboard(e) {
         </div>
       </nav>
 
-      <section ref="stage" class="stage" :aria-label="t('Slide {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="A.addImages([...$event.dataTransfer.files])" @pointerdown.self="ui.sel = []">
+      <section ref="stage" class="stage" :aria-label="t('Slide {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="dropFiles([...$event.dataTransfer.files])" @wheel="stageWheel"
+        @pointerdown.capture="fingerDown" @pointermove="fingerMove" @pointerup="fingerUp" @pointercancel="fingerUp"
+        @touchmove="$event.touches.length > 1 && $event.preventDefault()">
         <button class="tb icon small panel-toggle left" :aria-expanded="panels.slides" :aria-label="t('Show/hide slide list')" :title="`${t('Show/hide slide list')} (${keyLabel('alt+b')})`" @click="panels.slides = !panels.slides"><Icon :name="panels.slides ? 'chevronL' : 'chevronR'" :size="16" /></button>
         <button class="tb icon small panel-toggle right" :aria-expanded="panels.props" :aria-label="t('Show/hide properties')" :title="`${t('Show/hide properties')} (${keyLabel('alt+e')})`" @click="panels.props = !panels.props"><Icon :name="panels.props ? 'chevronR' : 'chevronL'" :size="16" /></button>
         <Teleport defer :to="mdOpen ? '.md-wrap' : '.stage'">
@@ -911,8 +1063,10 @@ function onClipboard(e) {
           </div>
         </dialog>
         </Teleport>
-        <div class="frame" :style="{ width: format.w * scale + 'px', height: format.h * scale + 'px', '--s': scale }" @contextmenu="onContext">
-          <SlideView ref="view" :key="slide.id" :slide="slide" :index="ui.slide" editable :scale="scale" :style="{ transform: `scale(${scale})` }" />
+        <div ref="scroller" class="stage-scroll" :class="{ zoomed: zoom != null }" @pointerdown.self="stageDown">
+          <div class="frame" :style="{ width: format.w * scale + 'px', height: format.h * scale + 'px', '--s': scale }" @contextmenu="onContext">
+            <SlideView ref="view" :key="slide.id" :slide="slide" :index="ui.slide" editable :scale="scale" :style="{ transform: `scale(${scale})` }" />
+          </div>
         </div>
         <Menu ref="ctx" manual>
           <template v-if="ctxAt?.group">
@@ -1081,7 +1235,7 @@ function onClipboard(e) {
             <button class="mi" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}</button>
           </template>
         </Menu>
-        <div class="stage-info">{{ ui.slide + 1 }} / {{ deck.slides.length }} · {{ Math.round(scale * 100) }} %</div>
+        <div class="stage-info" :class="{ zoomed: zoom != null }">{{ ui.slide + 1 }} / {{ deck.slides.length }} · <button type="button" class="zoom-btn" :aria-label="`${t('Zoom')}: ${Math.round(scale * 100)} %`" :title="t('Zoom')" @click="cycleZoom">{{ Math.round(scale * 100) }} %</button></div>
       </section>
 
       <Inspector @link="openLink" @markdown="openMarkdown('slide')" />
@@ -1118,14 +1272,14 @@ function onClipboard(e) {
       </form>
     </dialog>
 
-    <dialog ref="mdDialog" class="wide" @close="applyMarkdown">
+    <dialog ref="mdDialog" class="wide" @close="applyMarkdown" @cancel="mdCancel">
       <form method="dialog">
         <h2>{{ mdTarget === 'slide' ? t('Markdown of slide {0}', ui.slide + 1) : t('Slides from Markdown') }}</h2>
         <p>{{ t('Slidev Markdown: separate slides with') }} <code>---</code> {{ t(', set the layout via frontmatter (') }}<code>layout: cover</code>{{ t('). Ideal for slides generated by AI.') }}</p>
         <div class="md-wrap">
           <!-- the highlighted copy shows through the transparent textarea text; highlight() escapes the HTML -->
           <div class="md-mirror text-mirror" aria-hidden="true" v-html="highlight(mdText, 'markdown') + '\u200b'" />
-          <textarea v-model="mdText" class="md-editor" spellcheck="false" aria-label="Markdown" @scroll="$event.target.previousElementSibling.scrollTop = $event.target.scrollTop" />
+          <textarea v-model="mdText" class="md-editor" spellcheck="false" aria-label="Markdown" @keydown.meta.enter.prevent="mdDialog.close('ok')" @keydown.ctrl.enter.prevent="mdDialog.close('ok')" @scroll="$event.target.previousElementSibling.scrollTop = $event.target.scrollTop" />
         </div>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok">{{ mdTarget === 'slide' ? t('Replace slide') : t('Insert slides') }}</button></menu>
       </form>
@@ -1182,7 +1336,7 @@ function onClipboard(e) {
     <dialog ref="confirmDialog" @close="confirmDialog.returnValue === 'ok' && confirmAction?.()">
       <form method="dialog">
         <h2>{{ t('Are you sure?') }}</h2>
-        <p>{{ confirmText }} {{ t('You can get it back with “Undo”.') }}</p>
+        <p>{{ confirmText }} <template v-if="confirmUndo">{{ t('You can get it back with “Undo”.') }}</template></p>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary danger" value="ok">{{ confirmLabel }}</button></menu>
       </form>
     </dialog>
@@ -1198,7 +1352,8 @@ function onClipboard(e) {
     </dialog>
   </template>
 
-  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick">
+  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
+    @pointerdown="swipeDown" @pointermove="swipeMove" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
       <SlideView :slide="slide" :index="ui.slide" live :style="{ transform: `scale(${presentScale})` }" />
     </div>
@@ -1210,9 +1365,11 @@ function onClipboard(e) {
       </div>
       <div class="pv-notes">{{ slide.notes || t('No notes') }}</div>
     </aside>
+    <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
+    <div class="pv-jump" aria-live="polite">{{ jump && t('Slide {0}', jump) }}</div>
     <div class="pv-bar">
       <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
-      <span v-if="presenterView">⏱ {{ elapsed }}</span>
+      <button v-if="presenterView" class="tb small pv-timer" :title="t('Reset timer') + ' (R)'" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
       <button class="tb icon small" :title="t('Presenter view (P)')" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
       <button class="tb icon small" :title="t('Exit (Esc)')" @click.stop="stopPresenting"><Icon name="x" :size="16" /></button>
     </div>

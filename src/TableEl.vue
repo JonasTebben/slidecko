@@ -5,6 +5,15 @@ import { cellKey, cellPaste, cellCopy, mirrorCells, area, insertRow, deleteRow, 
 import { typed, autoList } from './lists.js'
 import { t } from './i18n.js'
 
+// follows one pointer until it lifts or the browser takes the gesture over (as SlideView's track())
+function track(e, move) {
+  const mv = ev => ev.pointerId === e.pointerId && move(ev)
+  const up = ev => { if (ev.pointerId !== e.pointerId) return; removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up) }
+  addEventListener('pointermove', mv)
+  addEventListener('pointerup', up)
+  addEventListener('pointercancel', up)
+}
+
 // A table element. While editing, every cell is editable; Tab/arrows move between cells,
 // pasted spreadsheet data fills the grid, and the column borders can be dragged.
 const props = defineProps({ el: Object, editing: Boolean, selected: Boolean, scale: { type: Number, default: 1 } })
@@ -56,16 +65,14 @@ function down(e, r, c) {
   if (!props.editing || e.button) return
   if (e.shiftKey && ui.cell) { e.preventDefault(); ui.cellEnd = r === ui.cell.r && c === ui.cell.c ? null : { r, c }; return } // the caret stays put
   const table = tableRef.value
-  const move = ev => {
+  track(e, ev => {
     const td = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-r]')
     if (!td || !table.contains(td)) return
     const to = { r: +td.dataset.r, c: +td.dataset.c }
     if (to.r === r && to.c === c) { ui.cellEnd = null; return }
     ui.cellEnd = to
     getSelection().removeAllRanges() // a cell range, not a text selection across cells
-  }
-  addEventListener('pointermove', move)
-  addEventListener('pointerup', () => removeEventListener('pointermove', move), { once: true })
+  })
 }
 function focused(r, c) {
   ui.cell = { r, c }
@@ -88,18 +95,14 @@ const borders = computed(() => {
 function resizeCol(e, i) {
   const table = e.target.parentElement.querySelector('table')
   const total = table.offsetWidth
-  const n = props.el.rows[0].length
   if (!props.el.widths) props.el.widths = [...table.rows[0].cells].map(c => Math.round((c.offsetWidth / total) * 1000) / 10)
   const start = [...props.el.widths]
-  const move = ev => {
+  track(e, ev => {
     const d = ((ev.clientX - e.clientX) / props.scale / total) * 100
     const a = Math.max(4, Math.min(start[i] + start[i + 1] - 4, start[i] + d))
     props.el.widths[i] = Math.round(a * 10) / 10
     props.el.widths[i + 1] = Math.round((start[i] + start[i + 1] - a) * 10) / 10
-  }
-  addEventListener('pointermove', move)
-  addEventListener('pointerup', () => removeEventListener('pointermove', move), { once: true })
-  void n
+  })
 }
 </script>
 

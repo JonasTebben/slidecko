@@ -61,7 +61,8 @@ export async function importSlidev(path, files, theme) {
   const format = headFormat(texts.get(path))
   const size = formatSize(parseRatio(format.aspectRatio) || 16 / 9, format.canvasWidth || 980)
   // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML
-  const htmls = parsed.map(s => marked.parse(stripNonContent(s.md)))
+  // sanitized: the markdown may come from a pasted text or a downloaded project (raw HTML, onerror=…)
+  const htmls = parsed.map(s => clean(marked.parse(stripNonContent(s.md))))
   await applyUno(htmls.join('\n'))
 
   const host = document.body.appendChild(document.createElement('div'))

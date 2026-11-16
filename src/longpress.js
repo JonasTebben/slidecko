@@ -27,3 +27,5 @@ addEventListener('contextmenu', e => {
 }, opts)
 // lifting the finger after the menu opened must not also click what was under it
 addEventListener('click', e => { if (fired) { fired = false; e.preventDefault(); e.stopImmediatePropagation() } }, opts)
+// a drag that started as a long press opened the menu instead: the box must not move
+export const longPressFired = () => fired

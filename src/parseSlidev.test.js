@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { parseSlidev, headFormat } from './parseSlidev.js'
-import { toSlidev, slideHash, slideToMarkdown } from './toSlidev.js'
+import { toSlidev, slideHash, slideToMarkdown, escapeMustache } from './toSlidev.js'
 import { importTheme } from './themes.js'
 
 // the JBT Theme is no built-in theme: the tests use it the way a user does, imported from its file
@@ -108,6 +108,23 @@ test('edited slides are written as positioned boxes that parse back identically'
   for (const part of ['<strong>Fett</strong>', '<a href="https://sli.dev">Link</a>', '<li>a</li>', '<th>A</th>', '<td>2</td>']) assert.ok(text.html.includes(part), part)
   assert.deepEqual([code.code, code.lang, code.meta, code.box.x], [elements[2].code, 'js', '{1,2}', 500])
   assert.deepEqual([img.src, img.box], ['/images/x.png', { x: 500, y: 300, w: 200, h: 100 }])
+})
+
+test('escapes Vue mustaches in text but not in code', () => {
+  const elements = [
+    { id: 'a', type: 'text', x: 0, y: 0, w: 400, h: 100, html: '<p>Hello {{name}} and <code>{{inline}}</code></p>' },
+    { id: 'b', type: 'code', x: 0, y: 200, w: 400, h: 100, lang: 'vue', code: '<p>{{ msg }}</p>' },
+  ]
+  const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', slides: [{ layout: 'default', elements }] }, {}).files['slides.md']
+  assert.match(md, /Hello <span v-pre>\{\{<\/span>name\}\}/)
+  assert.match(md, /`\{\{inline\}\}`/)
+  assert.match(md, /```vue\n<p>\{\{ msg \}\}<\/p>\n```/)
+  // Turndown's escaped backticks are text, not a code span
+  assert.equal(escapeMustache('Use \\` quotes {{name}} and \\` here'), 'Use \\` quotes <span v-pre>{{</span>name}} and \\` here')
+  // an unchanged imported slide stays byte for byte
+  const kept = { layout: 'default', md: 'Raw {{x}}', elements: [] }
+  kept.hash = slideHash(kept)
+  assert.match(toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', slides: [kept] }, {}).files['slides.md'], /Raw \{\{x\}\}/)
 })
 
 test('exports tables, shapes and decks in slide order', () => {

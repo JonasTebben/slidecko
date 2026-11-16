@@ -45,3 +45,14 @@ test('a plain-colour title bar becomes a gradient layer (a colour in a non-final
   assert.equal(themeStyle('business')['--bar'], 'linear-gradient(#0b2545, #0b2545)')
   assert.equal(themeStyle('ozean')['--bar'], 'linear-gradient(90deg, #0b2545, #0e7490)')
 })
+
+test('imported theme CSS that leaves its .theme-x block is dropped, a normal one is kept', () => {
+  for (const css of ['} body{display:none} .x{', '/* { */ } body{display:none} ', '& h1 { color: red']) {
+    const id = importTheme({ name: 'Evil', css })
+    assert.equal(THEMES[id].css, undefined, css)
+    deleteTheme(id)
+  }
+  const id = importTheme({ name: 'Fine', css: '& h1 { content: "}"; color: red } /* } */ &.layout-cover { & p { margin: 0 } }' })
+  assert.match(THEMES[id].css, /color: red/)
+  deleteTheme(id)
+})

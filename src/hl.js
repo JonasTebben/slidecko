@@ -10,8 +10,19 @@ export const LANGS = ['js', 'ts', 'html', 'astro', 'css', 'bash', 'json', 'http'
 export const highlight = (code, lang) =>
   hljs.highlight(code, { language: hljs.getLanguage(lang) ? lang : 'plaintext' }).value
 
-// highlighted HTML as one string per line: spans running over a line break are closed and reopened
+// highlighted HTML as one string per line: spans running over a line break are closed and reopened.
+// Memoized: every render of every thumbnail asks again; the newest 200 blocks are kept
+const memo = new Map()
 export function hlLines(code, lang) {
+  const key = lang + '\0' + code
+  let lines = memo.get(key)
+  if (lines) return lines
+  lines = splitLines(code, lang)
+  memo.set(key, lines)
+  if (memo.size > 200) memo.delete(memo.keys().next().value)
+  return lines
+}
+function splitLines(code, lang) {
   const out = [], open = []
   let cur = ''
   for (const t of highlight(code, lang).split(/(<span[^>]*>|<\/span>|\n)/)) {

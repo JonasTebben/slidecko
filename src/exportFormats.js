@@ -1,6 +1,7 @@
 import { toPng, toJpeg, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import { W, H, readDataUrl, deckFile } from './store.js'
+import { lang } from './i18n.js'
 
 // Exports that reuse the rendered slides (root: one .slide per slide at 1:1) as they are:
 // pictures of each slide and a self-contained HTML presentation. Both look exactly like the editor.
@@ -67,7 +68,7 @@ async function inlineUrls(css, files) {
   if (files) {
     const path = {}
     for (const u of Object.keys(data)) {
-      let p = 'assets/' + (u.split(/[?#]/)[0].split('/').pop().replace(/[^\w.-]+/g, '_') || 'datei')
+      let p = 'assets/' + (u.split(/[?#]/)[0].split('/').pop().replace(/[^\w.-]+/g, '_') || 'file')
       while (files[p]) p = p.replace(/(\.\w+)?$/, '-1$1')
       files[p] = data[u]
       path[u] = p
@@ -84,13 +85,14 @@ async function inlineUrls(css, files) {
 
 const viewerCss = () => `
 html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
-.deck { position: fixed; inset: 0; }
+.deck { position: fixed; inset: 0; touch-action: manipulation; }
 .deck > .slide { position: absolute !important; left: 50% !important; top: 50% !important; width: ${W}px !important; height: ${H}px !important; margin: 0 !important; visibility: hidden; box-shadow: 0 8px 40px #0008; }
 .deck > .slide.on { visibility: visible; }
 .hud { position: fixed; right: 14px; bottom: 10px; padding: 4px 4px 4px 10px; border-radius: 9px; background: #000a; font: 12px/1 system-ui, sans-serif; color: #fffc; user-select: none; opacity: 0; transition: opacity .3s; }
 .hud.show, .hud:hover, .hud:focus-within { opacity: 1; }
 .hud button { font: inherit; color: inherit; background: #fff1; border: 0; border-radius: 6px; padding: 6px 9px; margin-left: 4px; cursor: pointer; }
 .hud button:hover { background: #fff3; color: #fff; }
+@media (hover: none) { .hud { opacity: 1; } .hud button { min-width: 44px; min-height: 44px; } }
 @media print {
   html, body { height: auto; overflow: visible; background: none; }
   .deck { position: static; }
@@ -129,7 +131,7 @@ addEventListener('keydown', e => {
   else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) go(i - 1)
   else if (e.key === 'Home') go(0)
   else if (e.key === 'End') go(slides.length - 1)
-  else if (e.key === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
+  else if (e.key === 'f') full()
   else return
   e.preventDefault()
 })
@@ -139,7 +141,10 @@ addEventListener('touchstart', e => { x0 = e.touches[0].clientX }, { passive: tr
 addEventListener('touchend', e => { if (x0 != null && Math.abs(e.changedTouches[0].clientX - x0) > 40) go(i + (e.changedTouches[0].clientX < x0 ? 1 : -1)); x0 = null })
 document.querySelector('[data-prev]').onclick = () => go(i - 1)
 document.querySelector('[data-next]').onclick = () => go(i + 1)
-document.querySelector('[data-full]').onclick = () => document.documentElement.requestFullscreen()
+// iOS Safari has no Fullscreen API for pages: the button is hidden there, F does nothing
+function full() { if (document.fullscreenElement) document.exitFullscreen?.()?.catch(() => {}); else document.documentElement.requestFullscreen?.()?.catch(() => {}) }
+const fullBtn = document.querySelector('[data-full]')
+if (document.fullscreenEnabled) fullBtn.onclick = full; else fullBtn.hidden = true
 fit(); go(i)`
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -171,7 +176,7 @@ export async function htmlDeck(root, title, list, files) {
     return c.outerHTML
   }).join('\n')
   const html = `<!doctype html>
-<html lang="de">
+<html lang="${lang.value}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

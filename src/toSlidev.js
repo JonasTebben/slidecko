@@ -135,9 +135,15 @@ function slideStyle(slide) {
   return css ? `\n\n<style>\n${css.trim()}\n</style>` : ''
 }
 
+// Slidev compiles slides as Vue templates: "{{" in text would be read as an interpolation.
+// Fenced and inline code (Slidev adds v-pre there) and HTML tags are skipped; text gets Slidev's documented v-pre span.
+// (an entity like &#123; would not help: markdown-it decodes it back to "{" before Vue sees it)
+const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)[\s\S]*?[^`]\2(?!`)|<\/?[a-zA-Z][^>]*>|\{\{/gm
+export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
+
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
-  const body = slide.elements.map(elementMd).join('\n\n') + slideStyle(slide)
+  const body = escapeMustache(slide.elements.map(elementMd).join('\n\n') + slideStyle(slide))
   return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>')}\n-->` : body
 }
 

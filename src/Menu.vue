@@ -8,6 +8,7 @@ import Icon from './Icon.vue'
 const props = defineProps({ label: String, icon: String, title: String, primary: Boolean, wide: Boolean, manual: Boolean })
 const pop = ref(), btn = ref()
 let at = null // context menu: the pointer position instead of the button
+const open = ref(false) // slot prop: heavy content (previews) renders only while open
 const keep = ref(false) // keep the focus where it is (a code editor that ends on blur): items don't take it either
 const id = 'menu-' + Math.random().toString(36).slice(2)
 
@@ -20,8 +21,9 @@ const listen = on => {
 }
 onBeforeUnmount(() => listen(false))
 function place(e) {
-  if (props.manual) listen(e.newState === 'open')
-  if (e.newState !== 'open') return
+  open.value = e.newState === 'open'
+  if (props.manual) listen(open.value)
+  if (!open.value) return
   const r = at ? { left: at.x, bottom: at.y } : btn.value.getBoundingClientRect(), p = pop.value
   p.style.top = Math.max(8, Math.min(r.bottom + (at ? 0 : 6), innerHeight - p.offsetHeight - 8)) + 'px'
   p.style.left = Math.max(8, Math.min(r.left, innerWidth - p.offsetWidth - 8)) + 'px'
@@ -51,6 +53,6 @@ defineExpose({
     <Icon name="chevron" :size="14" class="chev" />
   </button>
   <div :id="id" ref="pop" :popover="manual ? 'manual' : 'auto'" class="menu" :class="{ wide }" @mousedown="keep && $event.preventDefault()" @toggle="place" @click="clicked" @keydown="keys">
-    <slot />
+    <slot :open="open" />
   </div>
 </template>
