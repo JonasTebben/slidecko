@@ -77,12 +77,12 @@ Text and buttons reach 4.5:1 contrast (also in dark mode), every control has an 
 
 ## Light and dark
 
-The interface follows the system or is fixed to light or dark (sun/moon switch in the footer, and next to EN/DE on the landing and legal page). One setting for the app and the pages (`src/scheme.js`, `public/site.js`) sets `<html data-scheme="light|dark">`, which `app.css` and `site.css` read. Slides keep their theme colours in either mode.
+The interface follows the system or is fixed to light or dark (sun/moon switch in the footer). `src/scheme.js` sets `<html data-scheme="light|dark">`, which `app.css` reads; the choice is stored under `slides-builder:scheme`, so pages on the same site can share it. Slides keep their theme colours in either mode.
 
 ## Languages
 
-German and English. Without a stored choice the browser language decides (German, otherwise English). A link with `?lang=de` or `?lang=en` (in the app, on the landing page and in `legal.html`, which also takes English anchors like `#privacy-en`) picks the language and stores it like the switch does. Switching in the footer works at once, without reloading.
+German and English. Without a stored choice the browser language decides (German, otherwise English). A link with `?lang=de` or `?lang=en` picks the language and stores it like the switch does (under `slides-builder:lang`, so pages on the same site can share it). Switching in the footer works at once, without reloading.
 
 ## View in the URL
 
-The project overview (`#home`) or the open project and slide (`#<project>/<slide>`) are in the address hash. Every change is a browser history entry, so back and forward move between overview, projects and slides, and reloads and links open exactly that view. `/app/` without a hash opens the last project. What the URL does not hold (selection, folded decks, scroll position, search term) is kept per tab in `sessionStorage` and restored after a reload.
+The project overview (`#home`) or the open project and slide (`#<project>/<slide>`) are in the address hash. Every change is a browser history entry, so back and forward move between overview, projects and slides, and reloads and links open exactly that view. The app's address without a hash opens the last project. What the URL does not hold (selection, folded decks, scroll position, search term) is kept per tab in `sessionStorage` and restored after a reload.

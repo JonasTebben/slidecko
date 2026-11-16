@@ -12,7 +12,7 @@ Requires [Bun](https://bun.sh) (version in `package.json` → `packageManager`).
 bun install
 bun run dev      # editor with hot reload (Vite)
 bun run build    # static files in dist/
-bun run start    # serve dist/ like in production: http://localhost:3000
+bun run start    # serve dist/ with the Bun server: http://localhost:3000
 bun test         # parser, export and server tests
 ```
 
@@ -46,9 +46,8 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 | `src/session.js` | view state in the URL hash and per-tab state for reloads |
 | `src/i18n.js`, `src/locales/` | interface translations |
 | `src/scheme.js` | light/dark mode |
-| `src/AppFooter.vue`, `src/support.js` | footer, optional donation link |
-| `app/index.html` | app entry (`/app/`) |
-| `index.html`, `legal.html`, `public/` | landing page and legal notice/privacy page (static HTML, German and English) |
+| `src/AppFooter.vue`, `src/support.js` | footer and its build-time links |
+| `index.html` | app entry |
 | `server.js` | Bun server: serves `dist/`, `/health` |
 | `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |
 
@@ -77,19 +76,31 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 | Where | What | How long |
 |---|---|---|
 | IndexedDB `slides-builder` | projects (slides, images, project files), project list | until the project or the site data is deleted |
-| localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`) | permanent; language and light/dark also apply to the landing and legal page |
+| localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`) | permanent |
 | sessionStorage `slides-builder:session` | the tab's view (selection, folded decks, scroll position), search term, YouTube consent | until the tab is closed |
 
 YouTube loads only after a click on "Load YouTube content" (thumbnails from `i.ytimg.com`, the player from `www.youtube-nocookie.com`).
 
-When this changes (`src/session.js`, `src/store.js`, `src/i18n.js`, `src/scheme.js`, `src/App.vue`), update this table and `legal.html` (both languages).
+When this changes (`src/session.js`, `src/store.js`, `src/i18n.js`, `src/scheme.js`, `src/App.vue`), update this table.
 
 ## Hosting your own copy
 
-`bun run build` produces static files; `server.js` serves them with Bun (port from `PORT`, health check at `/health`). `railway.json` holds the configuration for [Railway](https://railway.com), but any static host works.
+`bun run build` produces static files with relative paths, so `dist/` works under any path on any static host. `server.js` serves it with Bun (port from `PORT`, folder from `DIST`, health check at `/health`); `railway.json` is a ready configuration for [Railway](https://railway.com).
 
-- **Legal page.** `legal.html` names Jonas Tebben as the responsible party and Railway as the host. If you run Slidecko publicly, replace it with your own legal notice and privacy policy (or change the links in `src/AppFooter.vue`, `index.html` and `public/site.js`).
-- **Donation link (optional).** Put a Stripe Payment Link into `SUPPORT_URL` in `src/support.js`. When it is empty, the footer has no coffee link and the build removes the section between `<!-- stripe -->` and `<!-- /stripe -->` from `legal.html`.
+The footer links are set at build time through environment variables. An empty one hides its link:
+
+| Variable | Link | Default |
+|---|---|---|
+| `VITE_HOME_URL` | "Slidecko" | this repository |
+| `VITE_LEGAL_URL` | legal notice | none |
+| `VITE_PRIVACY_URL` | privacy policy | none |
+| `VITE_SUPPORT_URL` | donation link, e.g. a Stripe Payment Link | none |
+
+```bash
+VITE_LEGAL_URL=https://example.com/imprint VITE_PRIVACY_URL=https://example.com/privacy bun run build
+```
+
+If you run Slidecko publicly, you are responsible for your own legal notice and privacy policy; the table above lists what the app stores.
 
 ## Known limitations
 

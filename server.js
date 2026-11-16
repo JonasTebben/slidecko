@@ -1,7 +1,7 @@
-// Serves the built app (dist/) on Railway. Everything runs in the browser; the server only delivers files.
-import { join, normalize } from 'node:path'
+// Serves the built app (dist/, or the folder in DIST). Everything runs in the browser; the server only delivers files.
+import { join, normalize, resolve as absolute } from 'node:path'
 
-const root = join(import.meta.dir, 'dist')
+const root = Bun.env.DIST ? absolute(Bun.env.DIST) : join(import.meta.dir, 'dist')
 
 export function resolve(pathname) {
   let p

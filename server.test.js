@@ -14,9 +14,7 @@ test('health check answers without dist', async () => {
   expect(await res.text()).toBe('ok')
 })
 
-test.skipIf(!(await Bun.file(import.meta.dir + '/dist/app/index.html').exists()))('/app redirects to /app/ (needs a build)', async () => {
-  const res = await handle(new Request('http://x/app'))
-  expect(res.status).toBe(301)
-  expect(res.headers.get('location')).toBe('/app/')
+test.skipIf(!(await Bun.file(import.meta.dir + '/dist/index.html').exists()))('serves the build, 404 otherwise (needs a build)', async () => {
+  expect((await handle(new Request('http://x/'))).status).toBe(200)
   expect((await handle(new Request('http://x/nope'))).status).toBe(404)
 })
