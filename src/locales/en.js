@@ -429,6 +429,8 @@ export default {
   "Rechts": "Right",
   "Rechtsbündig": "Align right",
   "Referentenansicht": "Presenter view",
+  "Folienleiste ein-/ausblenden": "Show/hide slide list",
+  "Eigenschaften ein-/ausblenden": "Show/hide properties",
   "Referentenansicht (P)": "Presenter view (P)",
   "Regulären Ausdruck verwenden": "Use regular expression",
   "Rückgängig": "Undo",

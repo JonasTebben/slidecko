@@ -33,6 +33,10 @@ const confirmDialog = ref(), confirmText = ref(''), confirmAction = ref(null)
 const ytDialog = ref(), ytUrl = ref('')
 
 const collapsed = ref(new Set()) // decks folded in the slide list
+// sidebars folded away (wide screens only: the phone layout stacks them and ignores this)
+const PANELS = 'slides-builder:panels'
+const panels = reactive((() => { try { return { slides: true, props: true, ...JSON.parse(localStorage.getItem(PANELS)) } } catch { return { slides: true, props: true } } })())
+watch(panels, v => { try { localStorage.setItem(PANELS, JSON.stringify(v)) } catch {} })
 
 // --- find & replace, like VS Code's find widget: non-modal, replace row folded away ---
 // while the markdown editor is open, find works on its text (the editor is modal, the slides are out of reach)
@@ -511,6 +515,7 @@ const commands = computed(() => [
   [t('Neuer Foliensatz'), newDeck, 'shift+n'],
   [t('Präsentieren ab aktueller Folie'), () => present(), 'p'], [t('Präsentieren von Anfang'), () => present(0), 'shift+p'],
   [t('Referentenansicht'), () => { presenterView.value = true; present() }, 'alt+p'],
+  [t('Folienleiste ein-/ausblenden'), () => (panels.slides = !panels.slides), 'alt+b'], [t('Eigenschaften ein-/ausblenden'), () => (panels.props = !panels.props), 'alt+e'],
   [t('Rückgängig'), () => undo(), 'mod+z'], [t('Wiederholen'), redo, 'mod+shift+z'],
   [t('Suchen'), () => openFind(), 'mod+f'], [t('Ersetzen'), () => openFind(true), 'mod+alt+f'],
   [t('Alles auswählen'), A.selectAll, 'mod+a'], [t('Format kopieren'), A.copyLook, 'mod+alt+c'], [t('Format einfügen'), () => A.pasteLook(), 'mod+alt+v'], [t('Duplizieren'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'mod+d'],
@@ -733,6 +738,9 @@ function onClipboard(e) {
             <button class="mi" @click="present()"><Icon name="play" />{{ t('Präsentieren') }}<kbd>P</kbd></button>
             <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Von Anfang präsentieren') }}<kbd>⇧P</kbd></button>
             <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Referentenansicht') }}<kbd>{{ keyLabel('alt+p') }}</kbd></button>
+            <hr />
+            <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Folienleiste ein-/ausblenden') }}<kbd>{{ keyLabel('alt+b') }}</kbd></button>
+            <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Eigenschaften ein-/ausblenden') }}<kbd>{{ keyLabel('alt+e') }}</kbd></button>
           </Menu>
         </div>
       </div>
@@ -820,7 +828,7 @@ function onClipboard(e) {
       </div>
     </header>
 
-    <main>
+    <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props }">
       <nav class="slides-panel" :aria-label="t('Folien')">
         <div class="panel-head">
           <span>{{ t('Foliensätze') }}</span>
@@ -864,6 +872,8 @@ function onClipboard(e) {
       </nav>
 
       <section ref="stage" class="stage" :aria-label="t('Folie {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="A.addImages([...$event.dataTransfer.files])" @pointerdown.self="ui.sel = []">
+        <button class="tb icon small panel-toggle left" :aria-expanded="panels.slides" :aria-label="t('Folienleiste ein-/ausblenden')" :title="`${t('Folienleiste ein-/ausblenden')} (${keyLabel('alt+b')})`" @click="panels.slides = !panels.slides"><Icon :name="panels.slides ? 'chevronL' : 'chevronR'" :size="16" /></button>
+        <button class="tb icon small panel-toggle right" :aria-expanded="panels.props" :aria-label="t('Eigenschaften ein-/ausblenden')" :title="`${t('Eigenschaften ein-/ausblenden')} (${keyLabel('alt+e')})`" @click="panels.props = !panels.props"><Icon :name="panels.props ? 'chevronR' : 'chevronL'" :size="16" /></button>
         <Teleport defer :to="mdOpen ? '.md-wrap' : '.stage'">
         <dialog ref="findDialog" class="find" :class="{ replacing }" :aria-label="t('Suchen und ersetzen')" @keydown.esc.stop.prevent="closeFind" @keydown="findKey" @close="findOpen = false">
           <button type="button" class="tb icon small find-fold" :title="replacing ? t('Ersetzen ausblenden') : t('Ersetzen einblenden')" :aria-expanded="replacing" @click="replacing = !replacing"><Icon :name="replacing ? 'chevron' : 'chevronR'" :size="14" /></button>
