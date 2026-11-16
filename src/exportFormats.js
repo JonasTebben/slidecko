@@ -184,7 +184,7 @@ export async function htmlDeck(root, title, list, files) {
 <div class="deck">
 ${slides}
 </div>
-<div class="hud"><span></span><button data-prev aria-label="Zurück">‹</button><button data-next aria-label="Weiter">›</button><button data-full aria-label="Vollbild">⛶</button></div>
+<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-full aria-label="Full screen">⛶</button></div>
 <script type="application/json" id="slides-builder-project">${project.replace(/</g, '\\u003c')}</script>
 <script>${viewerJs()}</script>
 </body>

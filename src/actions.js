@@ -27,7 +27,7 @@ export function toast(msg, ms = 4000) {
 }
 // runs a user action; failures are shown instead of swallowed
 export async function run(fn) {
-  try { return await fn() } catch (e) { console.error(e); toast(t('Fehler: {0}', e.message), 8000) }
+  try { return await fn() } catch (e) { console.error(e); toast(t('Error: {0}', e.message), 8000) }
 }
 
 // --- elements ---
@@ -56,7 +56,7 @@ export async function replaceImage(el, file) {
 // --- image crop ---
 // The box shows the visible part; el.crop says which part of the picture that is ({x, y, w, h} as fractions).
 // ui.crop: the image in crop mode; ui.cropRatio: the fixed aspect ratio there ('orig', '1:1', '4:3', … or null = free)
-export const CROP_RATIOS = [[null, 'Frei'], ['orig', 'Original'], ['1:1', '1:1'], ['4:3', '4:3'], ['3:2', '3:2'], ['16:9', '16:9'], ['3:4', '3:4'], ['9:16', '9:16']]
+export const CROP_RATIOS = [[null, 'Free'], ['orig', 'Original'], ['1:1', '1:1'], ['4:3', '4:3'], ['3:2', '3:2'], ['16:9', '16:9'], ['3:4', '3:4'], ['9:16', '9:16']]
 const FULL = { x: 0, y: 0, w: 1, h: 1 }
 // the whole picture in slide units, as placed by the current crop
 export function cropFull(el) {
@@ -142,13 +142,13 @@ const LOOK = {
 }
 export function copyLook() {
   const e = primary.value
-  if (!LOOK[e?.type]) return toast(t('Zum Kopieren des Formats ein Textfeld, eine Form, einen Codeblock oder ein Bild auswählen.'))
+  if (!LOOK[e?.type]) return toast(t('Select a text box, shape, code block or image to copy its formatting.'))
   ui.look = Object.fromEntries(LOOK[e.type].map(k => [k, e[k]]))
-  toast(t('Format kopiert – mit ⌘⌥V auf die Auswahl übertragen.'))
+  toast(t('Formatting copied – apply it to the selection with ⌘⌥V.'))
 }
 // only what both kinds have (a text box's fill onto a shape, …); "no fill" is 'none' on shapes, unset elsewhere
 export function pasteLook(els = selection.value) {
-  if (!ui.look) return toast(t('Zuerst ein Format kopieren.'))
+  if (!ui.look) return toast(t('Copy formatting first.'))
   for (const e of els) for (const k of LOOK[e.type] || []) {
     if (!(k in ui.look)) continue
     let v = ui.look[k]
@@ -162,7 +162,7 @@ export function pasteLook(els = selection.value) {
 export function paint() {
   if (ui.painting) return (ui.painting = false)
   copyLook()
-  if (ui.look) { ui.painting = true; toast(t('Auf ein Element klicken, um das Format zu übertragen (Esc bricht ab).')) }
+  if (ui.look) { ui.painting = true; toast(t('Click an element to apply the formatting (Esc cancels).')) }
 }
 
 // aligns the selection to its common bounds, or to the slide (one element always)
@@ -180,12 +180,12 @@ export function align(kind, toSlide = false) {
     if (kind === 'bottom') e.y = b.b - e.h
   }
   // nothing moved (e.g. a full-width box is already centred): say so instead of doing nothing visibly
-  if (JSON.stringify(sel.map(e => [e.x, e.y])) === before) toast(t(sel.length > 1 ? 'Die Elemente sind schon so ausgerichtet.' : 'Das Element ist auf der Folie schon so ausgerichtet.'))
+  if (JSON.stringify(sel.map(e => [e.x, e.y])) === before) toast(t(sel.length > 1 ? 'The elements are already aligned this way.' : 'The element is already aligned this way on the slide.'))
 }
 const bounds = els => ({ x: Math.min(...els.map(e => e.x)), y: Math.min(...els.map(e => e.y)), r: Math.max(...els.map(e => e.x + e.w)), b: Math.max(...els.map(e => e.y + e.h)) })
 export function distribute(axis) {
   const sel = selection.value.filter(e => !e.locked).sort((a, b) => (axis === 'h' ? a.x - b.x : a.y - b.y))
-  if (sel.length < 3) return toast(t('Zum Verteilen mindestens drei Elemente auswählen.'))
+  if (sel.length < 3) return toast(t('Select at least three elements to distribute.'))
   const pos = axis === 'h' ? 'x' : 'y', size = axis === 'h' ? 'w' : 'h'
   const total = sel.reduce((s, e) => s + e[size], 0)
   const span = sel.at(-1)[pos] + sel.at(-1)[size] - sel[0][pos]
@@ -254,11 +254,11 @@ const fileName = name => {
   const used = new Set(deck.slides.map(fileOf))
   const nums = [...used].map(f => +(f.match(/^(\d+)_/)?.[1] || 0))
   const n = String(Math.max(0, ...nums) + 1).padStart(2, '0')
-  let f = `${n}_${name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_') || 'Foliensatz'}.md`
+  let f = `${n}_${name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_') || 'Deck'}.md`
   while (used.has(f)) f = f.replace(/\.md$/, '_2.md')
   return f
 }
-export function addDeck(name = t('Neuer Foliensatz')) {
+export function addDeck(name = t('New deck')) {
   const file = fileName(name)
   const s = newSlide('intro', [{ id: uid(), type: 'text', title: true, x: 60, y: 210, w: 860, h: 80, html: `<h1>${name.replace(/</g, '&lt;')}</h1>` }])
   s.file = file
@@ -269,7 +269,7 @@ export function addDeck(name = t('Neuer Foliensatz')) {
 }
 export function renameDeck(file, name) {
   const [, dir = '', num = ''] = file.match(/^(.*\/)?(\d+_)?/)
-  let next = dir + num + (name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_') || 'Foliensatz') + '.md'
+  let next = dir + num + (name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_') || 'Deck') + '.md'
   while (next !== file && deck.slides.some(s => fileOf(s) === next)) next = next.replace(/\.md$/, '_2.md')
   for (const s of deck.slides) if (fileOf(s) === file) s.file = next
 }
@@ -300,7 +300,7 @@ export function removeDeck(file) {
 export const slidesOf = file => deck.slides.filter(s => fileOf(s) === file)
 
 // --- import ---
-// counts: n(1, 'Folie', 'Folien') -> '1 Folie' (translated)
+// counts: n(1, 'Slide', 'Slides') -> '1 Folie' (translated)
 const n = (k, one, many) => { const w = t(k === 1 ? one : many); return `${k} ${lang.value === 'de' ? w : w.toLowerCase()}` } // English count nouns are lowercase
 const isMd = f => f.name.endsWith('.md') && !f.webkitRelativePath?.includes('node_modules')
 const rel = f => (f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(1).join('/') : f.name)
@@ -317,8 +317,8 @@ export async function entryCandidates(files) {
 }
 
 async function importReport(r) {
-  return t('{0} importiert', n(r.slides.length, 'Folie', 'Folien')) + (r.missing ? ' · ' + t('{0} nicht gefunden', n(r.missing, 'Bild', 'Bilder')) : '') +
-    (r.missingFiles.length ? ' · ' + t('fehlende Dateien: {0}', r.missingFiles.join(', ')) : '')
+  return t('{0} imported', n(r.slides.length, 'Slide', 'Slides')) + (r.missing ? ' · ' + t('{0} not found', n(r.missing, 'Image', 'Images')) : '') +
+    (r.missingFiles.length ? ' · ' + t('missing files: {0}', r.missingFiles.join(', ')) : '')
 }
 // the editor theme matching a Slidev headmatter `theme:`
 function detectTheme(md) {
@@ -356,7 +356,7 @@ async function projectFiles(files, slideFiles) {
 // a whole Slidev project (entry file + embedded decks + images) as a new project
 // replace: id of the project this import overwrites (same Slidev folder opened again)
 export const importProject = (files, entry, replace) => run(async () => {
-  toast(t('Importiere …'), 0)
+  toast(t('Importing …'), 0)
   const map = filesMap(files)
   const theme = detectTheme(await map.get(entry).text())
   const r = await importSlidev(entry, map, theme)
@@ -370,13 +370,13 @@ export const IMPORT_ACCEPT = '.pptx,.potx,.odp,.otp,.pdf,.html,.htm,.zip,image/*
 // what restoreProject did with the projects of one file, as a toast
 function restored(name, how) {
   const c = k => how.filter(h => h === k).length
-  toast(`${name}: ` + [c('new') && t('{0} geladen', n(c('new'), 'Projekt', 'Projekte')), c('replaced') && t('{0} aktualisiert', n(c('replaced'), 'Projekt', 'Projekte')),
-    c('copy') && t('{0} als Kopie (im Browser gibt es eine neuere Fassung)', n(c('copy'), 'ältere Sicherung', 'ältere Sicherungen'))].filter(Boolean).join(' · '), 8000)
+  toast(`${name}: ` + [c('new') && t('{0} loaded', n(c('new'), 'project', 'projects')), c('replaced') && t('{0} updated', n(c('replaced'), 'project', 'projects')),
+    c('copy') && t('{0} as a copy (the browser has a newer version)', n(c('copy'), 'older backup', 'older backups'))].filter(Boolean).join(' · '), 8000)
 }
 export const importPresentations = files => run(async () => {
   const images = files.filter(f => f.type.startsWith('image/'))
   for (const f of files.filter(x => !images.includes(x))) {
-    toast(t('Importiere {0} …', f.name), 0)
+    toast(t('Importing {0} …', f.name), 0)
     const ext = f.name.split('.').pop().toLowerCase()
     if (ext === 'json') { restored(f.name, [await restoreProject(JSON.parse(await f.text()))]); continue }
     if (ext === 'html' || ext === 'htm' || ext === 'zip') {
@@ -392,26 +392,26 @@ export const importPresentations = files => run(async () => {
         restored(f.name, how)
         continue
       }
-      if (zip && !page) throw new Error(t('{0}: keine HTML-Präsentation aus Slidecko (index.html fehlt)', f.name))
+      if (zip && !page) throw new Error(t('{0}: not an HTML presentation from Slidecko (index.html missing)', f.name))
       const html = zip ? await page.async('text') : await f.text()
       const json = new DOMParser().parseFromString(html, 'text/html').getElementById('slides-builder-project')?.textContent
-      if (!json) throw new Error(t('{0}: nur HTML-Präsentationen aus Slidecko lassen sich öffnen', f.name))
+      if (!json) throw new Error(t('{0}: only HTML presentations from Slidecko can be opened', f.name))
       const d = JSON.parse(json)
       for (const [id, v] of Object.entries(d.assets || {})) {
         if (typeof v !== 'string' || v.startsWith('data:')) continue
         const file = zip && zip.file(page.name.replace(/[^/]*$/, '') + v)
-        if (!file) throw new Error(t('{0}: Bilder fehlen – bitte die ZIP-Datei des HTML-Exports importieren', f.name))
+        if (!file) throw new Error(t('{0}: images missing – please import the ZIP file of the HTML export', f.name))
         d.assets[id] = await readDataUrl(Object.assign(await file.async('blob'), { name: v }))
       }
       await createProject(d)
-      toast(t('{0} aus {1} geöffnet', n(d.slides.length, 'Folie', 'Folien'), f.name), 8000)
+      toast(t('{0} opened from {1}', n(d.slides.length, 'Slide', 'Slides'), f.name), 8000)
       continue
     }
-    const read = { pptx: importPptx, potx: importPptx, odp: importOdp, otp: importOdp, pdf: file => importPdf(file, (i, k) => toast(t('{0}: Seite {1} von {2} …', f.name, i, k), 0)) }[ext]
-    if (!read) throw new Error(t('{0}: Format .{1} wird nicht unterstützt', f.name, ext))
+    const read = { pptx: importPptx, potx: importPptx, odp: importOdp, otp: importOdp, pdf: file => importPdf(file, (i, k) => toast(t('{0}: page {1} of {2} …', f.name, i, k), 0)) }[ext]
+    if (!read) throw new Error(t('{0}: format .{1} is not supported', f.name, ext))
     const r = await read(f)
     await createProject({ ...r, theme: 'hell', entry: 'slides.md', files: {} })
-    toast(t('{0} aus {1} importiert', n(r.slides.length, 'Folie', 'Folien'), f.name) + (ext === 'pdf' ? ' ' + t('(als Bilder)') : ''), 8000)
+    toast(t('{0} imported from {1}', n(r.slides.length, 'Slide', 'Slides'), f.name) + (ext === 'pdf' ? ' ' + t('(as images)') : ''), 8000)
   }
   if (!images.length) return
   const assets = {}, slides = []
@@ -423,15 +423,15 @@ export const importPresentations = files => run(async () => {
     const k = Math.min(SW / size.w, SH / size.h), w = Math.round(size.w * k), h = Math.round(size.h * k)
     slides.push({ layout: 'default', elements: [{ type: 'image', asset: id, src: path, x: Math.round((SW - w) / 2), y: Math.round((SH - h) / 2), w, h }] })
   }
-  await createProject({ title: images.length === 1 ? images[0].name.replace(/\.\w+$/, '') : t('Bilder'), theme: 'hell', slides, assets })
-  toast(t('{0} aus Bildern angelegt', n(slides.length, 'Folie', 'Folien')), 8000)
+  await createProject({ title: images.length === 1 ? images[0].name.replace(/\.\w+$/, '') : t('Images'), theme: 'hell', slides, assets })
+  toast(t('{0} created from images', n(slides.length, 'Slide', 'Slides')), 8000)
 })
 // loose markdown files (no slides.md): a new project with one deck per file, in name order
 export const importDecksAsProject = (files, paths) => run(async () => {
   const map = filesMap(files), slides = [], assets = {}, format = {}
   let missing = 0
   for (const p of [...paths].sort(byName)) {
-    toast(t('Importiere {0} …', p), 0)
+    toast(t('Importing {0} …', p), 0)
     const r = await importSlidev(p, map, detectTheme(await map.get(p).text()))
     Object.assign(assets, r.assets)
     format.aspectRatio ??= r.aspectRatio ?? '16/9' // the first deck's format (shortcut: decks of other formats keep their measured coordinates)
@@ -439,15 +439,15 @@ export const importDecksAsProject = (files, paths) => run(async () => {
     missing += r.missing
     slides.push(...r.slides.map(s => ({ ...s, file: s.file === 'slides.md' ? p.replace(/\.md$/, '-1.md') : s.file })))
   }
-  const title = files[0]?.webkitRelativePath?.split('/')[0] || (paths.length === 1 ? deckName(paths[0]) : t('Präsentation'))
+  const title = files[0]?.webkitRelativePath?.split('/')[0] || (paths.length === 1 ? deckName(paths[0]) : t('Presentation'))
   await createProject({ title, theme: detectTheme(await map.get(paths[0]).text()), entry: 'slides.md', ...format, slides, assets, files: {} })
-  toast(t('{0} aus {1} importiert', n(slides.length, 'Folie', 'Folien'), n(paths.length, 'Foliensatz', 'Foliensätzen')) + (missing ? ' · ' + t('{0} nicht gefunden', n(missing, 'Bild', 'Bilder')) : ''), 8000)
+  toast(t('{0} imported from {1}', n(slides.length, 'Slide', 'Slides'), n(paths.length, 'Deck', 'decks')) + (missing ? ' · ' + t('{0} not found', n(missing, 'Image', 'Images')) : ''), 8000)
 })
 // markdown files appended to the open project, each one a deck
 export const appendDecks = (files, paths) => run(async () => {
   const map = filesMap(files)
   for (const p of [...paths].sort(byName)) {
-    toast(t('Importiere {0} …', p), 0)
+    toast(t('Importing {0} …', p), 0)
     const r = await importSlidev(p, map, deck.theme)
     Object.assign(deck.assets, r.assets)
     const slides = cleanSlides(r.slides.map(s => ({ ...s, file: s.file === deck.entry ? p.replace(/\.md$/, '-1.md') : s.file })))
@@ -459,7 +459,7 @@ export const appendDecks = (files, paths) => run(async () => {
 // --- back to the imported state: re-render a slide from the Markdown it was imported from ---
 export const canRevert = s => s?.md != null && s.hash !== slideHash(s)
 export const revertSlides = (list = deck.slides.filter(canRevert)) => run(async () => {
-  if (!list.length) return toast(t('Keine geänderten importierten Folien.'))
+  if (!list.length) return toast(t('No changed imported slides.'))
   // the project's images by their Slidev path, so the re-import finds them without the original folder
   const paths = {}
   for (const s of deck.slides) for (const e of s.elements) {
@@ -483,7 +483,7 @@ export const revertSlides = (list = deck.slides.filter(canRevert)) => run(async 
     s.hash = slideHash(s) // unchanged again: the export writes the original Markdown
     done++
   }
-  toast(t('{0} auf den Import-Stand zurückgesetzt.', n(done, 'Folie', 'Folien')))
+  toast(t('{0} reset to the imported state.', n(done, 'Slide', 'Slides')))
 })
 
 // markdown typed or pasted (e.g. generated by an AI) -> slides
@@ -522,15 +522,15 @@ export const pdf = file => run(async () => {
 export const pptx = file => exportAs('pptx', file)
 
 // every export format: id -> [label for messages, file extension, build(rendered slides, name, slides)]
-const progress = (i, n) => toast(t('Folie {0} von {1} wird gerendert …', i, n), 0)
+const progress = (i, n) => toast(t('Rendering slide {0} of {1} …', i, n), 0)
 export const FORMATS = {
   pptx: ['PowerPoint', 'pptx', (out, name, slides) => exportPptx(out, name, slides)],
-  'pptx-google': ['PowerPoint für Google Slides', 'pptx', (out, name, slides) => exportPptx(out, name, slides, { forGoogle: true })],
-  'pptx-image': ['PowerPoint (originalgetreu)', 'pptx', async (out, name, slides) => exportPptx(out, name, slides, { images: await slideImages(out, 2, progress, true) })],
+  'pptx-google': ['PowerPoint for Google Slides', 'pptx', (out, name, slides) => exportPptx(out, name, slides, { forGoogle: true })],
+  'pptx-image': ['PowerPoint (true to original)', 'pptx', async (out, name, slides) => exportPptx(out, name, slides, { images: await slideImages(out, 2, progress, true) })],
   odp: ['OpenDocument', 'odp', (out, name, slides) => exportPptx(out, name, slides, { format: 'odp' })],
-  html: ['HTML-Präsentation', 'html', (out, name, slides) => htmlDeck(out, name, slides)],
-  'html-zip': ['HTML-Präsentation (ZIP)', 'zip', (out, name, slides) => htmlZip(out, name, slides)],
-  png: ['Bilder', 'zip', async (out, name) => {
+  html: ['HTML presentation', 'html', (out, name, slides) => htmlDeck(out, name, slides)],
+  'html-zip': ['HTML presentation (ZIP)', 'zip', (out, name, slides) => htmlZip(out, name, slides)],
+  png: ['Images', 'zip', async (out, name) => {
     const zip = new JSZip()
     const images = await slideImages(out, 2, progress)
     images.forEach((d, i) => zip.file(`${name}-${String(i + 1).padStart(3, '0')}.png`, d.split(',')[1], { base64: true }))
@@ -542,12 +542,12 @@ export const exportAs = (format, file) => {
   if (format === 'slidev') return slidev()
   const [label, ext, build] = FORMATS[format]
   return run(async () => {
-    toast(t('{0} wird erstellt …', t(label)), 0)
+    toast(t('Creating {0} …', t(label)), 0)
     try {
       const out = await renderOutput(file)
       download(await build(out, scopeName(file), exportSlides.value), `${scopeName(file)}${format === 'png' ? '-bilder' : format === 'html-zip' ? '-html' : format === 'pptx-google' ? '-google' : ''}.${ext}`)
     } finally { exportSlides.value = null }
-    toast(t('{0} exportiert.', t(label)))
+    toast(t('{0} exported.', t(label)))
   })
 }
 // zip with the Slidev project: entry file, deck files, images (and style.css for generic themes)
@@ -573,14 +573,14 @@ export const slidev = () => run(async () => {
   const bare = [...new Set(raw.map(([, u]) => u).filter(u => !/^\.{0,2}\//.test(u)))] // Slidev (Vite) cannot resolve "img/a.png", only "./img/a.png" or "/img/a.png"
   const list = a => a.slice(0, 3).join(', ') + (a.length > 3 ? ' …' : '')
   const issues = [
-    lacking.length && t('{0} (vor „npx slidev“ an diesen Pfad im Projekt legen, bei /… auch in public/): {1}', n(lacking.length, 'Bild fehlt', 'Bilder fehlen'), list(lacking)),
-    bare.length && t('Slidev braucht „./“ vor {0}', list(bare)),
+    lacking.length && t('{0} (put them at this path in the project before “npx slidev”, for /… also in public/): {1}', n(lacking.length, 'image missing', 'images missing'), list(lacking)),
+    bare.length && t('Slidev needs “./” before {0}', list(bare)),
   ].filter(Boolean)
-  toast(issues.length ? t('Slidev-Projekt exportiert – {0}', issues.join(' · ')) : t('Slidev-Projekt exportiert: entpacken und mit „npx slidev“ starten.'), issues.length ? 12000 : undefined)
+  toast(issues.length ? t('Slidev project exported – {0}', issues.join(' · ')) : t('Slidev project exported: unzip and start with “npx slidev”.'), issues.length ? 12000 : undefined)
 })
 // every stored project as .slides.json in one ZIP; importPresentations reads it back
 export const exportAllProjects = () => run(async () => {
-  toast(t('Alle Projekte werden gesichert …'), 0)
+  toast(t('Saving all projects …'), 0)
   const zip = new JSZip(), names = new Set()
   for (const p of library.list) {
     let name = safe(p.title) + '.slides.json'
@@ -589,7 +589,7 @@ export const exportAllProjects = () => run(async () => {
     zip.file(name, await projectFile(p.id))
   }
   download(await zip.generateAsync({ type: 'blob' }), `Slidecko-Projekte-${new Date().toISOString().slice(0, 10)}.zip`)
-  toast(t('{0} gesichert.', n(library.list.length, 'Projekt', 'Projekte')))
+  toast(t('{0} saved.', n(library.list.length, 'project', 'projects')))
 })
 // id + time: loading the file again updates this project instead of adding a copy (restoreProject)
 export const saveFile = () => download(new Blob([JSON.stringify({ ...JSON.parse(deckFile()), id: deck.id, updated: Date.now() })], { type: 'application/json' }), safe(deck.title) + '.slides.json')

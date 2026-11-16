@@ -306,7 +306,7 @@ export async function importPptx(file) {
     return Object.fromEntries(all(doc, 'Relationship').map(r => [r.getAttribute('Id'), { type: r.getAttribute('Type').split('/').pop(), target: r.getAttribute('TargetMode') === 'External' ? null : resolve(p, r.getAttribute('Target')) }]))
   }
   const pres = await read('ppt/presentation.xml')
-  if (!pres) throw new Error(t('Keine gültige PowerPoint-Datei'))
+  if (!pres) throw new Error(t('Not a valid PowerPoint file'))
   const presRels = await rels('ppt/presentation.xml')
   const sz = all(pres, 'sldSz')[0]
   const cx = +sz?.getAttribute('cx') || 12192000, cy = +sz?.getAttribute('cy') || 6858000
@@ -651,7 +651,7 @@ export async function importOdp(file) {
   const zip = await JSZip.loadAsync(file)
   const content = xml(await zip.file('content.xml')?.async('text') || '')
   const stylesDoc = xml(await zip.file('styles.xml')?.async('text') || '<x/>')
-  if (!all(content, 'page').length) throw new Error(t('Keine gültige OpenDocument-Präsentation'))
+  if (!all(content, 'page').length) throw new Error(t('Not a valid OpenDocument presentation'))
   const assets = {}
   const styles = new Map()
   for (const d of [stylesDoc, content]) for (const s of [...all(d, 'style'), ...all(d, 'page-layout')]) styles.set(s.getAttribute('style:family') + ':' + s.getAttribute('style:name'), s)

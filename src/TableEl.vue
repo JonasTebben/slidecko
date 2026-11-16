@@ -124,21 +124,21 @@ function resizeCol(e, i) {
     <template v-if="selected && grid.cols.length">
       <div class="tbl-bar cols" @pointerdown.stop>
         <span v-for="([x, w], c) in grid.cols" :key="'c' + c" class="tbl-chip" :style="{ left: x + 'px', width: w + 'px' }">
-          <button v-if="grid.cols.length > 1" class="tbl-btn del" :style="inv" :title="t('Spalte löschen')" @click="op(deleteCol, 0, c)">−</button>
+          <button v-if="grid.cols.length > 1" class="tbl-btn del" :style="inv" :title="t('Delete column')" @click="op(deleteCol, 0, c)">−</button>
         </span>
         <button v-for="(b, i) in grid.cols.length + 1" :key="'ci' + i" class="tbl-btn add" :style="{ ...inv, left: (i < grid.cols.length ? grid.cols[i][0] : grid.cols.at(-1)[0] + grid.cols.at(-1)[1]) + 'px' }"
-          :title="t('Spalte einfügen')" @click="op(insertCol, 0, Math.max(0, i - 1), i === 0 ? 'left' : 'right')">+</button>
+          :title="t('Insert column')" @click="op(insertCol, 0, Math.max(0, i - 1), i === 0 ? 'left' : 'right')">+</button>
       </div>
       <div class="tbl-bar rows" @pointerdown.stop>
         <span v-for="([y, h], r) in grid.rows" :key="'r' + r" class="tbl-chip" :style="{ top: y + 'px', height: h + 'px' }">
-          <button v-if="grid.rows.length > 1" class="tbl-btn del" :style="inv" :title="t('Zeile löschen')" @click="op(deleteRow, r, 0)">−</button>
+          <button v-if="grid.rows.length > 1" class="tbl-btn del" :style="inv" :title="t('Delete row')" @click="op(deleteRow, r, 0)">−</button>
         </span>
         <button v-for="(b, i) in grid.rows.length + 1" :key="'ri' + i" class="tbl-btn add" :style="{ ...inv, top: (i < grid.rows.length ? grid.rows[i][0] : grid.rows.at(-1)[0] + grid.rows.at(-1)[1]) + 'px' }"
-          :title="t('Zeile einfügen')" @click="op(insertRow, Math.max(0, i - 1), 0, i === 0 ? 'above' : 'below')">+</button>
+          :title="t('Insert row')" @click="op(insertRow, Math.max(0, i - 1), 0, i === 0 ? 'above' : 'below')">+</button>
       </div>
     </template>
     <template v-if="editing">
-      <i v-for="(x, i) in borders" :key="i" class="col-resize" :style="{ left: x + '%' }" :title="t('Spaltenbreite ziehen')" @pointerdown.stop.prevent="resizeCol($event, i)" />
+      <i v-for="(x, i) in borders" :key="i" class="col-resize" :style="{ left: x + '%' }" :title="t('Drag column width')" @pointerdown.stop.prevent="resizeCol($event, i)" />
     </template>
   </div>
 </template>

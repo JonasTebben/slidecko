@@ -1,13 +1,13 @@
-// UI translations. The German text is the key; a missing translation falls back to it.
-// Add a language: create locales/<code>.js (German → translation) and list it in LOCALES.
+// UI translations. The English text is the key; a missing translation falls back to it.
+// Add a language: create locales/<code>.js (English → translation) and list it in LOCALES.
 import { ref, watch, watchEffect } from 'vue'
-import en from './locales/en.js'
+import de from './locales/de.js'
 
-export const LOCALES = { en: { name: 'English', dict: en }, de: { name: 'Deutsch', dict: {} } } // English first in the switch
+export const LOCALES = { en: { name: 'English', dict: {} }, de: { name: 'Deutsch', dict: de } }
 const KEY = 'slides-builder:lang'
 
 const pick = () => {
-  if (!globalThis.document?.documentElement) return 'de' // node tests assert the German source text
+  if (!globalThis.document?.documentElement) return 'en' // node tests assert the English source text
   // a link can choose, ahead of the stored choice, and it is stored like a switch (as on the static pages)
   const url = new URLSearchParams(location.search).get('lang')
   if (LOCALES[url]) { try { localStorage.setItem(KEY, url) } catch {} return url }
@@ -27,5 +27,5 @@ if (globalThis.document?.documentElement) {
   })
 }
 
-// t('{0} von {1}', a, b) – reading lang.value makes every caller re-render on switch
-export const t = (de, ...args) => (LOCALES[lang.value].dict[de] ?? de).replace(/\{(\d+)\}/g, (_, i) => args[i] ?? '')
+// t('{0} of {1}', a, b) – reading lang.value makes every caller re-render on switch
+export const t = (key, ...args) => (LOCALES[lang.value].dict[key] ?? key).replace(/\{(\d+)\}/g, (_, i) => args[i] ?? '')

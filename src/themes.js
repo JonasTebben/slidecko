@@ -15,24 +15,24 @@ const GEO = "Futura, 'Century Gothic', 'Trebuchet MS', system-ui, sans-serif"
 const HUMAN = "'Gill Sans', 'Gill Sans MT', Optima, Candara, 'Segoe UI', sans-serif"
 const MONO = "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace"
 // fonts a text box can pick instead of the theme's (el.font); system fonts only, so exports need nothing to embed
-export const FONTS = { sans: ['Sans', SANS], serif: ['Serif', SERIF], round: ['Rund', ROUND], geo: ['Geometrisch', GEO], human: ['Humanistisch', HUMAN], mono: ['Mono', MONO] }
+export const FONTS = { sans: ['Sans', SANS], serif: ['Serif', SERIF], round: ['Round', ROUND], geo: ['Geometric', GEO], human: ['Humanist', HUMAN], mono: ['Mono', MONO] }
 export const fontStack = k => (Object.hasOwn(FONTS, k) ? FONTS[k][1] : undefined)
 // a CSS font-family as written or as the browser serializes it -> its FONTS key
 const bare = s => s.replace(/["'\s]/g, '').toLowerCase()
 export const fontKey = stack => stack && Object.keys(FONTS).find(k => bare(FONTS[k][1]) === bare(stack))
 
 const BUILTIN = {
-  hell: { name: 'Klar', vars: { bg: '#ffffff', fg: '#1f2937', title: '#0f172a', accent: '#2563eb', 'code-bg': '#f1f5f9', 'code-fg': '#0f172a', font: SANS, 'cover-bg': 'linear-gradient(135deg, #eff6ff, #ffffff 60%)', rule: '#2563eb' } },
-  dunkel: { name: 'Nacht', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'accent-fg': '#0f172a', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
-  serif: { name: 'Papier', vars: { bg: '#fbf8f1', fg: '#3b342b', title: '#7c2d12', accent: '#a4452c', 'code-bg': '#f0e9da', 'code-fg': '#3b342b', font: SERIF, 'heading-weight': '400', 'cover-bg': '#f4ecdc' } },
-  ozean: { name: 'Ozean', vars: { bg: '#ffffff', fg: '#16324f', title: '#0b2545', accent: '#0e7490', 'code-bg': '#ecfeff', 'code-fg': '#083344', font: SANS, bar: 'linear-gradient(90deg, #0b2545, #0e7490)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #0b2545, #0e7490 60%, #22d3ee)', 'cover-fg': '#ffffff' } },
-  wald: { name: 'Wald', vars: { bg: '#fbfdf8', fg: '#22311f', title: '#1f4d2b', accent: '#3f7d3a', 'code-bg': '#eef5e9', 'code-fg': '#1f2a1c', font: HUMAN, 'cover-bg': 'linear-gradient(160deg, #1f4d2b, #3f7d3a)', 'cover-fg': '#f1f8ec', rule: '#8fbc5a' } },
-  sonne: { name: 'Abendrot', vars: { bg: '#fffaf6', fg: '#3d2a24', title: '#9a3412', accent: '#c74b0a', 'code-bg': '#fff1e6', 'code-fg': '#3d2a24', font: ROUND, 'heading-weight': '700', bar: 'linear-gradient(90deg, #c2410c, #be185d)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #c2410c, #be185d 55%, #7c3aed)', 'cover-fg': '#ffffff' } },
+  hell: { name: 'Clear', vars: { bg: '#ffffff', fg: '#1f2937', title: '#0f172a', accent: '#2563eb', 'code-bg': '#f1f5f9', 'code-fg': '#0f172a', font: SANS, 'cover-bg': 'linear-gradient(135deg, #eff6ff, #ffffff 60%)', rule: '#2563eb' } },
+  dunkel: { name: 'Night', dark: true, vars: { bg: '#0f172a', fg: '#cbd5e1', title: '#f8fafc', accent: '#38bdf8', 'accent-fg': '#0f172a', 'code-bg': '#1e293b', 'code-fg': '#e2e8f0', font: SANS, 'cover-bg': 'radial-gradient(circle at 20% 20%, #1e3a8a, #0f172a 70%)' } },
+  serif: { name: 'Paper', vars: { bg: '#fbf8f1', fg: '#3b342b', title: '#7c2d12', accent: '#a4452c', 'code-bg': '#f0e9da', 'code-fg': '#3b342b', font: SERIF, 'heading-weight': '400', 'cover-bg': '#f4ecdc' } },
+  ozean: { name: 'Ocean', vars: { bg: '#ffffff', fg: '#16324f', title: '#0b2545', accent: '#0e7490', 'code-bg': '#ecfeff', 'code-fg': '#083344', font: SANS, bar: 'linear-gradient(90deg, #0b2545, #0e7490)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #0b2545, #0e7490 60%, #22d3ee)', 'cover-fg': '#ffffff' } },
+  wald: { name: 'Forest', vars: { bg: '#fbfdf8', fg: '#22311f', title: '#1f4d2b', accent: '#3f7d3a', 'code-bg': '#eef5e9', 'code-fg': '#1f2a1c', font: HUMAN, 'cover-bg': 'linear-gradient(160deg, #1f4d2b, #3f7d3a)', 'cover-fg': '#f1f8ec', rule: '#8fbc5a' } },
+  sonne: { name: 'Sunset', vars: { bg: '#fffaf6', fg: '#3d2a24', title: '#9a3412', accent: '#c74b0a', 'code-bg': '#fff1e6', 'code-fg': '#3d2a24', font: ROUND, 'heading-weight': '700', bar: 'linear-gradient(90deg, #c2410c, #be185d)', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(135deg, #c2410c, #be185d 55%, #7c3aed)', 'cover-fg': '#ffffff' } },
   nord: { name: 'Nord', vars: { bg: '#eceff4', fg: '#3b4252', title: '#2e3440', accent: '#4d6d95', 'code-bg': '#e5e9f0', 'code-fg': '#2e3440', font: SANS, 'cover-bg': '#2e3440', 'cover-fg': '#eceff4', rule: '#88c0d0' } },
   dracula: { name: 'Dracula', dark: true, vars: { bg: '#282a36', fg: '#f8f8f2', title: '#ff79c6', accent: '#bd93f9', 'accent-fg': '#282a36', 'code-bg': '#1e1f29', 'code-fg': '#f8f8f2', font: SANS, 'cover-bg': 'linear-gradient(135deg, #282a36, #44475a)' } },
   solarized: { name: 'Solarized', vars: { bg: '#fdf6e3', fg: '#586e75', title: '#cb4b16', accent: '#2076b2', 'code-bg': '#eee8d5', 'code-fg': '#073642', font: SANS, 'cover-bg': '#073642', 'cover-fg': '#fdf6e3' } },
-  pastell: { name: 'Pastell', vars: { bg: '#fffbfe', fg: '#4a4458', title: '#6d4c9f', accent: '#cb3f76', 'code-bg': '#f6eefc', 'code-fg': '#3b3049', font: ROUND, 'heading-weight': '700', 'cover-bg': 'linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)', rule: '#d9739b' } },
-  mono: { name: 'Kontrast', vars: { bg: '#ffffff', fg: '#111111', title: '#000000', accent: '#000000', 'code-bg': '#f2f2f2', 'code-fg': '#111111', font: GEO, 'heading-weight': '800', 'cover-bg': '#000000', 'cover-fg': '#ffffff', rule: '#000000' } },
+  pastell: { name: 'Pastel', vars: { bg: '#fffbfe', fg: '#4a4458', title: '#6d4c9f', accent: '#cb3f76', 'code-bg': '#f6eefc', 'code-fg': '#3b3049', font: ROUND, 'heading-weight': '700', 'cover-bg': 'linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)', rule: '#d9739b' } },
+  mono: { name: 'Contrast', vars: { bg: '#ffffff', fg: '#111111', title: '#000000', accent: '#000000', 'code-bg': '#f2f2f2', 'code-fg': '#111111', font: GEO, 'heading-weight': '800', 'cover-bg': '#000000', 'cover-fg': '#ffffff', rule: '#000000' } },
   neon: { name: 'Neon', dark: true, vars: { bg: '#0b0b1a', fg: '#d6d6f5', title: '#22d3ee', accent: '#f472b6', 'accent-fg': '#0b0b1a', 'code-bg': '#15152e', 'code-fg': '#e0e0ff', font: MONO, 'cover-bg': 'radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)', 'cover-fg': '#f0abfc' } },
   business: { name: 'Business', vars: { bg: '#ffffff', fg: '#27303f', title: '#0b2545', accent: '#b91c1c', 'code-bg': '#f3f4f6', 'code-fg': '#111827', font: SANS, bar: '#0b2545', 'bar-fg': '#ffffff', 'cover-bg': 'linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)', 'cover-fg': '#ffffff' } },
 }
@@ -156,8 +156,8 @@ export function typoCss(R, t = {}, L = l => `.layout-${l}`) {
 }
 // layouts offered in the editor; theme-specific ones only for that theme
 export const LAYOUTS = [
-  ['default', 'Inhalt'], ['cover', 'Titelfolie'], ['intro', 'Einleitung'], ['section', 'Abschnitt'],
-  ['statement', 'Aussage'], ['fact', 'Kennzahl'], ['quote', 'Zitat'], ['center', 'Zentriert'], ['end', 'Ende'],
+  ['default', 'Content'], ['cover', 'Title slide'], ['intro', 'Intro'], ['section', 'Section'],
+  ['statement', 'Statement'], ['fact', 'Key figure'], ['quote', 'Quote'], ['center', 'Centered'], ['end', 'End'],
 ]
 export const themeLayouts = id => [...LAYOUTS, ...(themeOf(id).layouts || [])]
 
@@ -189,8 +189,8 @@ ${R}${L('cover')} .pageno, ${R}${L('intro')} .pageno { display: none; }`
 
 // --- table presets ---
 export const TABLE_PRESETS = [
-  ['theme', 'Theme'], ['striped', 'Streifen'], ['minimal', 'Minimal'], ['grid', 'Raster'],
-  ['bold', 'Kräftig'], ['accent', 'Akzentspalte'], ['cards', 'Karten'], ['soft', 'Sanft'],
+  ['theme', 'Theme'], ['striped', 'Striped'], ['minimal', 'Minimal'], ['grid', 'Grid'],
+  ['bold', 'Strong'], ['accent', 'Accent column'], ['cards', 'Cards'], ['soft', 'Soft'],
 ]
 const TABLE_RULES = {
   theme: '',
@@ -228,7 +228,7 @@ ${R} [data-table][data-borders] table :is(tr, tr > td, tr > th) { border: 0; }`
 }
 
 // --- callouts (Hinweis, Tipp, Warnung, Achtung) ---
-export const CALLOUTS = [['info', 'Hinweis', '#2563eb'], ['tip', 'Tipp', '#059669'], ['warn', 'Warnung', '#d97706'], ['danger', 'Achtung', '#dc2626']]
+export const CALLOUTS = [['info', 'Note', '#2563eb'], ['tip', 'Tip', '#059669'], ['warn', 'Warning', '#d97706'], ['danger', 'Caution', '#dc2626']]
 export const calloutCss = R => `
 ${R} [data-callout] { --c: #2563eb; padding: 12px 16px; border-radius: 8px; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
 ${R} [data-callout] > * { margin: 0; }

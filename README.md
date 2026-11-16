@@ -53,11 +53,11 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 
 ## Translations
 
-German text is the key: code calls `t('Folie {0} von {1}', a, b)` and `src/locales/en.js` maps it to English. A missing entry shows the German text.
+English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` maps it to German. A missing entry shows the English text.
 
-- Put every new interface string in `t()` and add it to `src/locales/en.js`. Labels in constants (`presets.js`, `themes.js`) stay German and are translated when shown, with `t(x.name)`.
-- Another language: add `src/locales/<code>.js` and register it in `LOCALES` in `src/i18n.js`.
-- Tests always run in German, because they check German text.
+- Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
+- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/i18n.js`.
+- Tests always run in English, because they check English text.
 
 ## Theme readability
 

@@ -194,7 +194,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   // headmatter (first frontmatter of the entry): theme and title
   const first = entrySlides[0] || (entrySlides[0] = { fm: '', body: '' })
   if (!fmGet(first.fm, 'theme')) first.fm = `theme: ${own || 'default'}\n${first.fm}`.trim()
-  if (!fmGet(first.fm, 'title')) first.fm = `title: ${JSON.stringify(title || 'Präsentation')}\n${first.fm}`.trim()
+  if (!fmGet(first.fm, 'title')) first.fm = `title: ${JSON.stringify(title || 'Presentation')}\n${first.fm}`.trim()
   // slide format: written when it is not Slidev's default or the headmatter already names it (a value that means the same stays as written)
   const ratio = v => parseRatio(v) || 16 / 9
   const format = (key, value, same, isDefault) => {
@@ -208,7 +208,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   if (!own) files['style.css'] = slidevThemeCss(theme) + (projectFiles['style.css'] ? '\n' + projectFiles['style.css'] : '') // the project's own rules stay
   // project-wide font sizes: Slidev loads style.css from the project root for every slide
   const typoRules = typoCss('.slidev-layout', typo, l => `.${l}`)
-  if (typoRules) files['style.css'] = `${files['style.css'] || projectFiles['style.css'] || ''}\n/* Schriftgrößen für alle Folien (Slidecko) */\n${typoRules}`.trimStart()
+  if (typoRules) files['style.css'] = `${files['style.css'] || projectFiles['style.css'] || ''}\n/* font sizes for all slides (Slidecko) */\n${typoRules}`.trimStart()
   files['package.json'] ||= JSON.stringify({ name: 'slides', private: true, type: 'module', scripts: { dev: 'slidev --open', build: 'slidev build', export: 'slidev export' }, dependencies: { '@slidev/cli': '^52.11.3', '@slidev/theme-default': 'latest' } }, null, 2) + '\n'
   // the theme package must be installable; an imported package.json that already lists it stays byte for byte
   if (own && fmGet(first.fm, 'theme') === own) {

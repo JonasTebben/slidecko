@@ -364,7 +364,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable ? 0 : null"
-      :aria-label="editable ? t({ text: 'Textfeld', code: 'Codeblock', image: 'Bild', table: 'Tabelle', shape: 'Form', video: 'Video' }[el.type]) : null"
+      :aria-label="editable ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = [el.id])"
     >
       <div
@@ -391,9 +391,9 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         </div>
       </template>
       <div v-else-if="el.type === 'video'" class="video" :style="{ backgroundImage: ui.yt && !live ? `url(${ytThumb(el.youtube)})` : null }">
-        <iframe v-if="live && ui.yt" :src="`https://www.youtube-nocookie.com/embed/${el.youtube}`" :title="t('YouTube-Video')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen />
+        <iframe v-if="live && ui.yt" :src="`https://www.youtube-nocookie.com/embed/${el.youtube}`" :title="t('YouTube video')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen />
         <i v-else class="play" />
-        <button v-if="!ui.yt" class="yt-consent" @pointerdown.stop @click.stop="ui.yt = true">{{ t('YouTube-Inhalte laden') }}<small>{{ t('Dabei werden Daten an Google übertragen.') }}</small></button>
+        <button v-if="!ui.yt" class="yt-consent" @pointerdown.stop @click.stop="ui.yt = true">{{ t('Load YouTube content') }}<small>{{ t('This sends data to Google.') }}</small></button>
       </div>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
         <template v-if="ui.crop === el.id"><i v-for="h in HANDLES" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>

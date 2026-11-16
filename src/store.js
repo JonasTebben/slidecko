@@ -50,7 +50,7 @@ export const decks = computed(() => {
   const out = []
   deck.slides.forEach((s, i) => {
     const file = fileOf(s)
-    if (out.at(-1)?.file !== file) out.push({ file, start: i, count: 0, name: file === deck.entry ? t('Gesamt-Deckblatt') : deckName(file) })
+    if (out.at(-1)?.file !== file) out.push({ file, start: i, count: 0, name: file === deck.entry ? t('Main deck') : deckName(file) })
     out.at(-1).count++
   })
   return out
@@ -141,11 +141,11 @@ export const cleanSlides = slides => slides.map(cleanSlide)
 
 // Replaces the open project's content (keeps its id).
 export function loadDeck(d) {
-  if (!Array.isArray(d?.slides)) throw new Error(t('Keine gültige Projektdatei'))
+  if (!Array.isArray(d?.slides)) throw new Error(t('Not a valid project file'))
   if (d.styles) mergeTextStyles(d.styles)
   for (const [k, v] of Object.entries(d.assets || {})) if (/^data:image\//.test(v)) deck.assets[k] = v
   if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && !k.includes('..')))
-  deck.title = String(d.title || t('Präsentation')).slice(0, 200)
+  deck.title = String(d.title || t('Presentation')).slice(0, 200)
   deck.source = typeof d.source === 'string' ? d.source.slice(0, 200) : '' // Slidev folder it was imported from
   // an own theme the project file carries joins this browser's unless one with that id exists already;
   // an unknown id stays (shown in the default theme), so importing that theme later brings the look back
@@ -168,7 +168,7 @@ export function loadDeck(d) {
 export function newSlide(layout = 'default', elements) {
   return {
     id: uid(), layout, notes: '',
-    elements: elements || [{ id: uid(), type: 'text', title: true, x: 56, y: 40, w: 868, h: 40, html: '<h1>Titel</h1>' }],
+    elements: elements || [{ id: uid(), type: 'text', title: true, x: 56, y: 40, w: 868, h: 40, html: `<h1>${t('Title')}</h1>` }],
   }
 }
 
@@ -228,7 +228,7 @@ export const readDataUrl = blob => new Promise((res, rej) => {
 export const imageSize = src => new Promise((res, rej) => {
   const img = new Image()
   img.onload = () => res({ w: img.naturalWidth || 300, h: img.naturalHeight || 200 })
-  img.onerror = () => rej(new Error(t('Bild konnte nicht gelesen werden')))
+  img.onerror = () => rej(new Error(t('Image could not be read')))
   img.src = src
 })
 // stores an image file; returns the asset id and the path it gets in a Slidev export
@@ -281,7 +281,7 @@ const idb = (mode, fn) => db.then(d => new Promise((res, rej) => {
 const get = k => idb('readonly', s => s.get(k))
 const put = (k, v) => idb('readwrite', s => s.put(v, k))
 const del = k => idb('readwrite', s => s.delete(k))
-const saveFailed = e => { ui.save = 'failed'; ui.status = t('Speichern im Browser fehlgeschlagen – bitte als Datei sichern! ({0})', e.message) }
+const saveFailed = e => { ui.save = 'failed'; ui.status = t('Saving in the browser failed – please save as a file! ({0})', e.message) }
 const remember = id => { try { localStorage.setItem('slides-builder:last', id) } catch {} }
 
 function meta() {
@@ -310,7 +310,7 @@ const persistAssets = () => { if (deck.id) queue(() => Promise.all([put('a:' + d
 // opens a stored project
 export async function openProject(id) {
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
-  if (!json) throw new Error(t('Projekt nicht gefunden'))
+  if (!json) throw new Error(t('Project not found'))
   deck.assets = {}
   deck.files = {}
   deck.id = id
@@ -349,14 +349,14 @@ export async function renameProject(id, title) {
   if (!title) return
   if (id === deck.id) { deck.title = title; return }
   const json = await get('p:' + id)
-  if (!json) throw new Error(t('Projekt nicht gefunden'))
+  if (!json) throw new Error(t('Project not found'))
   library.list = library.list.map(p => (p.id === id ? { ...p, title, updated: Date.now() } : p))
   await Promise.all([put('p:' + id, JSON.stringify({ ...JSON.parse(json), title })), saveList()])
 }
 // the same .slides.json as deckFile(), read straight from storage without opening the project
 export async function projectFile(id) {
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
-  if (!json) throw new Error(t('Projekt nicht gefunden'))
+  if (!json) throw new Error(t('Project not found'))
   const updated = library.list.find(p => p.id === id)?.updated
   const d = JSON.parse(json)
   return JSON.stringify({ format: 'slides-builder', version: 1, id, updated, ...d, assets: assets || {}, files: files || {}, styles: usedStyles(d.slides), themeDef: themeDef(d.theme) })
@@ -367,7 +367,7 @@ export async function restoreProject(d) {
   const id = typeof d?.id === 'string' && /^[\w-]{1,64}$/.test(d.id) ? d.id : null
   const have = id && library.list.find(p => p.id === id)
   const older = have && !(d.updated >= have.updated)
-  await createProject(older ? { ...d, title: d.title + ' ' + t('(ältere Sicherung)') } : d, older ? undefined : id || undefined)
+  await createProject(older ? { ...d, title: d.title + ' ' + t('(older backup)') } : d, older ? undefined : id || undefined)
   return have ? (older ? 'copy' : 'replaced') : 'new'
 }
 
@@ -386,7 +386,7 @@ export async function restore(session = {}) {
     const open = [session.project, last].find(id => id && library.list.some(p => p.id === id))
     if (!deck.id && open) await openProject(open)
   } catch (e) {
-    ui.status = t('Gespeicherte Projekte konnten nicht geladen werden: {0}', e.message)
+    ui.status = t('Saved projects could not be loaded: {0}', e.message)
   }
   if (!deck.id || session.home) ui.home = true
 

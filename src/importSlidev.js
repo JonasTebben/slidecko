@@ -41,7 +41,7 @@ export async function importSlidev(path, files, theme) {
   const texts = new Map(await Promise.all(
     [...files].filter(([p]) => p.endsWith('.md') && !p.includes('node_modules')).map(async ([p, f]) => [p, typeof f === 'string' ? f : await f.text()])))
   const read = p => (texts.has(p) ? texts.get(p) : void missingFiles.push(p))
-  if (!texts.has(path)) throw new Error(t('{0} wurde nicht gefunden', path))
+  if (!texts.has(path)) throw new Error(t('{0} was not found', path))
 
   const storeAsset = data => {
     const id = uid()

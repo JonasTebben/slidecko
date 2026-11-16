@@ -3,7 +3,7 @@
 import { ref, computed, watchEffect } from 'vue'
 
 const KEY = 'slides-builder:scheme'
-export const SCHEMES = [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']]
+export const SCHEMES = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']]
 const read = () => { try { const s = localStorage.getItem(KEY); if (SCHEMES.some(x => x[0] === s)) return s } catch {} return 'system' }
 export const scheme = ref(read())
 

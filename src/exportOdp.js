@@ -210,6 +210,6 @@ class OdpSlide {
     const dp = bg ? ` draw:style-name="${d.style('drawing-page', `<style:drawing-page-properties draw:fill="solid" draw:fill-color="${color(bg)}" draw:background-size="full" presentation:background-visible="true" presentation:background-objects-visible="true"/>`, 'dp')}"` : ''
     const r = d.size.height / d.size.width, th = Math.min(3.9, 6.5 * r) // thumbnail in the slide's ratio, above the notes at 4.8in
     const notes = this.notes ? `<presentation:notes><draw:page-thumbnail svg:x="1in" svg:y="0.8in" svg:width="${inch(th / r)}" svg:height="${inch(th)}" draw:page-number="${i + 1}" presentation:class="page"/><draw:frame presentation:class="notes" svg:x="0.8in" svg:y="4.8in" svg:width="6.9in" svg:height="4.4in"><draw:text-box>${this.notes.split('\n').map(l => `<text:p>${textXml(l)}</text:p>`).join('')}</draw:text-box></draw:frame></presentation:notes>` : ''
-    return `<draw:page draw:name="Folie ${i + 1}" draw:master-page-name="${esc(this.master || 'Standard')}"${dp}>${this.items.join('')}${notes}</draw:page>`
+    return `<draw:page draw:name="Slide ${i + 1}" draw:master-page-name="${esc(this.master || 'Standard')}"${dp}>${this.items.join('')}${notes}</draw:page>`
   }
 }
