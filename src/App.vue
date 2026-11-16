@@ -16,7 +16,7 @@ import { shapeSvg } from './toSlidev.js'
 import { applyUno } from './uno.js'
 import * as A from './actions.js'
 import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells } from './tableOps.js'
-import { toggleMarked, codeOpts, withLines } from './hl.js'
+import { toggleMarked, codeOpts, withLines, highlight } from './hl.js'
 import { find, replace, ranges, pattern } from './search.js'
 import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, parseViewHash } from './session.js'
 
@@ -1113,7 +1113,8 @@ function onClipboard(e) {
         <h2>{{ mdTarget === 'slide' ? t('Markdown von Folie {0}', ui.slide + 1) : t('Folien aus Markdown') }}</h2>
         <p>{{ t('Slidev-Markdown: Folien mit') }} <code>---</code> {{ t('trennen, Layout per Frontmatter (') }}<code>layout: cover</code>{{ t('). Ideal für Folien, die eine KI erzeugt hat.') }}</p>
         <div class="md-wrap">
-          <div class="md-mirror text-mirror" aria-hidden="true">{{ mdText }}{{ '\u200b' }}</div>
+          <!-- the highlighted copy shows through the transparent textarea text; highlight() escapes the HTML -->
+          <div class="md-mirror text-mirror" aria-hidden="true" v-html="highlight(mdText, 'markdown') + '\u200b'" />
           <textarea v-model="mdText" class="md-editor" spellcheck="false" aria-label="Markdown" @scroll="$event.target.previousElementSibling.scrollTop = $event.target.scrollTop" />
         </div>
         <menu><button value="">{{ t('Abbrechen') }}</button><button class="primary" value="ok">{{ mdTarget === 'slide' ? t('Folie ersetzen') : t('Folien einfügen') }}</button></menu>

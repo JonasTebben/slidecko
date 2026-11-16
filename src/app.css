@@ -232,7 +232,18 @@ dialog menu button.primary:hover { background: var(--ui-fill-hover); }
 .md-editor, .md-mirror { font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px; tab-size: 2; }
 .md-editor { width: 100%; height: min(58vh, 520px); resize: vertical; }
 .md-wrap { position: relative; }
-.md-wrap .md-editor { position: relative; display: block; background: transparent; }
+.md-wrap .md-editor { position: relative; display: block; background: transparent; color: transparent; caret-color: var(--ui-fg); }
+/* syntax colours; weight and style stay put so the copy lines up with the textarea */
+.md-wrap .md-mirror, .md-mirror * { color: var(--ui-fg); font-weight: inherit; font-style: inherit; }
+.md-mirror :is(.hljs-section, .hljs-bullet) { color: #1d4fc4; }
+.md-mirror :is(.hljs-name, .hljs-tag) { color: #1e7633; }
+.md-mirror :is(.hljs-attr, .hljs-meta) { color: #aa4907; }
+.md-mirror :is(.hljs-string, .hljs-link) { color: #b42332; }
+.md-mirror :is(.hljs-code, .hljs-quote, .hljs-comment) { color: var(--ui-muted); }
+[data-scheme="dark"] .md-mirror :is(.hljs-section, .hljs-bullet) { color: #79a6ff; }
+[data-scheme="dark"] .md-mirror :is(.hljs-name, .hljs-tag) { color: #7ee787; }
+[data-scheme="dark"] .md-mirror :is(.hljs-attr, .hljs-meta) { color: #ffa657; }
+[data-scheme="dark"] .md-mirror :is(.hljs-string, .hljs-link) { color: #a5d6ff; }
 
 /* command palette */
 dialog.find { position: absolute; inset: 10px 12px auto auto; margin: 0; z-index: 20; padding: 6px 6px 6px 30px; width: min(440px, calc(100% - 24px)); display: none; flex-direction: column; gap: 4px; border-radius: 8px; }
@@ -379,7 +390,8 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .style-btn.custom:hover .style-del, .style-del:focus-visible { opacity: 1; }
 @media (hover: none) { .style-del { opacity: 1; } } /* touch: nothing reveals them */
 .style-del:hover { color: var(--ui-danger); }
-.slide.mini.style-prev { display: block; width: 100% !important; padding: 6px 10px !important; background: var(--bg, #fff) !important; font-size: 15px !important; text-align: left; }
+/* no cover/title-bar text colour: the preview sits on --bg (white on white in Ozean) */
+.slide.mini.style-prev { --cover-fg: initial !important; --bar-fg: initial !important; display: block; width: 100% !important; padding: 6px 10px !important; background: var(--bg, #fff) !important; font-size: 15px !important; text-align: left; }
 .slide.mini.style-prev > * { zoom: 0.6; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .slide.mini.style-prev > :is(h3, h5, h6, p, blockquote, pre) { zoom: 0.9; } /* small theme sizes stay legible in the preview */
 .slide.mini.style-prev > pre { padding: 6px 10px; }
@@ -450,7 +462,7 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 
 /* touch screens: fingers need bigger targets (WCAG 2.5.8) */
 @media (pointer: coarse) {
-  input, select, textarea { font-size: 16px !important; } /* iOS zooms into fields under 16px */
+  input, select, textarea, .text-mirror { font-size: 16px !important; } /* iOS zooms into fields under 16px; the copy behind a textarea must match */
   /* a long press opens our menu, not iOS's text selection or image preview */
   .stage .el:not(.editing), .thumbs, .deck-head, .project-open, .project-meta b { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .tb { height: 40px; } .tb.icon { width: 40px; }
@@ -485,7 +497,7 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
   .thumb-row { flex-direction: column; align-items: center; gap: 2px; }
   .num { width: auto; padding: 0; }
   .thumb { zoom: 0.55; }
-  .add-slide { flex: none; width: auto; height: 56px; margin: 28px 0 0; padding: 0 14px; }
+  .add-slide { flex: none; align-self: flex-end; width: auto; height: 56px; margin: 0; padding: 0 14px; } /* level with the thumbnails */
   .inspector { width: auto; border-left: 0; overflow: visible; }
   .presenter.pv { grid-template-columns: 1fr; align-content: start; padding: 16px; overflow-y: auto; }
   .pv-side { height: auto; }
