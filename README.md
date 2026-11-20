@@ -81,7 +81,7 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 
 YouTube loads only after a click on "Load YouTube content" (thumbnails from `i.ytimg.com`, the player from `www.youtube-nocookie.com`).
 
-When this changes (`src/session.js`, `src/store.js`, `src/i18n.js`, `src/scheme.js`, `src/App.vue`), update this table.
+When this changes (`src/session.js`, `src/store.js`, `src/themes.js`, `src/i18n.js`, `src/scheme.js`, `src/App.vue`), update this table.
 
 ## Hosting your own copy
 
