@@ -150,7 +150,9 @@ function replaceOne() {
 function replaceAll() {
   ui.editing = null
   const n = replace(hits.value, rx.value, findR.value, findOpt)
-  A.toast(t('{0} matches replaced', n))
+  // the whole project also means the master and the layouts (a name in the footer, say)
+  const m = findScope.value === 'all' && !mdOpen.value ? replace(find([{ elements: deck.master }, ...deck.layouts], rx.value, { ...findKinds, notes: false }), rx.value, findR.value, findOpt) : 0
+  A.toast(m ? t('{0} matches replaced, {1} of them in the master and layouts', n + m, m) : t('{0} matches replaced', n))
 }
 // marks in the text copy behind a textarea; scrolls the textarea to the current hit (the copy follows its scroll)
 function mirror(node, isCurrent, all, cur) {

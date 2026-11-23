@@ -893,4 +893,5 @@ export default {
   "Delete layout “{0}”? Its {1} slides keep their content and get the default layout.": "Layout „{0}“ löschen? Seine {1} Folien behalten ihren Inhalt und bekommen das Standardlayout.",
   "Delete layout “{0}”?": "Layout „{0}“ löschen?",
   "Put the tool away (Esc)": "Werkzeug weglegen (Esc)",
+  "{0} matches replaced, {1} of them in the master and layouts": "{0} Treffer ersetzt, davon {1} im Master und in Layouts",
 }
