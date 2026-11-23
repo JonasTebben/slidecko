@@ -28,6 +28,11 @@ export const ELEMENTS = {
     fill: shape === 'line' ? 'none' : '#3b82f6', stroke: shape === 'line' ? '#334155' : 'none', strokeWidth: shape === 'line' ? 4 : 0, radius: 0,
   }),
   video: youtube => ({ type: 'video', youtube, x: 240, y: 120, w: 500, h: 281 }),
+  // notes box for the class: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
+  board: () => T(`<p><strong>${t('Ideas from the class …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
+  timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
+  picker: () => ({ type: 'picker', names: [1, 2, 3, 4].map(n => t('Group {0}', n)), fontSize: 64, x: 280, y: 190, w: 420, h: 160 }),
+  quiz: () => ({ type: 'quiz', question: t('Question?'), answers: [{ text: t('Answer {0}', 1), correct: true }, { text: t('Answer {0}', 2) }, { text: t('Answer {0}', 3) }, { text: t('Answer {0}', 4) }], x: 80, y: 90, w: 800, h: 360 }),
 }
 
 const el = o => ({ id: uid(), ...o })

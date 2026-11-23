@@ -42,7 +42,7 @@ export const library = reactive({ list: [] }) // [{ id, title, theme, slides, de
 export const uid = () => Math.random().toString(36).slice(2, 10)
 // Slidev's click animations are kept in the markup so they survive a round trip
 // <style> is dropped: its rules would apply to the whole app, not just the box (remote url() in style attributes stays)
-export const clean = html => DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth'], FORBID_TAGS: ['style'] })
+export const clean = html => DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'v-click'], FORBID_TAGS: ['style'] })
 
 // --- decks (Foliensätze) ---
 export const fileOf = s => s.file || deck.entry
@@ -103,10 +103,12 @@ export function cleanEl(e) {
   if (e.locked) base.locked = true // not moved or resized in the editor
   if (/^[\w-]{1,20}$/.test(e.group)) base.group = e.group // elements sharing it are selected and moved together
   if (Object.hasOwn(SHADOWS, e.shadow)) base.shadow = e.shadow
+  if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
   switch (e.type) {
     case 'text': return {
       ...base, html: clean(e.html), ...(e.title && { title: true }), ...(ALIGN.includes(e.align) && { align: e.align }), ...(['middle', 'bottom'].includes(e.valign) && { valign: e.valign }),
       ...(color(e.color) && { color: color(e.color) }), ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(fontStack(e.font) && { font: e.font }),
+      ...(e.board === true && { board: true }), // notes box: the class's answers are typed into it while presenting
       // border: colour, width in px, line style
       ...(color(e.stroke) && e.stroke !== 'none' && { stroke: color(e.stroke), strokeWidth: num(e.strokeWidth || 1, 0.5, 20), ...(['dashed', 'dotted'].includes(e.strokeStyle) && { strokeStyle: e.strokeStyle }) }),
     }
@@ -144,6 +146,20 @@ export function cleanEl(e) {
       ...(e.shape !== 'line' && str(e.html)?.trim() && { html: clean(e.html) }), ...(color(e.color) && { color: color(e.color) }), ...(ALIGN.includes(e.align) && { align: e.align }),
     }
     case 'video': return /^[\w-]{6,20}$/.test(e.youtube) ? { ...base, youtube: e.youtube } : null
+    // countdown length in seconds (0: counts up), started by a click while presenting
+    case 'timer': return { ...base, seconds: Math.round(num(e.seconds, 0, 359999)), ...(color(e.color) && { color: color(e.color) }) }
+    // names or groups to draw from while presenting: plain text, trimmed, at most 200 of 100 characters
+    case 'picker': return {
+      ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),
+      ...(color(e.color) && { color: color(e.color) }),
+    }
+    // plain text (rendered as text, never as HTML) on one line, 2–6 answers, any of them correct
+    case 'quiz': {
+      const line = (v, n) => (str(v) || '').replace(/\s+/g, ' ').trim().slice(0, n)
+      const answers = (Array.isArray(e.answers) ? e.answers : []).filter(a => a && typeof a === 'object').slice(0, 6).map(a => ({ text: line(a.text, 200), ...(a.correct === true && { correct: true }) }))
+      while (answers.length < 2) answers.push({ text: '' })
+      return { ...base, question: line(e.question, 300), answers }
+    }
   }
   return null
 }
@@ -169,6 +185,18 @@ export const shownSlides = slides => slides.filter(s => !s.hidden)
 export function nextShown(slides, i, d) {
   for (let j = i + d; j >= 0 && j < slides.length; j += d) if (!slides[j].hidden) return j
   return i
+}
+// click steps of a slide: its distinct click order numbers, ascending (step k shows the elements up to the k-th)
+export const clickSteps = slide => [...new Set((slide?.elements || []).map(e => e.click).filter(Boolean))].sort((a, b) => a - b)
+export const revealed = (el, steps, k) => !el.click || (k > 0 && el.click <= steps[k - 1])
+// next (d = 1) or back (-1) while presenting: reveal or hide a step first, then change the slide;
+// arriving backwards shows all of the slide's steps (as in Slidev)
+export function stepMove(slides, i, k, d) {
+  const n = clickSteps(slides[i]).length
+  k = Math.min(k, n)
+  if (d > 0 ? k < n : k > 0) return { slide: i, step: k + d }
+  const j = nextShown(slides, i, d)
+  return { slide: j, step: j === i ? k : d > 0 ? 0 : clickSteps(slides[j]).length }
 }
 
 // Replaces the open project's content (keeps its id).

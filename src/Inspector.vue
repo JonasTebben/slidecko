@@ -2,11 +2,13 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { listAt } from './lists.js'
 import Icon from './Icon.vue'
-import { deck, ui, SHAPES, deckOfSlide, clean, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches } from './store.js'
+import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches } from './store.js'
 import { themeLayouts, TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
 import { LANGS, codeOpts, withLines } from './hl.js'
 import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook } from './actions.js'
 import * as table from './tableOps.js'
+import { clock, parseClock } from './timer.js'
+import { LETTERS } from './quiz.js'
 import { t } from './i18n.js'
 import { PALETTE, FILLS, SHAPE_NAMES } from './presets.js'
 
@@ -106,6 +108,9 @@ const shadowable = computed(() => selection.value.filter(e => ['text', 'shape', 
 function setAll(els, k, v) {
   for (const e of els) { e[k] = v; if (k === 'fill' && !v) delete e.fillAlpha; if (k === 'font' || k === 'fontSize') fitHeight(e) }
 }
+// appear on click: switched on, an element gets a step after the slide's last one
+const nextClick = () => Math.min(99, Math.max(0, ...slide.value.elements.map(e => e.click || 0)) + 1)
+const clickNum = v => Math.min(99, Math.max(1, Math.round(+v) || 1))
 const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || '').split('\n').length + 1)))
 </script>
 
@@ -155,6 +160,10 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
         <label class="check" :title="t('Locked elements can be selected and edited, but not moved, resized or aligned.')">
           <input type="checkbox" :checked="selection.every(e => e.locked)" :indeterminate.prop="selection.some(e => e.locked) && !selection.every(e => e.locked)" @change="setAll(selection, 'locked', $event.target.checked || undefined)" /> {{ t('Lock position') }}
         </label>
+        <label class="check" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')">
+          <input type="checkbox" :checked="selection.every(e => e.click)" :indeterminate.prop="selection.some(e => e.click) && !selection.every(e => e.click)" @change="setAll(selection, 'click', $event.target.checked ? nextClick() : undefined)" /> {{ t('Appear on click') }}
+        </label>
+        <label v-if="selection.every(e => e.click)" class="field">{{ t('Click order') }}<input type="number" min="1" max="99" :value="same('click', selection) ?? ''" :placeholder="t('Mixed')" @change="setAll(selection, 'click', clickNum($event.target.value))" /></label>
       </section>
       <section class="actions">
         <button v-if="ui.look" class="ib wide" :title="t('Apply copied formatting to all (⌘⌥V)')" @click="pasteLook()"><Icon name="brush" /> {{ t('Paste formatting') }}</button>
@@ -203,6 +212,7 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
           <button v-for="[a, i, lbl] in [['top', 'alignT', 'Text top'], ['middle', 'alignM', 'Text middle'], ['bottom', 'alignB', 'Text bottom']]" :key="a" class="ib" :class="{ on: (el.valign || 'top') === a }" :title="t(lbl)" @click="el.valign = a === 'top' ? undefined : a"><Icon :name="i" /></button>
         </div>
         <p v-if="!typing" class="hint">{{ t('Double-click into the text to format words.') }}</p>
+        <label class="check" :title="t('While presenting, a click into the box lets you type the class’s ideas into it; they are saved in the project.')"><input type="checkbox" :checked="!!el.board" @change="el.board = $event.target.checked || undefined" /> {{ t('Editable while presenting') }}</label>
         <label class="field">{{ t('Font') }}
           <select :value="el.font || ''" :style="{ fontFamily: fontStack(el.font) || null }" @change="el.font = $event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Theme') }}</option><option v-for="(f, k) in FONTS" :key="k" :value="k" :style="{ fontFamily: f[1] }">{{ f[0] }}</option></select>
         </label>
@@ -371,6 +381,56 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
         <label v-if="el.shape === 'rect'" class="field">{{ t('Corner radius') }} <input type="range" min="0" max="80" :value="el.radius" @input="el.radius = +$event.target.value" /></label>
       </section>
 
+      <section v-else-if="el.type === 'timer'">
+        <h3>{{ t('Timer') }}</h3>
+        <label class="field">{{ t('Duration (minutes or m:ss, 0 counts up)') }}
+          <input :value="clock(el.seconds)" inputmode="numeric" @change="el.seconds = parseClock($event.target.value) ?? el.seconds; $event.target.value = clock(el.seconds)" /></label>
+        <label class="field">{{ t('Font size') }}
+          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
+        </label>
+        <div class="field">{{ t('Text color') }}
+          <div class="swatches">
+            <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" @click="el.color = c" />
+            <button class="sw none" :title="t('Theme color')" @click="el.color = undefined" />
+          </div>
+        </div>
+        <p class="hint">{{ t('While presenting: a click starts or pauses it, a double click sets it back.') }}</p>
+      </section>
+
+      <section v-else-if="el.type === 'picker'">
+        <h3>{{ t('Random picker') }}</h3>
+        <!-- the same limits as when loading a project -->
+        <label class="field">{{ t('Names or groups, one per line') }}
+          <textarea :value="el.names.join('\n')" rows="8" maxlength="20000" @change="el.names = cleanEl({ type: 'picker', names: $event.target.value.split('\n') }).names" /></label>
+        <label class="field">{{ t('Font size') }}
+          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
+        </label>
+        <div class="field">{{ t('Text color') }}
+          <div class="swatches">
+            <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" @click="el.color = c" />
+            <button class="sw none" :title="t('Theme color')" @click="el.color = undefined" />
+          </div>
+        </div>
+        <p class="hint">{{ t('While presenting: a click draws a name, nobody twice until everyone was drawn; a double click starts over.') }}</p>
+      </section>
+
+      <section v-else-if="el.type === 'quiz'">
+        <h3>{{ t('Quiz') }}</h3>
+        <label class="field">{{ t('Question') }} <input :value="el.question" maxlength="300" @input="el.question = $event.target.value" /></label>
+        <div class="field">{{ t('Answers (tick the correct ones)') }}
+          <div v-for="(a, i) in el.answers" :key="i" class="btn-row">
+            <input type="checkbox" :checked="a.correct" :aria-label="t('Answer {0} is correct', LETTERS[i])" @change="a.correct = $event.target.checked || undefined" />
+            <input class="grow" :value="a.text" maxlength="200" :aria-label="t('Answer {0}', LETTERS[i])" @input="a.text = $event.target.value" />
+            <button class="ib" :disabled="el.answers.length <= 2" :title="t('Remove answer')" :aria-label="t('Remove answer')" @click="el.answers.splice(i, 1)"><Icon name="x" /></button>
+          </div>
+          <button class="ib wide" :disabled="el.answers.length >= LETTERS.length" @click="el.answers.push({ text: '' })"><Icon name="plus" /> {{ t('Add answer') }}</button>
+        </div>
+        <label class="field">{{ t('Font size') }}
+          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+        </label>
+        <p class="hint">{{ t('While presenting: a click marks an answer, “Reveal” (or Q) shows the solution.') }}</p>
+      </section>
+
       <section v-else-if="el.type === 'video'">
         <h3>{{ t('Video') }}</h3>
         <label class="field">{{ t('YouTube link or ID') }} <input :value="el.youtube" @change="setVideo($event.target.value)" /></label>
@@ -383,6 +443,8 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
           <label v-for="k in ['x', 'y', 'w', 'h']" :key="k">{{ { x: 'X', y: 'Y', w: t('W'), h: t('H') }[k] }}<input type="number" :value="el[k]" :disabled="el.locked" @change="num(k, $event.target.value)" /></label>
         </div>
         <label class="check" :title="t('Locked elements can be selected and edited, but not moved, resized or aligned.')"><input type="checkbox" :checked="!!el.locked" @change="el.locked = $event.target.checked || undefined" /> {{ t('Lock position') }}</label>
+        <label class="check" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')"><input type="checkbox" :checked="!!el.click" @change="el.click = $event.target.checked ? nextClick() : undefined" /> {{ t('Appear on click') }}</label>
+        <label v-if="el.click" class="field">{{ t('Click order') }}<input type="number" min="1" max="99" :value="el.click" @change="el.click = clickNum($event.target.value)" /></label>
         <label v-if="['text', 'shape', 'image', 'code'].includes(el.type)" class="field">{{ t('Shadow') }}
           <select :value="el.shadow || ''" @change="el.shadow = $event.target.value || undefined"><option value="">{{ t('none') }}</option><option value="soft">{{ t('soft') }}</option><option value="strong">{{ t('strong') }}</option></select>
         </label>
@@ -419,7 +481,7 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
           <button class="ib wide" @click="duplicateSlide()"><Icon name="copy" /> {{ t('Duplicate') }}</button>
           <button class="ib wide danger" @click="deleteSlide()"><Icon name="trash" /> {{ t('Delete') }}</button>
         </div>
-        <button class="ib wide" :title="t('View and edit this slide’s Markdown – e.g. generated by an AI')" @click="emit('markdown')"><Icon name="markdown" /> {{ t('Edit Markdown') }}</button>
+        <button class="ib wide" data-tour="markdown" :title="t('View and edit this slide’s Markdown – e.g. generated by an AI')" @click="emit('markdown')"><Icon name="markdown" /> {{ t('Edit Markdown') }}</button>
         <button v-if="canRevert(slide)" class="ib wide" :title="t('Show the slide as it was imported – changes to this slide are lost (can be undone)')" @click="revertSlides([slide])"><Icon name="undo" /> {{ t('Revert to imported version') }}</button>
       </section>
       <section>

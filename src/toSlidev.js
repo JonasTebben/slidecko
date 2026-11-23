@@ -2,6 +2,7 @@ import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
 import { fmGet, fmHidden, TRANSITIONS } from './parseSlidev.js'
 import { parseRatio } from './format.js'
+import { clock } from './timer.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss } from './themes.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
@@ -38,7 +39,7 @@ export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id
 // the slide follows the Slidev layout and is written as plain Markdown instead of positioned boxes
 export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, html, code, h, ...e }) => e)])
 // only one column of text and code flows in Markdown the way it sits in the editor
-export const flowable = els => els.every(e => e.type === 'text' || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
+export const flowable = els => els.every(e => (e.type === 'text' && !e.board) || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
 // a malformed escape ("100%.png") stays as written instead of stopping the export
 export const imagePath = src => { try { src = decodeURI(src) } catch { /* keep src */ } return src.replace(/^\.?\//, '') }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
@@ -56,6 +57,7 @@ function boxStyle(el, extra = '') {
   if ((el.fill || el.stroke) && el.type === 'text') s += ';padding:12px 16px;border-radius:10px'
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
+  if (el.board) s += ';--board:1' // editable while presenting, likewise
   if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`
   return s + extra
 }
@@ -123,6 +125,12 @@ function elementMd(el, flat) {
     }
     case 'shape':
       return `<div data-shape="${el.shape}" data-fill="${el.fill}" data-stroke="${el.stroke}" data-sw="${el.strokeWidth || 0}" data-radius="${el.radius || 0}"${el.fillAlpha != null ? ` data-alpha="${el.fillAlpha}"` : ''} style="${boxStyle(el)}">${shapeSvg(el)}${el.html ? `<div class="shape-text" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;text-align:${el.align || 'center'}"><div${curShapeFont[el.id] ? ` style="font-size:${curShapeFont[el.id]}"` : ''}>${el.html}</div></div>` : ''}</div>`
+    case 'timer': // Slidev has no timer: its start value as text, data-timer brings it back on import
+      return `<div data-timer="${el.seconds}" style="${boxStyle(el)}">\n\n${clock(el.seconds)}\n\n</div>`
+    case 'picker': // Slidev has no picker: the names as text, data-picks (JSON, one line) brings them back on import
+      return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
+    case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import
+      return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: // text
@@ -151,11 +159,13 @@ function slideStyle(slide) {
 const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)[\s\S]*?[^`]\2(?!`)|<\/?[a-zA-Z][^>]*>|\{\{/gm
 export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
 
+// appear on click: Slidev's v-click attribute with the step number on the element's box
+const withClick = (el, md) => (el.click ? md.replace(/^<(div|img)\b/, `<$1 v-click="${el.click}"`) : md)
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
   const flow = slide.flow != null && slide.flow === flowHash(slide)
   const els = flow ? [...slide.elements].sort((a, b) => a.y - b.y) : slide.elements
-  const body = escapeMustache(els.map(e => elementMd(e, flow)).join('\n\n') + slideStyle(slide))
+  const body = escapeMustache(els.map(e => withClick(e, elementMd(e, flow))).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
   return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defineAsyncComponent } from 'vue'
 import Icon from './Icon.vue'
 import AppFooter from './AppFooter.vue'
 import Menu from './Menu.vue'
@@ -7,9 +7,15 @@ import SlideView from './SlideView.vue'
 import Inspector from './Inspector.vue'
 import Home from './Home.vue'
 import ThemeEditor from './ThemeEditor.vue'
+import { tour, begin } from './tour.js'
+const Tour = defineAsyncComponent(() => import('./Tour.vue')) // loaded only when someone takes the tour
+import { tutorial, openTutorial } from './tutorial.js'
+const MarkdownTutorial = defineAsyncComponent(() => import('./MarkdownTutorial.vue')) // loaded on first open
 import { t, lang } from './i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown } from './store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps } from './store.js'
 import { parseRatio } from './format.js'
+import { slidePoint, arrowHead } from './draw.js'
+import { toggleSolution, resetQuiz } from './quiz.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { SLIDE_PRESETS, PALETTE, FILLS } from './presets.js'
 import { shapeSvg } from './toSlidev.js'
@@ -572,6 +578,10 @@ async function present(from = ui.slide) {
   presenting.value = true
   blank.value = null
   jump.value = ''
+  tool.value = null
+  strokes.value = []
+  resetQuiz()
+  clickStep.value = 0
   started.value = Date.now()
   await nextTick()
   presenter.value.focus()
@@ -580,14 +590,43 @@ async function present(from = ui.slide) {
 }
 function stopPresenting() {
   presenting.value = false
+  tool.value = null
   if (document.fullscreenElement) document.exitFullscreen()
 }
+// laser pointer and pen: the drawing is for this slide only, a slide change wipes it (not saved)
+const tool = ref(null), strokes = ref([]), laser = ref(null) // 'laser' | 'pen' | 'arrow'; strokes in slide units; laser at screen [x, y]
+// pen colours readable on light and dark slides, stroke widths in slide units
+const INKS = ['#e5202a', '#facc15', '#16a34a', '#2563eb', '#ffffff'], WIDTHS = [3, 6, 12]
+const ink = reactive({ color: INKS[0], width: 6 })
+const drawing = computed(() => tool.value === 'pen' || tool.value === 'arrow')
+const setTool = n => { tool.value = tool.value === n ? null : n; laser.value = null }
+watch(() => ui.slide, () => { strokes.value = [] })
+// Chrome: a short Esc reaches the page in full screen (holding it still leaves), so Esc can drop the tool first
+watch(tool, v => v ? navigator.keyboard?.lock?.(['Escape'])?.catch(() => {}) : navigator.keyboard?.unlock?.())
+let stroke = null
+function penDown(e) {
+  if (!e.isPrimary || e.button > 0) return
+  e.currentTarget.setPointerCapture(e.pointerId)
+  const p = slidePoint(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), format.w, format.h)
+  strokes.value.push({ pts: [p, p], color: ink.color, width: ink.width, arrow: tool.value === 'arrow' }) // two points: a tap leaves a dot
+  stroke = strokes.value.at(-1)
+}
+function penMove(e) {
+  if (!stroke || !e.isPrimary) return
+  const p = slidePoint(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), format.w, format.h)
+  if (stroke.arrow) stroke.pts[1] = p // an arrow is a straight line from where the drag began
+  else stroke.pts.push(p)
+}
+const penUp = () => { stroke = null }
 const blank = ref(null) // 'black' | 'white': the screen goes blank while the audience should look at the speaker
 const jump = ref('') // typed slide number, Enter jumps there
 let jumpTimer = 0
 // hidden slides are skipped (a typed slide number still shows them)
-const shownStep = d => nextShown(deck.slides, ui.slide, d)
-const presentGo = i => { blank.value = null; jump.value = ''; A.go(i) }
+const clickStep = ref(0) // click steps revealed on the current slide
+const presentGo = (i, k = 0) => { blank.value = null; jump.value = ''; A.go(i); clickStep.value = k }
+// next/back: click steps first, then the slide (hidden slides are skipped)
+const presentStep = d => { const m = stepMove(deck.slides, ui.slide, clickStep.value, d); presentGo(m.slide, m.step) }
+const upNext = computed(() => stepMove(deck.slides, ui.slide, clickStep.value, 1))
 // Slidev: the earlier slide's transition plays between two slides, reversed when going back
 const transition = ref('none')
 watch(() => ui.slide, (n, o) => {
@@ -595,7 +634,16 @@ watch(() => ui.slide, (n, o) => {
   transition.value = n < o ? { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }[name] || name : name
 })
 const resetTimer = () => { started.value = Date.now(); now.value = started.value }
+// every presenting key, shown with ? or H and the keyboard button (one list, so help and handler stay in step)
+const PRESENT_KEYS = [
+  ['→  Space  Enter', 'Next step or slide'], ['←  Backspace', 'Previous step or slide'], ['Home  End', 'First / last slide'],
+  ['12 Enter', 'Jump to slide 12'], ['P', 'Presenter view'], ['B  W', 'Black / white screen'], ['R', 'Reset the talk timer'],
+  ['Q', 'Show the quiz solution'], ['L', 'Laser pointer'], ['D', 'Draw'], ['A', 'Draw an arrow'], ['E', 'Erase the drawing'],
+  ['?  H', 'This list'], ['Esc', 'Put the tool away, then end presenting'],
+]
+const keysHelp = ref(false)
 function presentKey(e) {
+  if (e.target.closest?.('.el.board')) return // typing into a notes box (Esc first ends the typing there)
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey
   if (plain && /^[0-9]$/.test(e.key)) {
     jump.value += e.key
@@ -611,8 +659,14 @@ function presentKey(e) {
     return e.preventDefault()
   }
   if (plain && k === 'r') { resetTimer(); return e.preventDefault() }
+  if (plain && k === 'q') { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id); return e.preventDefault() }
+  if (plain && (k === 'l' || k === 'd' || k === 'a')) { setTool({ l: 'laser', d: 'pen', a: 'arrow' }[k]); return e.preventDefault() }
+  if (plain && (k === 'e' || k === 'c')) { strokes.value = []; return e.preventDefault() }
+  if (e.key === '?' || (plain && k === 'h')) { keysHelp.value = !keysHelp.value; return e.preventDefault() }
+  if (e.key === 'Escape' && keysHelp.value) { keysHelp.value = false; return e.preventDefault() }
+  if (e.key === 'Escape' && tool.value) { tool.value = null; return e.preventDefault() }
   const d = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1, Enter: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1, Backspace: -1 }[e.key]
-  if (d) presentGo(shownStep(d))
+  if (d) presentStep(d)
   else if (e.key === 'Home') presentGo(nextShown(deck.slides, -1, 1))
   else if (e.key === 'End') presentGo(nextShown(deck.slides, deck.slides.length, -1))
   else if (e.key === 'Escape') stopPresenting()
@@ -624,7 +678,7 @@ function presentKey(e) {
 let swipe = null, swiped = false
 function swipeDown(e) {
   swiped = false
-  swipe = e.pointerType === 'touch' && e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 } : null
+  swipe = !tool.value && e.pointerType === 'touch' && e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 } : null
 }
 function swipeMove(e) { if (swipe?.id === e.pointerId) Object.assign(swipe, { dx: e.clientX - swipe.x, dy: e.clientY - swipe.y }) }
 function swipeUp(e) {
@@ -633,14 +687,15 @@ function swipeUp(e) {
   swipe = null
   if (Math.abs(dx) <= 40 || Math.abs(dx) <= Math.abs(dy)) return
   swiped = true
-  presentGo(shownStep(dx < 0 ? 1 : -1))
+  presentStep(dx < 0 ? 1 : -1)
 }
 function presentClick(e) {
   if (swiped) { swiped = false; return }
   const a = e.target.closest('a[href]')
   if (a) return window.open(a.href, '_blank', 'noopener')
-  if (e.target.closest('iframe, .pv-side, .pv-bar')) return
-  presentGo(shownStep(e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
+  if (tool.value) return // pointing or drawing does not turn the slide
+  if (e.target.closest('iframe, .pv-side, .pv-bar, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal')) return // a timer click starts the timer, a picker click draws, not the next slide
+  presentStep(e.clientX < innerWidth / 4 ? -1 : 1) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
@@ -668,8 +723,8 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'],
-  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
+  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
@@ -690,6 +745,7 @@ const commands = computed(() => [
   [t('Save project as file'), A.saveFile, 'mod+s'], [t('Go to project overview'), () => { ui.home = true }],
   [t('Save snapshot'), snapNow], [t('Version history …'), openSnaps],
   [t('All commands and shortcuts'), openPalette, 'mod+k'],
+  [t('Take the tour'), () => begin(false)], [t('Full tour incl. Markdown (~5 min)'), () => begin(true)],
   [t('Revert this slide to imported version'), () => A.revertSlides([slide.value])],
   [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert'))],
   ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),
@@ -887,6 +943,7 @@ function onClipboard(e) {
             <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
+            <button class="mi" @click="openTutorial()"><Icon name="markdown" />{{ t('Markdown tutorial …') }}</button>
             <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ mod }}S</kbd></button>
             <button class="mi" @click="openSnaps"><Icon name="undo" />{{ t('Version history …') }}</button>
@@ -903,6 +960,7 @@ function onClipboard(e) {
             <button class="mi" :disabled="!selection.length" @click="A.remove"><Icon name="trash" />{{ t('Delete') }}<kbd>⌫</kbd></button>
             <hr />
             <button class="mi" @click="openPalette"><Icon name="search" />{{ t('All commands & shortcuts …') }}<kbd>{{ mod }}K</kbd></button>
+            <button class="mi" @click="begin(false)"><Icon name="play" />{{ t('Take the tour') }}</button>
           </Menu>
           <Menu :label="t('View')">
             <button class="mi" @click="present()"><Icon name="play" />{{ t('Present') }}<kbd>P</kbd></button>
@@ -933,7 +991,7 @@ function onClipboard(e) {
             <span class="slide mini-tbl" :class="`theme-${deck.theme}`"><span class="tbl-wrap" :data-table="id"><table><thead><tr><th /><th /><th /></tr></thead><tbody><tr><td /><td /><td /></tr><tr><td /><td /><td /></tr></tbody></table></span></span>{{ t(n) }}
           </button>
         </Menu>
-        <Menu icon="shapes" :label="t('Insert')">
+        <span data-tour="insert" class="tour-anchor"><Menu icon="shapes" :label="t('Insert')">
           <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ keyLabel('h') }}</kbd></button>
           <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ keyLabel('l') }}</kbd></button>
           <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ keyLabel('shift+l') }}</kbd></button>
@@ -949,16 +1007,20 @@ function onClipboard(e) {
           </div>
           <hr />
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
+          <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
+          <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
+          <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
           <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>⇧M</kbd></button>
-        </Menu>
+        </Menu></span>
         <span class="divider" />
         <button class="tb icon" :disabled="!canUndo()" :title="`${t('Undo')} (${mod}Z)`" @click="undo()"><Icon name="undo" /></button>
         <button class="tb icon" :disabled="!canRedo()" :title="`${t('Redo')} (${mod}⇧Z)`" @click="redo"><Icon name="redo" /></button>
       </div>
 
       <div class="right">
-        <button class="tb icon" :title="`${t('Search commands')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
-        <Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
+        <button class="tb icon" data-tour="palette" :title="`${t('Search commands')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
+        <span data-tour="theme" class="tour-anchor"><Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
           <template v-for="own in [false, true]" :key="own">
             <h4 class="mh">{{ own ? t('Own themes') : t('Built-in themes') }}</h4>
             <div class="theme-grid">
@@ -974,7 +1036,7 @@ function onClipboard(e) {
             <label class="mi"><Icon name="upload" />{{ t('Import …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
           </div>
           <label class="check keep-sizes" data-keep :title="t('The new theme brings its colors and fonts but keeps the current font sizes – so no layout shifts')"><input v-model="keepSizes" type="checkbox" /> {{ t('Keep font sizes when switching') }}<small v-if="deck.typo.from">{{ t('currently: sizes from “{0}”', themeName(deck.typo.from)) }}</small></label>
-        </Menu>
+        </Menu></span>
         <Menu ref="formatMenu" icon="fullscreen" :label="ratioLabel(deck.aspectRatio)" :title="t('Slide format (aspect ratio)')">
           <h4 class="mh">Format</h4>
           <button v-for="r in formats" :key="r" class="mi" :aria-pressed="deck.aspectRatio === r" @click="setFormat(r, deck.canvasWidth)">
@@ -986,20 +1048,20 @@ function onClipboard(e) {
             <button class="mi" @click="setCustomRatio">OK</button>
           </div>
         </Menu>
-        <Menu icon="download" label="Export">
+        <span data-tour="export" class="tour-anchor"><Menu icon="download" label="Export">
           <h4 class="mh">{{ t('Everything · {0} slides', deck.slides.length) }}</h4>
           <button v-for="f in EXPORTS" :key="f.id" class="mi" @click="A.exportAs(f.id)"><Icon :name="f.id === 'slidev' ? 'markdown' : 'file'" />{{ t(f.name) }} <small class="mi-ext">{{ f.ext }}</small></button>
           <hr />
           <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }} <small class="mi-ext">{{ keyLabel('mod+e') }}</small></button>
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Export single deck …') }}</button>
-        </Menu>
-        <button class="tb primary" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
+        </Menu></span>
+        <button class="tb primary" data-tour="present" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
       </div>
       </div>
     </header>
 
     <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props }">
-      <nav class="slides-panel" :aria-label="t('Slides')">
+      <nav class="slides-panel" data-tour="slides" :aria-label="t('Slides')">
         <div class="panel-head">
           <span>{{ t('Decks') }}</span>
           <button class="tb icon small" :title="t('New deck')" @click="newDeck"><Icon name="plus" :size="16" /></button>
@@ -1042,7 +1104,7 @@ function onClipboard(e) {
         </div>
       </nav>
 
-      <section ref="stage" class="stage" :aria-label="t('Slide {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="dropFiles([...$event.dataTransfer.files])" @wheel="stageWheel"
+      <section ref="stage" class="stage" data-tour="canvas" :aria-label="t('Slide {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="dropFiles([...$event.dataTransfer.files])" @wheel="stageWheel"
         @pointerdown.capture="fingerDown" @pointermove="fingerMove" @pointerup="fingerUp" @pointercancel="fingerUp"
         @touchmove="$event.touches.length > 1 && $event.preventDefault()">
         <button class="tb icon small panel-toggle left" :aria-expanded="panels.slides" :aria-label="t('Show/hide slide list')" :title="`${t('Show/hide slide list')} (${keyLabel('alt+b')})`" @click="panels.slides = !panels.slides"><Icon :name="panels.slides ? 'chevronL' : 'chevronR'" :size="16" /></button>
@@ -1262,13 +1324,15 @@ function onClipboard(e) {
         <div class="stage-info" :class="{ zoomed: zoom != null }">{{ ui.slide + 1 }} / {{ deck.slides.length }} · <button type="button" class="zoom-btn" :aria-label="`${t('Zoom')}: ${Math.round(scale * 100)} %`" :title="t('Zoom')" @click="cycleZoom">{{ Math.round(scale * 100) }} %</button></div>
       </section>
 
-      <Inspector @link="openLink" @markdown="openMarkdown('slide')" />
+      <Inspector data-tour="inspector" @link="openLink" @markdown="openMarkdown('slide')" />
     </main>
     <AppFooter />
   </div>
 
   <template v-if="ready">
 
+    <Tour v-if="tour.on" />
+    <MarkdownTutorial v-if="tutorial.open" />
     <div v-if="ui.status" class="toast" role="status">{{ ui.status }}<button class="tb icon small" :aria-label="t('Close')" @click="ui.status = ''"><Icon name="x" :size="14" /></button></div>
 
     <!-- dialogs -->
@@ -1392,26 +1456,46 @@ function onClipboard(e) {
     </dialog>
   </template>
 
-  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
-    @pointerdown="swipeDown" @pointermove="swipeMove" @pointerup="swipeUp" @pointercancel="swipeUp">
+  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
+    @pointerdown="swipeDown" @pointermove="e => { swipeMove(e); if (tool === 'laser') laser = [e.clientX, e.clientY] }" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
       <Transition :name="'tr-' + transition" :css="transition !== 'none'">
-        <div :key="ui.slide" class="pv-slide"><SlideView :slide="slide" :index="ui.slide" live :style="{ transform: `scale(${presentScale})` }" /></div>
+        <div :key="ui.slide" class="pv-slide"><SlideView :slide="slide" :index="ui.slide" live :step="clickStep" :style="{ transform: `scale(${presentScale})` }" /></div>
       </Transition>
+      <!-- [[x, y], …].join(' ') is SVG's "x,y x,y" -->
+      <svg v-if="drawing || strokes.length" class="pv-ink" :class="{ on: drawing }" :viewBox="`0 0 ${format.w} ${format.h}`" aria-hidden="true"
+        @pointerdown="penDown" @pointermove="penMove" @pointerup="penUp" @pointercancel="penUp">
+        <g v-for="(s, i) in strokes" :key="i" :style="{ stroke: s.color, strokeWidth: s.width }"><polyline :points="s.pts.join(' ')" /><polyline v-if="s.arrow" :points="arrowHead(s.pts[0], s.pts[1], s.width).join(' ')" /></g>
+      </svg>
     </div>
     <aside v-if="presenterView" class="pv-side">
       <div class="pv-next">
         <small>{{ t('Next slide') }}</small>
-        <div v-if="shownStep(1) !== ui.slide" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[shownStep(1)]" :index="shownStep(1)" :style="{ transform: 'scale(0.3)' }" /></div>
+        <div v-if="upNext.slide !== ui.slide || upNext.step !== clickStep" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[upNext.slide]" :index="upNext.slide" :step="upNext.step" :style="{ transform: 'scale(0.3)' }" /></div>
         <p v-else>{{ t('End') }}</p>
       </div>
       <div class="pv-notes">{{ slide.notes || t('No notes') }}</div>
     </aside>
     <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
+    <div v-if="tool === 'laser' && laser" class="pv-laser" :style="{ translate: `${laser[0]}px ${laser[1]}px` }" aria-hidden="true" />
     <div class="pv-jump" aria-live="polite">{{ jump && t('Slide {0}', jump) }}</div>
+    <div v-if="keysHelp" class="pv-keys" role="dialog" :aria-label="t('Keys while presenting')" @click.stop="keysHelp = false">
+      <h2>{{ t('Keys while presenting') }}</h2>
+      <dl><template v-for="[k, what] in PRESENT_KEYS" :key="k"><dt><kbd v-for="x in k.split('  ')" :key="x">{{ x }}</kbd></dt><dd>{{ t(what) }}</dd></template></dl>
+    </div>
     <div class="pv-bar">
       <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
+      <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
       <button v-if="presenterView" class="tb small pv-timer" :title="t('Reset timer') + ' (R)'" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
+      <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="t('Laser pointer') + ' (L)'" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
+      <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="t('Pen') + ' (D)'" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
+      <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="t('Arrow') + ' (A)'" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
+      <template v-if="drawing">
+        <button v-for="c in INKS" :key="c" class="pv-swatch" :class="{ on: ink.color === c }" :style="{ background: c }" :title="c" :aria-label="t('Pen colour {0}', c)" :aria-pressed="ink.color === c" @click.stop="ink.color = c" />
+        <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click.stop="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
+      </template>
+      <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
+      <button v-if="strokes.length" class="tb icon small" :title="t('Clear drawing') + ' (E)'" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
       <button class="tb icon small" :title="t('Presenter view (P)')" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
       <button class="tb icon small" :title="t('Exit (Esc)')" @click.stop="stopPresenting"><Icon name="x" :size="16" /></button>
     </div>

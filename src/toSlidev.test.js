@@ -58,3 +58,56 @@ test('a new slide in its preset arrangement is plain Markdown until it is moved'
   assert.match(slideToMarkdown(s), /position:absolute/)
   assert.ok(!flowable([{ type: 'text', x: 56, w: 410 }, { type: 'text', x: 514, w: 410 }])) // two columns
 })
+
+test('a timer is written with its start value and data-timer for the import', () => {
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 't', type: 'timer', ...box, seconds: 600 }] })
+  assert.match(md, /<div data-timer="600" style="position:absolute[^"]*">\n\n10:00\n\n<\/div>/)
+})
+
+test('a picker keeps its names in one escaped data-picks attribute that reads back to the same list', () => {
+  const names = ['Ana "A" <b>', 'Ben & Co', '{{ x }}', 'Line\nbreak']
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'p', type: 'picker', ...box, names }] })
+  const attr = md.match(/<div data-picks="([^"]*)" style="position:absolute[^"]*">/)[1]
+  assert.doesNotMatch(attr, /[<>\n]/)
+  // what the browser's dataset gives the import
+  assert.deepEqual(JSON.parse(attr.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')), names)
+  assert.match(md, /🎲 Ana/)
+})
+
+test('a notes box keeps its "editable while presenting" flag as --board in its box style', () => {
+  const el = { id: 'n', type: 'text', ...box, html: '<ul><li>idea</li></ul>', board: true }
+  assert.match(slideToMarkdown({ layout: 'default', elements: [el] }), /<div style="position:absolute[^"]*;--board:1[^"]*">/) // positioned, not flowed
+  assert.doesNotMatch(slideToMarkdown({ layout: 'default', elements: [{ ...el, board: undefined }] }), /--board/)
+})
+
+test('a quiz is written as text, the correct answer boxed on the next click, and data-quiz brings it back', () => {
+  const el = { id: 'q', type: 'quiz', ...box, question: 'Is "a" > b & <c> {{ x }}?', answers: [{ text: 'Yes <i>', correct: true }, { text: 'No' }] }
+  const md = slideToMarkdown({ layout: 'default', elements: [el] })
+  const attr = md.match(/<div data-quiz="([^"]*)"/)[1]
+  assert.ok(!/[<>]/.test(attr)) // a ">" would end the tag for the Vue-safety pass
+  const data = JSON.parse(attr.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'))
+  assert.deepEqual(data, { question: el.question, answers: el.answers })
+  assert.match(md, /- <span v-mark\.box\.green>\*\*A\*\* Yes &lt;i><\/span>/)
+  assert.match(md, /- \*\*B\*\* No$/m)
+})
+
+test('appear on click: the box gets Slidev’s v-click with its step, which the import reads back', async () => {
+  const { clickOf } = await import('./parseSlidev.js')
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'a', type: 'text', ...box, html: '<p>x</p>', click: 2 }, { id: 'b', type: 'image', ...box, src: '/a.png', click: 1 }, { id: 'c', type: 'shape', shape: 'rect', ...box }] })
+  assert.match(md, /<div v-click="2" style="position:absolute/)
+  assert.match(md, /<img v-click="1" src="\/a\.png"/)
+  assert.equal(md.match(/v-click/g).length, 2)
+  assert.deepEqual([...md.matchAll(/v-click="(\d+)"/g)].map(m => clickOf(m[1], 0)), [2, 1])
+  // Slidev's relative forms: an empty v-click (and "+1") is the step after the last one
+  assert.deepEqual([clickOf('', 0), clickOf('', 3), clickOf('+2', 1), clickOf('4', 9)], [1, 4, 3, 4])
+})
+
+test('static exports get each quiz slide twice: as asked and with the solution', async () => {
+  const { withSolutions } = await import('./quiz.js')
+  const q = { id: 'q', type: 'quiz' }, t = { id: 't', type: 'text' }
+  const out = withSolutions([{ id: 'a', elements: [t] }, { id: 'b', elements: [t, q] }])
+  assert.deepEqual(out.map(s => s.id), ['a', 'b', 'b-solution'])
+  assert.equal(out[1].elements[1].solved, undefined) // the original stays unsolved
+  assert.equal(out[2].elements[1].solved, true)
+  assert.equal(out[2].elements[0], t)
+})

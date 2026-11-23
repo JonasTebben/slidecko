@@ -7,6 +7,7 @@ import { formatSize, parseRatio } from './format.js'
 import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
 import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath } from './toSlidev.js'
+import { withSolutions } from './quiz.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
 const loadZip = async () => (await import('jszip')).default
 const importPptx = async (...a) => (await import('./importOffice.js')).importPptx(...a)
@@ -548,8 +549,8 @@ export function download(blob, name) {
 // all: hidden slides too (the Slidev export keeps them, with hide: true)
 const scopeSlides = (file, all) => (all ? s => s : shownSlides)(file ? slidesOf(file) : deck.slides)
 const scopeName = file => safe(file ? deckName(file) : deck.title)
-async function renderOutput(file, all) {
-  const slides = scopeSlides(file, all)
+async function renderOutput(file, all, solutions) {
+  const slides = solutions ? withSolutions(scopeSlides(file, all)) : scopeSlides(file, all)
   if (!slides.length) throw new Error(t('All slides are hidden'))
   exportSlides.value = slides
   await nextTick()
@@ -560,7 +561,7 @@ async function renderOutput(file, all) {
 }
 // print CSS: one page per slide at the project format -> vector PDF with selectable text
 export const pdf = file => run(async () => {
-  await flattenBackgrounds(await renderOutput(file))
+  await flattenBackgrounds(await renderOutput(file, false, true))
   const title = document.title
   document.title = scopeName(file) // browsers use it as the PDF file name
   addEventListener('afterprint', () => { exportSlides.value = null; document.title = title }, { once: true })
@@ -591,7 +592,7 @@ export const exportAs = (format, file) => {
   return run(async () => {
     toast(t('Creating {0} …', t(label)), 0)
     try {
-      const out = await renderOutput(file)
+      const out = await renderOutput(file, false, !format.startsWith('html')) // the HTML presentation reveals quizzes itself
       download(await build(out, scopeName(file), exportSlides.value), `${scopeName(file)}${format === 'png' ? '-images' : format === 'html-zip' ? '-html' : format === 'pptx-google' ? '-google' : ''}.${ext}`)
     } finally { exportSlides.value = null }
     toast(t('{0} exported.', t(label)))

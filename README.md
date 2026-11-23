@@ -20,10 +20,10 @@ bun test         # parser, export and server tests
 
 - **Import** Slidev projects (a folder with `slides.md`, `src:` includes, images, theme), PowerPoint (`.pptx`/`.potx`, also from Google Slides and Keynote), OpenDocument (`.odp`/`.otp`), PDF (one image slide per page, text in the notes), Slidecko's own HTML exports and images.
 - **Export** to Slidev (`.zip`), PDF (vector, selectable text), PowerPoint (editable, plus a Google Slides variant and an image-only "exact" variant), OpenDocument, a single-file or zipped HTML presentation, and PNG images.
-- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, shapes and YouTube videos, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
+- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, shapes, YouTube videos, and timers, random pickers ("who's next?") and quizzes you use while presenting, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
 - **Themes**: 13 built-in themes and a theme editor (colours, fonts, own CSS) whose themes can be exported and imported as `.theme.json`.
-- **Markdown**: insert slides from Slidev Markdown (e.g. written by an AI) or edit one slide as Markdown.
-- **Present** in full screen or with a presenter view (notes, next slide, timer).
+- **Markdown**: insert slides from Slidev Markdown (e.g. written by an AI) or edit one slide as Markdown; a hands-on Markdown tutorial teaches the syntax in a few minutes.
+- **Present** in full screen or with a presenter view (notes, next slide, timer); elements can appear step by step on click (Slidev's `v-click`).
 - **Phone and tablet** layout, long press for context menus, light/dark mode, English and German interface, accessible controls (4.5:1 contrast, named controls, reduced motion).
 
 The full behaviour is described in [docs/features.md](docs/features.md).
@@ -33,6 +33,7 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 | Path | Purpose |
 | --- | --- |
 | `src/parseSlidev.js` | Markdown → slides (frontmatter, `src:` includes, blocks) |
+| `src/tutorial.js`, `src/MarkdownTutorial.vue` | Markdown tutorial: lessons with their checks, and its dialog (lazy-loaded) |
 | `src/importSlidev.js` | renders each slide like Slidev does and measures its elements |
 | `src/importOffice.js` | PowerPoint and OpenDocument import |
 | `src/toSlidev.js` | slides → Slidev project files |
@@ -76,7 +77,7 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 | Where | What | How long |
 |---|---|---|
 | IndexedDB `slides-builder` | projects (slides, images, project files), project list, snapshots (version history: up to 20 per project with the images they use) | until the project or the site data is deleted |
-| localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`) | permanent |
+| localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`), tour offered on the start page (`tour`) | permanent |
 | sessionStorage `slides-builder:session` | the tab's view (selection, folded decks, scroll position), search term, YouTube consent | until the tab is closed |
 
 YouTube loads only after a click on "Load YouTube content" (thumbnails from `i.ytimg.com`, the player from `www.youtube-nocookie.com`).

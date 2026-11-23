@@ -116,3 +116,59 @@ test('cleanSlides keeps only the transitions the editor offers', async () => {
   const { cleanSlides } = await import('./store.js')
   assert.deepEqual(cleanSlides([{ transition: 'fade' }, { transition: 'none' }, { transition: 'slide-right' }, { transition: '<x>' }]).map(s => s.transition), ['fade', 'none', undefined, undefined])
 })
+
+test('timer: seconds are kept within a day-sized range, a bad colour is dropped', () => {
+  assert.equal(S.cleanEl({ type: 'timer', seconds: 600.4 }).seconds, 600)
+  assert.equal(S.cleanEl({ type: 'timer', seconds: -5 }).seconds, 0)
+  assert.equal(S.cleanEl({ type: 'timer', seconds: 'x' }).seconds, 0)
+  assert.equal(S.cleanEl({ type: 'timer', seconds: 1e9 }).seconds, 359999)
+  assert.equal(S.cleanEl({ type: 'timer', color: 'red;x' }).color, undefined)
+})
+
+test('picker: names are trimmed strings, empty lines and non-strings dropped, length and count limited', () => {
+  assert.deepEqual(S.cleanEl({ type: 'picker', names: [' Ana ', '', 3, null, 'Ben'] }).names, ['Ana', 'Ben'])
+  assert.deepEqual(S.cleanEl({ type: 'picker', names: 'Ana' }).names, [])
+  assert.equal(S.cleanEl({ type: 'picker', names: ['x'.repeat(500)] }).names[0].length, 100)
+  assert.equal(S.cleanEl({ type: 'picker', names: Array(500).fill('a') }).names.length, 200)
+})
+
+test('click steps: next reveals a step before the slide changes, back hides it, arriving backwards shows all', async () => {
+  const { stepMove, clickSteps, revealed } = await import('./store.js')
+  const el = click => ({ click })
+  const s = [{ elements: [el(), el(3), el(1), el(3)] }, { hidden: true, elements: [el(1)] }, { elements: [] }, { elements: [el(2)] }]
+  assert.deepEqual(clickSteps(s[0]), [1, 3])
+  assert.deepEqual([0, 1, 2].map(k => s[0].elements.filter(e => revealed(e, [1, 3], k)).length), [1, 2, 4])
+  assert.deepEqual(stepMove(s, 0, 0, 1), { slide: 0, step: 1 })
+  assert.deepEqual(stepMove(s, 0, 2, 1), { slide: 2, step: 0 }) // all shown: next slide, the hidden one skipped
+  assert.deepEqual(stepMove(s, 0, 1, -1), { slide: 0, step: 0 })
+  assert.deepEqual(stepMove(s, 0, 0, -1), { slide: 0, step: 0 }) // first slide: stays
+  assert.deepEqual(stepMove(s, 2, 0, -1), { slide: 0, step: 2 })
+  assert.deepEqual(stepMove(s, 3, 1, 1), { slide: 3, step: 1 }) // end: stays
+  assert.deepEqual(stepMove(s, 0, 5, 1), { slide: 2, step: 0 }) // a step past the end (elements removed) counts as all shown
+})
+test('click order is kept as a whole number from 1 to 99', () => {
+  assert.equal(S.cleanEl({ type: 'shape', click: '2.4' }).click, 2)
+  assert.equal(S.cleanEl({ type: 'shape', click: 500 }).click, 99)
+  for (const v of [0, -1, 'x', null]) assert.equal(S.cleanEl({ type: 'shape', click: v }).click, undefined)
+})
+
+test('notes box: the "editable while presenting" flag is kept only on text boxes and only as true', async () => {
+  const { default: DOMPurify } = await import('dompurify')
+  const real = DOMPurify.sanitize
+  DOMPurify.sanitize = String // no DOM here; the sanitizing itself is not under test
+  try {
+    assert.equal(S.cleanEl({ type: 'text', html: '<p>x</p>', board: true }).board, true)
+    assert.equal(S.cleanEl({ type: 'text', html: '<p>x</p>', board: 'yes' }).board, undefined)
+    assert.equal(S.cleanEl({ type: 'timer', seconds: 60, board: true }).board, undefined)
+  } finally { DOMPurify.sanitize = real }
+})
+
+test('quiz: plain one-line text with length limits, 2–6 answers, only true marks one correct', () => {
+  const q = S.cleanEl({ type: 'quiz', question: '  Why\n<b>x</b>?  ' + 'a'.repeat(400), answers: [{ text: 'A', correct: 'yes' }, null, { text: 7, correct: true }, ...Array(9).fill({ text: 'z'.repeat(300) })] })
+  assert.equal(q.question.length, 300)
+  assert.ok(q.question.startsWith('Why <b>x</b>?')) // stays text: rendered with {{ }}, never as HTML
+  assert.equal(q.answers.length, 6)
+  assert.deepEqual(q.answers.slice(0, 2), [{ text: 'A' }, { text: '', correct: true }])
+  assert.equal(q.answers[2].text.length, 200)
+  assert.deepEqual(S.cleanEl({ type: 'quiz', answers: 'x' }).answers, [{ text: '' }, { text: '' }])
+})

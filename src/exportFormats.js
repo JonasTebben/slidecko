@@ -88,12 +88,19 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .deck { position: fixed; inset: 0; touch-action: manipulation; }
 .deck > .slide { position: absolute !important; left: 50% !important; top: 50% !important; width: ${W}px !important; height: ${H}px !important; margin: 0 !important; visibility: hidden; box-shadow: 0 8px 40px #0008; }
 .deck > .slide.on, .deck > .slide.moving { visibility: visible; }
+@media screen { .deck .el.unshown { visibility: hidden; } }
 .deck { --tr-w: 100vw; --tr-h: 100vh; }
 .hud { position: fixed; right: 14px; bottom: 10px; padding: 4px 4px 4px 10px; border-radius: 9px; background: #000a; font: 12px/1 system-ui, sans-serif; color: #fffc; user-select: none; opacity: 0; transition: opacity .3s; }
 .hud.show, .hud:hover, .hud:focus-within { opacity: 1; }
 .hud button { font: inherit; color: inherit; background: #fff1; border: 0; border-radius: 6px; padding: 6px 9px; margin-left: 4px; cursor: pointer; }
 .hud button:hover { background: #fff3; color: #fff; }
 @media (hover: none) { .hud { opacity: 1; } .hud button { min-width: 44px; min-height: 44px; } }
+.hud button[aria-pressed=true] { background: #fff4; color: #fff; }
+body[data-tool=laser], body[data-tool=laser] * { cursor: none !important; }
+body[data-tool=pen] .deck { touch-action: none; cursor: crosshair; }
+body[data-tool=pen] .deck * { pointer-events: none; }
+.laser { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: #ff2a2a; box-shadow: 0 0 6px 3px #ff2a2acc, 0 0 18px 8px #ff2a2a66; pointer-events: none; }
+.ink { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9999; pointer-events: none; fill: none; stroke: #e5202a; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
 @media print {
   html, body { height: auto; overflow: visible; background: none; }
   .deck { position: static; }
@@ -120,8 +127,20 @@ const still = matchMedia('(prefers-reduced-motion: reduce)')
 const BACK = { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }
 const settle = s => s.classList.remove('moving', ...[...s.classList].filter(c => c.startsWith('tr-')))
 for (const s of slides) s.addEventListener('animationend', e => { if (e.target === s) settle(s) })
-function go(n) {
+// click steps (Slidev v-click): elements with data-click appear one step at a time, as when presenting in the editor
+const stepsOf = s => [...new Set([...s.querySelectorAll('[data-click]')].map(e => +e.dataset.click))].sort((a, b) => a - b)
+let k = 0
+function reveal() {
+  const st = stepsOf(slides[i])
+  for (const e of slides[i].querySelectorAll('[data-click]')) e.classList.toggle('unshown', !(k && +e.dataset.click <= st[k - 1]))
+}
+// next/back: a step first, then the slide; arriving backwards shows all steps
+function step(d) {
+  if (d > 0 ? k < stepsOf(slides[i]).length : k > 0) { k += d; reveal() } else if (slides[i + d]) go(i + d, d < 0)
+}
+function go(n, back) {
   n = Math.max(0, Math.min(slides.length - 1, n))
+  if (n !== i) clearInk()
   slides.forEach(settle)
   const name = (project.slides[Math.min(i, n)] || {}).transition || project.transition || 'none'
   if (n !== i && name !== 'none' && !still.matches) {
@@ -130,6 +149,8 @@ function go(n) {
     slides[n].classList.add('moving', tr + '-enter-active')
   }
   i = n
+  k = back ? stepsOf(slides[i]).length : 0
+  reveal()
   slides.forEach((s, j) => s.classList.toggle('on', j === i))
   no.textContent = (i + 1) + ' / ' + slides.length
   history.replaceState(null, '', '#' + (i + 1))
@@ -141,24 +162,101 @@ const hud = document.querySelector('.hud')
 let hideTimer
 addEventListener('mousemove', () => { hud.classList.add('show'); clearTimeout(hideTimer); hideTimer = setTimeout(() => hud.classList.remove('show'), 1800) })
 addEventListener('keydown', e => {
-  if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) go(i + 1)
-  else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) go(i - 1)
+  if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) step(1)
+  else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) step(-1)
   else if (e.key === 'Home') go(0)
   else if (e.key === 'End') go(slides.length - 1)
+  else if (e.key === 'Escape' && tool) setTool(tool)
+  else if (e.metaKey || e.ctrlKey || e.altKey) return
+  else if (e.key === 'l') setTool('laser')
+  else if (e.key === 'd') setTool('pen')
+  else if (e.key === 'e' || e.key === 'c') clearInk()
   else if (e.key === 'f') full()
   else return
   e.preventDefault()
 })
-document.querySelector('.deck').addEventListener('click', e => { if (!e.target.closest('a, iframe, video')) go(i + 1) })
+// timers: a click starts or pauses, a double click sets back, a run-out countdown starts over (same as in the editor)
+const clock = sec => { sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + s : m + ':' + s }
+for (const f of document.querySelectorAll('.timer-face')) {
+  const total = +f.dataset.timer || 0, p = f.querySelector('p')
+  let acc = 0, since = 0, tick = null
+  const left = () => { const e = (acc + (since ? Date.now() - since : 0)) / 1000; return total ? Math.max(0, total - e) : e }
+  const draw = () => { p.textContent = clock(left()); f.classList.toggle('done', !!total && left() <= 0) }
+  const run = on => { clearInterval(tick); tick = on ? setInterval(draw, 250) : null; draw() }
+  f.addEventListener('click', e => {
+    e.stopPropagation()
+    if (total && left() <= 0) { acc = 0; since = Date.now() } else if (since) { acc += Date.now() - since; since = 0 } else since = Date.now()
+    run(!!since)
+  })
+  f.addEventListener('dblclick', () => { acc = 0; since = 0; run(false) })
+}
+// quizzes: a click marks an answer, the button (or Q) shows the solution (same as in the editor)
+for (const q of document.querySelectorAll('.el > .quiz')) {
+  const b = document.createElement('button')
+  b.className = 'quiz-reveal'
+  b.textContent = q.dataset.reveal
+  b.addEventListener('click', e => { e.stopPropagation(); b.textContent = q.classList.toggle('revealed') ? q.dataset.hide : q.dataset.reveal })
+  q.append(b)
+  for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
+}
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'q' && !e.metaKey && !e.ctrlKey && !e.altKey) for (const b of slides[i].querySelectorAll('.quiz-reveal')) b.click() })
+// random pickers: a click draws a name, nobody twice until everyone was drawn, a double click starts over (same as in the editor)
+for (const f of document.querySelectorAll('.picker-face')) {
+  const names = JSON.parse(f.dataset.picks || '[]'), label = [...f.childNodes]
+  let left = []
+  f.setAttribute('role', 'button'); f.setAttribute('aria-live', 'polite')
+  f.addEventListener('click', e => {
+    e.stopPropagation()
+    if (!names.length) return
+    if (!left.length) left = names.slice()
+    const p = document.createElement('p'), s = document.createElement('small')
+    p.className = 'pick'
+    p.textContent = left.splice(Math.floor(Math.random() * left.length), 1)[0]
+    s.textContent = f.dataset.left.replace('{0}', left.length).replace('{1}', names.length)
+    f.replaceChildren(p, s)
+  })
+  f.addEventListener('dblclick', () => { left = []; f.replaceChildren(...label) })
+}
+document.querySelector('.deck').addEventListener('click', e => { if (!tool && !e.target.closest('a, iframe, video')) step(1) })
 let x0 = null
 addEventListener('touchstart', e => { x0 = e.touches[0].clientX }, { passive: true })
-addEventListener('touchend', e => { if (x0 != null && Math.abs(e.changedTouches[0].clientX - x0) > 40) go(i + (e.changedTouches[0].clientX < x0 ? 1 : -1)); x0 = null })
-document.querySelector('[data-prev]').onclick = () => go(i - 1)
-document.querySelector('[data-next]').onclick = () => go(i + 1)
+addEventListener('touchend', e => { if (!tool && x0 != null && Math.abs(e.changedTouches[0].clientX - x0) > 40) step(e.changedTouches[0].clientX < x0 ? 1 : -1); x0 = null })
+document.querySelector('[data-prev]').onclick = () => step(-1)
+document.querySelector('[data-next]').onclick = () => step(1)
 // iOS Safari has no Fullscreen API for pages: the button is hidden there, F does nothing
 function full() { if (document.fullscreenElement) document.exitFullscreen?.()?.catch(() => {}); else document.documentElement.requestFullscreen?.()?.catch(() => {}) }
 const fullBtn = document.querySelector('[data-full]')
 if (document.fullscreenEnabled) fullBtn.onclick = full; else fullBtn.hidden = true
+// laser pointer (L) and pen (D) as in the editor: E or C clears, Esc leaves the tool, a slide change wipes the drawing
+const dot = document.querySelector('.laser'), btn = { laser: document.querySelector('[data-laser]'), pen: document.querySelector('[data-pen]') }
+let tool = null, ink = null, line = null
+function setTool(t) {
+  tool = tool === t ? null : t
+  document.body.dataset.tool = tool || ''
+  dot.hidden = true
+  for (const k in btn) btn[k].setAttribute('aria-pressed', tool === k)
+}
+function clearInk() { if (ink) ink.remove(); ink = line = null }
+// the ink lives inside the slide in slide units (viewBox), so it scales with it
+function addPoint(e) {
+  const r = slides[i].getBoundingClientRect()
+  line.setAttribute('points', (line.getAttribute('points') || '') + ' ' + ((e.clientX - r.left) / r.width * ${W}).toFixed(1) + ',' + ((e.clientY - r.top) / r.height * ${H}).toFixed(1))
+}
+addEventListener('pointerdown', e => {
+  if (tool !== 'pen' || !e.isPrimary || e.button > 0 || e.target.closest('.hud')) return
+  if (!ink) { ink = slides[i].appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg')); ink.setAttribute('class', 'ink'); ink.setAttribute('viewBox', '0 0 ${W} ${H}') }
+  line = ink.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polyline'))
+  addPoint(e); addPoint(e) // two points: a tap leaves a dot
+})
+addEventListener('pointermove', e => {
+  if (tool === 'laser') { dot.hidden = false; dot.style.translate = e.clientX + 'px ' + e.clientY + 'px' }
+  if (line && e.isPrimary) addPoint(e)
+})
+addEventListener('pointerup', () => { line = null })
+addEventListener('pointercancel', () => { line = null })
+btn.laser.onclick = () => setTool('laser')
+btn.pen.onclick = () => setTool('pen')
+document.querySelector('[data-clear]').onclick = clearInk
 fit(); go(i)`
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -203,7 +301,8 @@ export async function htmlDeck(root, title, list, files) {
 <div class="deck">
 ${slides}
 </div>
-<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-full aria-label="Full screen">⛶</button></div>
+<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-laser aria-label="Laser pointer" title="Laser pointer (L)" aria-pressed="false">◉</button><button data-pen aria-label="Pen" title="Pen (D)" aria-pressed="false">✎</button><button data-clear aria-label="Clear drawing" title="Clear drawing (E)">⌫</button><button data-full aria-label="Full screen">⛶</button></div>
+<div class="laser" hidden></div>
 <script type="application/json" id="slides-builder-project">${project.replace(/</g, '\\u003c')}</script>
 <script>${viewerJs()}</script>
 </body>

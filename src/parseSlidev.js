@@ -13,6 +13,8 @@ export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm')
 // Slidev hides a slide with `hide: true` (alias `disabled: true`)
 // slide transitions the editor offers (Slidev's built-in names); 'none' turns the project's default off for one slide
 export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up']
+// Slidev's v-click value -> click step: "2" is that step, an empty one (or "+1") the step after the last one
+export const clickOf = (v, last) => (/^\d+$/.test(v) ? +v : last + (+v || 1))
 export const fmHidden =fm => fmGet(fm, 'hide') === 'true' || fmGet(fm, 'disabled') === 'true'
 
 // the slide format of a Slidev headmatter: { aspectRatio: '4/3', canvasWidth: 980 } (keys only when set);

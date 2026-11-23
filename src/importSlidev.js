@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, clickOf } from './parseSlidev.js'
 import { imagePath } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
@@ -25,7 +25,7 @@ const hasText = el => [...el.childNodes].some(n => n.nodeType === 3 && n.data.tr
 // a box written by toSlidev.js: <div style="position:absolute;left:…px;…">
 const savedBox = el => el.tagName === 'DIV' && el.style.position === 'absolute' && el.style.width.endsWith('px')
 const isImageOnly = el => el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG' && !hasText(el)
-const special = el => el.dataset.shape || el.dataset.video || el.dataset.table || el.dataset.callout
+const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.table || el.dataset.callout
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -136,6 +136,7 @@ function measure(slide, parsed) {
     if (box.style.borderTopStyle && box.style.borderTopStyle !== 'none') Object.assign(el, { stroke: box.style.borderTopColor, strokeWidth: px(box.style.borderTopWidth), ...(box.style.borderTopStyle !== 'solid' && { strokeStyle: box.style.borderTopStyle }) })
     if (box.style.getPropertyValue('--locked')) el.locked = true
     if (box.style.getPropertyValue('--group')) el.group = box.style.getPropertyValue('--group').trim()
+    if (box.style.getPropertyValue('--board')) el.board = true
     // shadow written by toSlidev: drop-shadow(… 0px Ypx BLURpx), recognised by its blur
     const blur = box.style.filter.match(/drop-shadow\(.*?([\d.]+)px\)?\s*\)?$/)?.[1]
     if (blur) el.shadow = Object.keys(SHADOWS).find(k => SHADOWS[k].blur === +blur)
@@ -155,7 +156,7 @@ function measure(slide, parsed) {
   const textual = m => !special(m) && m.tagName !== 'IMG' && !isImageOnly(m) && m.tagName !== 'PRE' && m.tagName !== 'TABLE' && !styled(m)
 
   const elements = []
-  let titled = false
+  let titled = false, clicks = 0
   for (let i = 0; i < leaves.length; i++) {
     const n = leaves[i], box = boxOf(n), r = rect(n)
     if (r.r - r.x < 1 && r.b - r.y < 1) continue
@@ -168,6 +169,16 @@ function measure(slide, parsed) {
       if (text?.textContent.trim()) el.html = text.innerHTML
     } else if (n.dataset.video) {
       Object.assign(el, { type: 'video', youtube: n.dataset.video })
+    } else if (n.dataset.timer) {
+      Object.assign(el, { type: 'timer', seconds: +n.dataset.timer || 0 })
+    } else if (n.dataset.picks) {
+      let names = []
+      try { names = JSON.parse(n.dataset.picks) } catch { /* a broken list: an empty picker, cleanEl checks the rest */ }
+      Object.assign(el, { type: 'picker', names })
+    } else if (n.dataset.quiz) {
+      let q = {}
+      try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }
+      Object.assign(el, { type: 'quiz', question: q?.question, answers: q?.answers })
     } else if (img) {
       if (!img.dataset.asset) continue
       Object.assign(el, { type: 'image', asset: img.dataset.asset, src: img.dataset.src, ...(img.getAttribute('class') && { cls: img.getAttribute('class') }) })
@@ -214,6 +225,8 @@ function measure(slide, parsed) {
       if (isTitle) titled = true
       if (!box) sized(el, group.map(rect))
     }
+    const vc = (box || img || n).getAttribute('v-click') // Slidev's appear on click, written by toSlidev on the box
+    if (vc != null) clicks = Math.max(clicks, (el.click = clickOf(vc, clicks)))
     if (box) fromBox(box, el)
     else if (el.w == null) sized(el, [r])
     elements.push(el)

@@ -1,6 +1,6 @@
 <script setup>
-import { nextTick, ref, watch, onBeforeUnmount } from 'vue'
-import { W, H, deck, ui, clean, withGroups } from './store.js'
+import { computed, nextTick, ref, watch, onBeforeUnmount } from 'vue'
+import { W, H, deck, ui, clean, withGroups, clickSteps, revealed } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
@@ -10,10 +10,14 @@ import { pasteHtml } from './paste.js'
 import { toggleList, undoList, typed, indent, autoList } from './lists.js'
 import { t } from './i18n.js'
 import { longPressFired } from './longpress.js'
+import { clock, shown, done, running, toggle, reset } from './timer.js'
+import * as picker from './picker.js'
+import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
-const props = defineProps({ slide: Object, index: Number, editable: Boolean, scale: { type: Number, default: 1 }, live: Boolean, theme: String }) // theme: preview in another theme than the deck's
+const props = defineProps({ slide: Object, index: Number, editable: Boolean, scale: { type: Number, default: 1 }, live: Boolean, theme: String, step: Number }) // theme: preview in another theme than the deck's; step: click steps revealed (unset: all)
+const steps = computed(() => clickSteps(props.slide))
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const root = ref()
 const selected = el => props.editable && ui.sel.includes(el.id)
@@ -35,6 +39,7 @@ const unresolveImgs = html => html.replace(/<img\b[^>]*>/g, t => {
 // magenta guides show what they stick to. Alt switches snapping off.
 const SNAP = 6
 const guides = ref({ x: null, y: null })
+const measure = ref(null) // the box being moved or resized: its position or size shown next to it
 const marquee = ref(null)
 function nearest(edges, lines) {
   let best = { d: 0, line: null, dist: SNAP / props.scale }
@@ -45,7 +50,7 @@ function track(e, move, done, cancel) {
   // a touch the browser takes over (scrolling, a system gesture) ends with pointercancel instead of pointerup
   // only the pointer that started it moves the box; a second finger (a pinch zoom) stops the gesture and calls cancel
   const mv = ev => ev.pointerId === e.pointerId && move(ev)
-  const stop = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('pointerdown', second, true); guides.value = { x: null, y: null } }
+  const stop = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('pointerdown', second, true); guides.value = { x: null, y: null }; measure.value = null }
   const up = ev => { if (ev.pointerId !== e.pointerId) return; stop(); done?.(ev) }
   const second = ev => { if (ev.pointerId === e.pointerId) return; stop(); cancel ? cancel() : done?.({ type: 'pointercancel' }) }
   addEventListener('pointermove', mv)
@@ -132,6 +137,7 @@ function drag(e, el, dir = '') {
     if (dir) Object.assign(el, { x: Math.round(l), y: Math.round(t), w: Math.round(r - l), h: Math.round(b - t) })
     else for (const [g, s] of start) Object.assign(g, { x: Math.round(s.x + l - o.x), y: Math.round(s.y + t - o.y) })
     guides.value = { x: sx.line ?? null, y: sy.line ?? null }
+    measure.value = { x: Math.round(l), y: Math.round(t), w: Math.round(r - l), h: Math.round(b - t), size: !!dir }
   }, null, () => { for (const [g, p] of start) Object.assign(g, p) }) // back where it started: the same state, so no undo step
 }
 
@@ -234,27 +240,38 @@ function backgroundDown(e) {
 // --- editing in place ---
 async function edit(e, el) {
   if (props.editable && el.type === 'image') return startCrop(el)
-  if (!props.editable || ['image', 'video'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
+  if (!props.editable || ['image', 'video', 'timer', 'quiz', 'picker'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
   const box = e.currentTarget, cell = e.target.closest?.('[data-r]')
   ui.sel = [el.id]
   ui.editing = el.id
   await nextTick()
   const target = cell ? box.querySelector(`[data-r="${cell.dataset.r}"][data-c="${cell.dataset.c}"]`) : box.querySelector('[contenteditable=true], textarea')
   target?.focus()
-  if (el.type === 'text' || cell) {
-    // caret where the user double-clicked, not at the start
-    let range = document.caretRangeFromPoint?.(e.clientX, e.clientY)
-    const pos = !range && document.caretPositionFromPoint?.(e.clientX, e.clientY)
-    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset) }
-    if (range && target?.contains(range.startContainer)) { getSelection().removeAllRanges(); getSelection().addRange(range) }
-  }
+  if (el.type === 'text' || cell) caretAt(e, target)
+}
+// caret where the user clicked, not at the start
+function caretAt(e, target) {
+  let range = document.caretRangeFromPoint?.(e.clientX, e.clientY)
+  const pos = !range && document.caretPositionFromPoint?.(e.clientX, e.clientY)
+  if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset) }
+  if (range && target?.contains(range.startContainer)) { getSelection().removeAllRanges(); getSelection().addRange(range) }
 }
 defineExpose({ edit })
+// notes box while presenting: a click types into it; saved like an edit in the editor (commit)
+const liveEdit = ref(null)
+async function editLive(e, el) {
+  const target = e.currentTarget
+  liveEdit.value = el.id
+  await nextTick()
+  target?.focus()
+  caretAt(e, target)
+}
 // el.html is only written when editing ends: re-rendering v-html while typing would reset the caret
 function commit(e, el) {
   const html = clean(unresolveImgs(e.target.innerHTML))
   if (html !== el.html) el.html = html
   if (ui.editing === el.id) ui.editing = null
+  if (liveEdit.value === el.id) { liveEdit.value = null; root.value?.closest('[tabindex]')?.focus() } // back to the slide keys
 }
 function textKey(e) {
   // ⌘⇧7 numbering, ⌘⇧8 bullets, as in Google Slides and Docs (by key position: ⇧7 is "/" on German keyboards)
@@ -389,18 +406,20 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
   <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown">
     <div
       v-for="el in slide.elements" :key="el.id" :data-el="el.id"
-      class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), editing: editable && ui.editing === el.id }]"
+      :data-click="el.click || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
+      class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable ? 0 : null"
-      :aria-label="editable ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video' }[el.type]) : null"
+      :aria-label="editable ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
         v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="resolveImgs(el.html)" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
-        :contenteditable="editable && ui.editing === el.id"
+        :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event)" @paste.prevent="pasteText"
+        @click="live && el.board && liveEdit !== el.id && editLive($event, el)"
       />
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
@@ -425,6 +444,24 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         <i v-else class="play" />
         <button v-if="!ui.yt" class="yt-consent" @pointerdown.stop @click.stop="ui.yt = true">{{ t('Load YouTube content') }}<small>{{ t('This sends data to Google.') }}</small></button>
       </div>
+      <!-- while presenting a click starts or pauses it, a double click sets it back -->
+      <div v-else-if="el.type === 'timer'" class="content timer-face" :class="{ running: live && running(el.id), done: live && done(el) }" :data-timer="el.seconds"
+        :role="live ? 'button' : null" :aria-label="live ? t('Start or pause the timer') : null" @click="live && toggle(el)" @dblclick="live && reset(el.id)"><p>{{ clock(live ? shown(el) : el.seconds) }}</p></div>
+      <!-- while presenting a click draws a name (nobody twice until everyone was drawn), a double click starts over; data-left is for the HTML export -->
+      <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-left="t('{0} of {1} left', '{0}', '{1}')" :role="live ? 'button' : null"
+        :aria-label="live ? t('Draw a name') : null" :aria-live="live ? 'polite' : null" @click="live && picker.next(el)" @dblclick="live && picker.reset(el.id)">
+        <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small>{{ t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) }}</small></template>
+        <p v-else class="label">🎲 {{ t('Random pick ({0})', el.names.length) }}</p>
+      </div>
+      <!-- while presenting a click on a tile marks it (the class's vote), the button shows the solution; the labels are for the HTML export -->
+      <div v-else-if="el.type === 'quiz'" class="content quiz" :class="{ revealed: el.solved || (live && quiz.shown[el.id]) }" :data-reveal="t('Reveal')" :data-hide="t('Hide')">
+        <p class="quiz-q">{{ el.question }}</p>
+        <div class="quiz-a">
+          <div v-for="(a, i) in el.answers" :key="i" class="quiz-tile" :class="{ picked: live && picked(el.id, i) }" :data-correct="a.correct || null" :role="live ? 'button' : null" :aria-pressed="live ? picked(el.id, i) : null" @click="live && pick(el.id, i)"><b>{{ LETTERS[i] }}</b><span>{{ a.text }}</span></div>
+        </div>
+        <button v-if="live" class="quiz-reveal" @pointerdown.prevent @click="toggleSolution(el.id)">{{ quiz.shown[el.id] ? t('Hide') : t('Reveal') }}</button>
+      </div>
+      <span v-if="editable && el.click" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
         <template v-if="ui.crop === el.id"><i v-for="h in HANDLES" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>
         <template v-else><i v-for="h in HANDLES" :key="h" class="handle" :class="h" @pointerdown.stop="drag($event, el, h)" /></template>
@@ -436,6 +473,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
     </div>
     <i v-if="guides.x != null" class="guide x" :style="{ left: guides.x + 'px' }" />
     <i v-if="guides.y != null" class="guide y" :style="{ top: guides.y + 'px' }" />
+    <span v-if="measure" class="measure" :style="{ left: measure.x + measure.w / 2 + 'px', top: measure.y + measure.h + 'px' }">{{ measure.size ? `${measure.w} × ${measure.h}` : `X ${measure.x}  Y ${measure.y}` }}</span>
     <i v-if="marquee" class="marquee" :style="{ left: marquee.x + 'px', top: marquee.y + 'px', width: marquee.w + 'px', height: marquee.h + 'px' }" />
     <div class="pageno">{{ index + 1 }}</div>
   </div>
