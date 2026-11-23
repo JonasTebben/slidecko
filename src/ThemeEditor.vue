@@ -3,7 +3,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import SlideView from './SlideView.vue'
 import { t } from './i18n.js'
-import { THEMES, FONTS, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf } from './themes.js'
+import { THEMES, FONTS, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf, containedCss } from './themes.js'
 import { download } from './actions.js'
 import CodeEditor from './CodeEditor.vue'
 
@@ -37,7 +37,8 @@ defineExpose({ open })
 
 const theme = () => ({ ...keep.value, name: draft.name, vars: Object.fromEntries(Object.entries(draft.vars).filter(([, v]) => v?.trim())), css: draft.css, base: draft.base })
 watch(draft, () => dlg.value?.open && setDraft(theme()), { deep: true })
-const valid = computed(() => draft.name.trim() && !Object.values(draft.vars).some(v => /[;{}<>]/.test(v || '')))
+// unbalanced CSS would leak into the app, saveTheme refuses it
+const valid = computed(() => draft.name.trim() && containedCss(draft.css || '') && !Object.values(draft.vars).some(v => /[;{}<>]/.test(v || '')))
 
 function save() {
   const id = saveTheme(editId.value || newThemeId(draft.name), theme())

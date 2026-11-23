@@ -8,7 +8,7 @@ import { clean } from './store.js'
 const PARA = /^(P|DIV|H[1-6]|BLOCKQUOTE|PRE|TR|TABLE|SECTION|ARTICLE|DD|DT)$/
 const PLAIN = /^(windowtext|black|auto|inherit|initial|currentcolor|transparent|#000|#000000|rgb\(0,\s*0,\s*0\))$/i // default text colour: the theme's
 const BLANK = /^(white|transparent|initial|inherit|none|#fff|#ffffff|rgba?\(255,\s*255,\s*255(,\s*1)?\)|rgba\(.*,\s*0\))$/i // default cell background
-const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') // also into attributes (href)
 
 function parse(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -113,14 +113,22 @@ export function pasteHtml(html, cell = false) {
 }
 
 // the first table in pasted HTML as a grid of { html, fill } (fill '' = no colour), or null without a table;
-// merged cells (colspan) keep their place in the grid
+// merged cells (colspan, rowspan) keep their place in the grid: the cells they cover stay empty
 export function pasteTable(html) {
   const { doc, own } = parse(html)
   const table = doc.querySelector('table')
   if (!table) return null
-  return [...table.rows].map(tr => [...tr.cells].flatMap(td => {
-    const bs = blocks(td, own), bg = own(td)['background-color']?.trim()
-    const inner = bs.every(b => b.kind === 'p') ? bs.map(b => runsHtml(b.runs)).join('<br>') : blocksHtml(bs)
-    return [{ html: clean(inner), fill: bg && !BLANK.test(bg) ? bg : '' }, ...Array(Math.max(0, td.colSpan - 1)).fill({ html: '', fill: '' })]
-  }))
+  const empty = { html: '', fill: '' }, grid = [...table.rows].map(() => [])
+  for (const [r, tr] of [...table.rows].entries()) {
+    let c = 0
+    for (const td of tr.cells) {
+      while (grid[r][c]) c++ // taken by a rowspan from above
+      const bs = blocks(td, own), bg = own(td)['background-color']?.trim()
+      const inner = bs.every(b => b.kind === 'p') ? bs.map(b => runsHtml(b.runs)).join('<br>') : blocksHtml(bs)
+      const cell = { html: clean(inner), fill: bg && !BLANK.test(bg) ? bg : '' }
+      for (let i = 0; i < Math.max(1, td.rowSpan) && r + i < grid.length; i++) for (let j = 0; j < td.colSpan; j++) grid[r + i][c + j] = i || j ? empty : cell
+      c += td.colSpan
+    }
+  }
+  return grid.map(row => Array.from(row, v => v || empty)) // holes of ragged rows
 }

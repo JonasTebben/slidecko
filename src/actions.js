@@ -1,6 +1,6 @@
 import { toggleList } from './lists.js'
 import { computed, nextTick, ref } from 'vue'
-import { W, H, deck, ui, uid, cleanEl, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath } from './store.js'
+import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides } from './store.js'
 import { ELEMENTS, SLIDE_PRESETS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
 import { formatSize, parseRatio } from './format.js'
@@ -117,7 +117,7 @@ export function resetCrop(el) {
   if (ui.crop !== el.id) delete el.crop
 }
 function pasteElements(list, offset = 16) {
-  const added = list.map(cleanEl).filter(Boolean).map(e => ({ ...e, x: e.x + offset, y: e.y + offset }))
+  const added = regroup(list.map(cleanEl).filter(Boolean).map(e => ({ ...e, x: e.x + offset, y: e.y + offset })))
   slide.value.elements.push(...added)
   ui.sel = added.map(e => e.id)
 }
@@ -128,6 +128,9 @@ export function remove() {
   ui.editing = null
 }
 export const selectAll = () => { ui.sel = slide.value.elements.map(e => e.id) }
+// a group is a shared id on its members: a click on one selects all, then they act as a multi-selection
+export function group() { if (selection.value.length < 2) return; const g = uid(); for (const e of selection.value) e.group = g }
+export const ungroup = () => { for (const e of selection.value) delete e.group }
 
 // --- arrangement ---
 export function order(where) {
@@ -238,6 +241,11 @@ export function duplicateSlide(i = ui.slide) {
   copy.elements = copy.elements.map(e => ({ ...e, id: uid() }))
   deck.slides.splice(i + 1, 0, copy)
   ui.slide = i + 1
+}
+export function toggleHidden(i = ui.slide) {
+  const s = deck.slides[i]
+  if (s.hidden) delete s.hidden
+  else s.hidden = true
 }
 export function deleteSlide(i = ui.slide) {
   deck.slides.splice(i, 1)
@@ -366,9 +374,10 @@ export const importProject = (files, entry, replace) => run(async () => {
   const map = filesMap(files)
   const theme = detectTheme(await map.get(entry).text())
   const r = await importSlidev(entry, map, theme)
+  if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition // the headmatter's transition is the project default, not slide 1's own
   const slideFiles = new Set([entry, ...r.slides.map(s => s.file)])
   const source = files[0]?.webkitRelativePath?.split('/')[0] || ''
-  await createProject({ title: source || entry.replace(/\.md$/, ''), source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
+  await createProject({ title: source || entry.replace(/\.md$/, ''), source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
   toast(await importReport(r), 8000)
 })
 // presentations from other programs, one new project each: .pptx, .odp, .pdf, .html (own export), images (one slide each)
@@ -535,10 +544,13 @@ export function download(blob, name) {
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
-const scopeSlides = file => (file ? slidesOf(file) : deck.slides)
+// all: hidden slides too (the Slidev export keeps them, with hide: true)
+const scopeSlides = (file, all) => (all ? s => s : shownSlides)(file ? slidesOf(file) : deck.slides)
 const scopeName = file => safe(file ? deckName(file) : deck.title)
-async function renderOutput(file) {
-  exportSlides.value = scopeSlides(file)
+async function renderOutput(file, all) {
+  const slides = scopeSlides(file, all)
+  if (!slides.length) throw new Error(t('All slides are hidden'))
+  exportSlides.value = slides
   await nextTick()
   const out = document.querySelector('.output')
   await Promise.all([...out.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
@@ -589,7 +601,7 @@ export const slidev = () => run(async () => {
   // text that shrinks to fit its shape (shrinkShapeText) keeps that size: Slidev cannot fit text itself
   const shapeFont = {}
   if (deck.slides.some(s => s.elements.some(e => e.type === 'shape' && e.html))) {
-    try { for (const c of (await renderOutput()).querySelectorAll('[data-el] > .shape-text > .content')) if (c.style.fontSize) shapeFont[c.closest('[data-el]').dataset.el] = c.style.fontSize }
+    try { for (const c of (await renderOutput(undefined, true)).querySelectorAll('[data-el] > .shape-text > .content')) if (c.style.fontSize) shapeFont[c.closest('[data-el]').dataset.el] = c.style.fontSize }
     finally { exportSlides.value = null }
   }
   const { files, images } = toSlidev(deckData(), deck.files, { shapeFont })

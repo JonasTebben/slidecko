@@ -88,7 +88,7 @@ export async function importSlidev(path, files, theme) {
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
-      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap })
+      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition })
     }
   } finally {
     host.remove()
@@ -135,6 +135,7 @@ function measure(slide, parsed) {
     if (box.style.backgroundColor) Object.assign(el, unmix(box.style.backgroundColor))
     if (box.style.borderTopStyle && box.style.borderTopStyle !== 'none') Object.assign(el, { stroke: box.style.borderTopColor, strokeWidth: px(box.style.borderTopWidth), ...(box.style.borderTopStyle !== 'solid' && { strokeStyle: box.style.borderTopStyle }) })
     if (box.style.getPropertyValue('--locked')) el.locked = true
+    if (box.style.getPropertyValue('--group')) el.group = box.style.getPropertyValue('--group').trim()
     // shadow written by toSlidev: drop-shadow(… 0px Ypx BLURpx), recognised by its blur
     const blur = box.style.filter.match(/drop-shadow\(.*?([\d.]+)px\)?\s*\)?$/)?.[1]
     if (blur) el.shadow = Object.keys(SHADOWS).find(k => SHADOWS[k].blur === +blur)

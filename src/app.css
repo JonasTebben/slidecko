@@ -97,6 +97,8 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .thumb:hover { box-shadow: 0 0 0 1px var(--ui-line-strong), 0 2px 6px #0001; }
 .thumb[aria-current='true'] { border-color: var(--ui-sel); box-shadow: 0 0 0 2px var(--ui-accent-soft); }
 .thumb > .slide { position: absolute; left: 0; top: 0; pointer-events: none; }
+.thumb.is-hidden > .slide { opacity: 0.4; }
+.hidden-badge { position: absolute; left: 4px; top: 4px; display: flex; padding: 2px; border-radius: 5px; background: #000b; color: #fff; }
 .add-slide { width: 100%; margin-top: 10px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px dashed var(--ui-line-strong); border-radius: 8px; background: none; color: var(--ui-muted); cursor: pointer; }
 .add-slide:hover { border-color: var(--ui-accent); color: var(--ui-accent); background: var(--ui-accent-soft); }
 
@@ -238,6 +240,11 @@ dialog menu button.primary:hover { background: var(--ui-fill-hover); }
 .pick-list { max-height: 300px; overflow-y: auto; border: 1px solid var(--ui-line); border-radius: 8px; padding: 4px; }
 .pick-list .check { padding: 6px 8px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 12px; }
 .pick-list .check:hover { background: var(--ui-hover); }
+.snap-list { list-style: none; margin: 0; }
+.snap-list li { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 8px; border-radius: 6px; font-size: 12.5px; }
+.snap-list li:hover { background: var(--ui-hover); }
+.snap-list span { flex: 1; }
+.snap-list button { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--ui-line-strong); border-radius: 6px; background: var(--ui-panel); color: inherit; cursor: pointer; }
 .md-editor, .md-mirror { font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px; tab-size: 2; }
 .md-editor { width: 100%; height: min(58vh, 520px); height: min(58svh, 520px); resize: vertical; } /* svh: the iOS toolbar and keyboard do not push it off screen */
 .md-wrap { position: relative; }
@@ -340,7 +347,27 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .presenter { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #000; cursor: default; outline: none; touch-action: pan-y; } /* no double-tap zoom (two quick taps are two slides), and a horizontal swipe is not taken over as a pan */
 .presenter a { cursor: pointer; }
 .pv-main { position: relative; overflow: hidden; }
-.pv-main > .slide { position: absolute; left: 0; top: 0; }
+.pv-slide { position: absolute; inset: 0; }
+.pv-slide > .slide { position: absolute; left: 0; top: 0; }
+/* slide transitions (presenting and the HTML export), Slidev's names; going back plays the reverse (slide-right/-down).
+   --tr-w/--tr-h: how far a slide travels (the export's viewer: the whole window) */
+.tr-fade-enter-active, .tr-fade-leave-active, .tr-slide-left-enter-active, .tr-slide-left-leave-active, .tr-slide-right-enter-active, .tr-slide-right-leave-active,
+.tr-slide-up-enter-active, .tr-slide-up-leave-active, .tr-slide-down-enter-active, .tr-slide-down-leave-active { animation: 0.4s ease both; }
+.tr-fade-enter-active { animation-name: tr-fade-in; } .tr-fade-leave-active { animation-name: tr-fade-out; }
+.tr-slide-left-enter-active { animation-name: tr-from-right; } .tr-slide-left-leave-active { animation-name: tr-to-left; }
+.tr-slide-right-enter-active { animation-name: tr-from-left; } .tr-slide-right-leave-active { animation-name: tr-to-right; }
+.tr-slide-up-enter-active { animation-name: tr-from-bottom; } .tr-slide-up-leave-active { animation-name: tr-to-top; }
+.tr-slide-down-enter-active { animation-name: tr-from-top; } .tr-slide-down-leave-active { animation-name: tr-to-bottom; }
+@keyframes tr-fade-in { from { opacity: 0; } }
+@keyframes tr-fade-out { to { opacity: 0; } }
+@keyframes tr-from-right { from { translate: var(--tr-w, 100%) 0; } }
+@keyframes tr-to-left { to { translate: calc(-1 * var(--tr-w, 100%)) 0; } }
+@keyframes tr-from-left { from { translate: calc(-1 * var(--tr-w, 100%)) 0; } }
+@keyframes tr-to-right { to { translate: var(--tr-w, 100%) 0; } }
+@keyframes tr-from-bottom { from { translate: 0 var(--tr-h, 100%); } }
+@keyframes tr-to-top { to { translate: 0 calc(-1 * var(--tr-h, 100%)); } }
+@keyframes tr-from-top { from { translate: 0 calc(-1 * var(--tr-h, 100%)); } }
+@keyframes tr-to-bottom { to { translate: 0 var(--tr-h, 100%); } }
 .presenter.pv { grid-template-columns: auto 1fr; gap: 24px; padding: 24px; background: #111317; align-items: start; justify-items: start; color: #e8eaed; }
 .pv-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: calc(100dvh - 80px); }
 .pv-next small { display: block; color: #9aa0a6; margin-bottom: 6px; }

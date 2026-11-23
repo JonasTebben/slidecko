@@ -8,7 +8,7 @@ import Inspector from './Inspector.vue'
 import Home from './Home.vue'
 import ThemeEditor from './ThemeEditor.vue'
 import { t, lang } from './i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets } from './store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown } from './store.js'
 import { parseRatio } from './format.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { SLIDE_PRESETS, PALETTE, FILLS } from './presets.js'
@@ -33,6 +33,14 @@ const paletteDialog = ref(), paletteQuery = ref(''), paletteIndex = ref(0)
 const deckDialog = ref(), deckNameInput = ref(''), deckRenaming = ref(null)
 const confirmDialog = ref(), confirmText = ref(''), confirmAction = ref(null)
 const ytDialog = ref(), ytUrl = ref('')
+// version history of the open project
+const snapDialog = ref(), snaps = ref([])
+const snapTime = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', timeStyle: 'short' }).format(d)
+const reloadSnaps = async () => { snaps.value = await listSnapshots() }
+const openSnaps = () => A.run(async () => { await reloadSnaps(); openDlg(snapDialog.value) })
+const snapNow = () => A.run(async () => { await saveSnapshot(); await reloadSnaps(); A.toast(t('Snapshot saved')) })
+const restoreSnap = at => A.run(async () => { await restoreSnapshot(at); snapDialog.value.close(); A.toast(t('Snapshot restored – the state before is a snapshot too, and Undo brings it back.')) })
+const deleteSnap = at => ask(t('Delete the snapshot from {0}?', snapTime(at)), () => A.run(async () => { await deleteSnapshot(at); await reloadSnaps() }), t('Delete'), false)
 // returnValue keeps the last button pressed: cleared, so Esc (no button) never repeats a previous OK
 const openDlg = d => { d.returnValue = ''; d.showModal() }
 
@@ -183,7 +191,7 @@ const EXPORTS = [
   { id: 'png', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
   { id: 'slidev', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
 ]
-const exportDialog = ref(), exportScope = ref(''), exportFormat = ref(localStorage.getItem('slides-builder:export') || 'pptx')
+const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 function openExport(scope = '', format) {
   exportScope.value = scope
   if (format) exportFormat.value = format
@@ -560,7 +568,7 @@ const fitPresenter = () => {
 async function present(from = ui.slide) {
   ui.sel = []
   ui.editing = null
-  A.go(from)
+  A.go(deck.slides[from]?.hidden ? nextShown(deck.slides, from, 1) : from) // a hidden slide is skipped, unless nothing follows it
   presenting.value = true
   blank.value = null
   jump.value = ''
@@ -577,7 +585,15 @@ function stopPresenting() {
 const blank = ref(null) // 'black' | 'white': the screen goes blank while the audience should look at the speaker
 const jump = ref('') // typed slide number, Enter jumps there
 let jumpTimer = 0
+// hidden slides are skipped (a typed slide number still shows them)
+const shownStep = d => nextShown(deck.slides, ui.slide, d)
 const presentGo = i => { blank.value = null; jump.value = ''; A.go(i) }
+// Slidev: the earlier slide's transition plays between two slides, reversed when going back
+const transition = ref('none')
+watch(() => ui.slide, (n, o) => {
+  const name = deck.slides[Math.min(n, o)]?.transition || deck.transition
+  transition.value = n < o ? { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }[name] || name : name
+})
 const resetTimer = () => { started.value = Date.now(); now.value = started.value }
 function presentKey(e) {
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey
@@ -596,11 +612,11 @@ function presentKey(e) {
   }
   if (plain && k === 'r') { resetTimer(); return e.preventDefault() }
   const d = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1, Enter: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1, Backspace: -1 }[e.key]
-  if (d) presentGo(ui.slide + d)
-  else if (e.key === 'Home') presentGo(0)
-  else if (e.key === 'End') presentGo(deck.slides.length - 1)
+  if (d) presentGo(shownStep(d))
+  else if (e.key === 'Home') presentGo(nextShown(deck.slides, -1, 1))
+  else if (e.key === 'End') presentGo(nextShown(deck.slides, deck.slides.length, -1))
   else if (e.key === 'Escape') stopPresenting()
-  else if (e.key.toLowerCase() === 'p') { presenterView.value = !presenterView.value; fitPresenter() }
+  else if (plain && k === 'p') { presenterView.value = !presenterView.value; fitPresenter() }
   else return
   e.preventDefault()
 }
@@ -617,14 +633,14 @@ function swipeUp(e) {
   swipe = null
   if (Math.abs(dx) <= 40 || Math.abs(dx) <= Math.abs(dy)) return
   swiped = true
-  presentGo(ui.slide + (dx < 0 ? 1 : -1))
+  presentGo(shownStep(dx < 0 ? 1 : -1))
 }
 function presentClick(e) {
   if (swiped) { swiped = false; return }
   const a = e.target.closest('a[href]')
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (e.target.closest('iframe, .pv-side, .pv-bar')) return
-  presentGo(ui.slide + (e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
+  presentGo(shownStep(e.clientX < innerWidth / 4 ? -1 : 1)) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
@@ -653,7 +669,7 @@ const commands = computed(() => [
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
   [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'],
-  [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'],
+  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
@@ -665,12 +681,14 @@ const commands = computed(() => [
   [t('Select all'), A.selectAll, 'mod+a'], [t('Copy formatting'), A.copyLook, 'mod+alt+c'], [t('Paste formatting'), () => A.pasteLook(), 'mod+alt+v'], [t('Duplicate'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'mod+d'],
   [t('Bring forward'), () => A.order('forward'), 'mod+arrowup'], [t('Send backward'), () => A.order('backward'), 'mod+arrowdown'],
   [t('Bring to front'), () => A.order('front'), 'mod+shift+arrowup'], [t('Send to back'), () => A.order('back'), 'mod+shift+arrowdown'],
+  [t('Group'), A.group, 'mod+g'], [t('Ungroup'), A.ungroup, 'mod+shift+g'],
   [t('Export …'), () => openExport(), 'mod+e'],
   [t('Export: PDF (all)'), () => A.pdf(), 'mod+p'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'mod+shift+e'], [t('Export: Slidev project (ZIP)'), A.slidev, 'mod+alt+s'],
   [t('Export: PowerPoint exact copy (all)'), () => A.exportAs('pptx-image')], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp')], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google')],
   [t('Export: HTML presentation (all)'), () => A.exportAs('html')], [t('Export: PNG images (all)'), () => A.exportAs('png')],
   ...decks.value.filter(d => d.file !== deck.entry).map(d => [t('Export: deck “{0}” …', d.name), () => openExport(d.file)]),
   [t('Save project as file'), A.saveFile, 'mod+s'], [t('Go to project overview'), () => { ui.home = true }],
+  [t('Save snapshot'), snapNow], [t('Version history …'), openSnaps],
   [t('All commands and shortcuts'), openPalette, 'mod+k'],
   [t('Revert this slide to imported version'), () => A.revertSlides([slide.value])],
   [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert'))],
@@ -701,7 +719,8 @@ function runCommand(c) {
 
 // --- keyboard & clipboard ---
 function onKey(e) {
-  if (presenting.value || ui.home) return
+  // handled already (menu arrows, palette Enter, ⌘↵ in the Markdown editor): not a second time as a shortcut
+  if (presenting.value || ui.home || e.defaultPrevented) return
   const k = e.key.toLowerCase(), cmd = e.metaKey || e.ctrlKey
   // letters by position: Alt/Option changes e.key (⌥P = π)
   // digits by position too (Shift+0 is ")" or "="), and "+" as "=" (⌘+ on German keyboards)
@@ -767,7 +786,7 @@ function onContext(e) {
   e.preventDefault()
   if (!editingCell) ui.editing = null
   if (!el) ui.sel = []
-  else if (!ui.sel.includes(el.id)) ui.sel = [el.id]
+  else if (!ui.sel.includes(el.id)) ui.sel = withGroups(slide.value.elements, [el.id])
   if (cell) {
     // a click inside the marked cells keeps the marking, anywhere else it moves to that cell
     const r = +cell.dataset.r, c = +cell.dataset.c, [r0, r9, c0, c9] = ui.cellEnd ? area(el) : []
@@ -829,7 +848,7 @@ function onClipboard(e) {
       const list = Array.isArray(d) ? d : Array.isArray(d?.elements) ? d.elements : []
       // only images this project lacks, and only image data (the loadDeck rule)
       for (const [k, v] of Object.entries(Array.isArray(d) ? {} : d?.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:image\//.test(v)) deck.assets[k] = v
-      const els = cleanSlides([{ elements: list }])[0].elements.map(el => ({ ...el, x: el.x + 16, y: el.y + 16 }))
+      const els = regroup(cleanSlides([{ elements: list }])[0].elements.map(el => ({ ...el, x: el.x + 16, y: el.y + 16 })))
       slide.value.elements.push(...els)
       ui.sel = els.map(el => el.id)
       if (els.length < list.length) A.toast(t('{0} elements could not be pasted.', list.length - els.length))
@@ -870,6 +889,7 @@ function onClipboard(e) {
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
             <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ mod }}S</kbd></button>
+            <button class="mi" @click="openSnaps"><Icon name="undo" />{{ t('Version history …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
             <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ mod }}Z</kbd></button>
@@ -1009,9 +1029,10 @@ function onClipboard(e) {
             <div v-if="!collapsed.has(g.file)" class="thumbs">
               <div v-for="(s, j) in g.slides" :key="s.id" class="thumb-row" @dragover.prevent @drop.prevent="drop($event, g.start + j, g.file)">
                 <span class="num">{{ g.start + j + 1 }}</span>
-                <button class="thumb" :style="{ height: Math.round(format.h * THUMB) + 4 + 'px' }" :aria-current="g.start + j === ui.slide" :aria-label="t('Slide {0}', g.start + j + 1)" draggable="true"
+                <button class="thumb" :class="{ 'is-hidden': s.hidden }" :style="{ height: Math.round(format.h * THUMB) + 4 + 'px' }" :aria-current="g.start + j === ui.slide" :aria-label="t('Slide {0}', g.start + j + 1) + (s.hidden ? ` (${t('hidden')})` : '')" draggable="true"
                   @click="ui.slide = g.start + j" @dblclick="present(g.start + j)" @contextmenu="onThumbContext($event, g.start + j)" @dragstart="dragStart($event, g.start + j)">
                   <SlideView :slide="s" :index="g.start + j" :style="thumbStyle" inert aria-hidden="true" />
+                  <span v-if="s.hidden" class="hidden-badge" :title="t('Hidden: skipped when presenting and exporting')"><Icon name="eyeOff" :size="14" /></span>
                   <span v-if="findOpen && hitsOn[g.start + j]" class="find-badge" :title="t('{0} matches', hitsOn[g.start + j])">{{ hitsOn[g.start + j] }}</span>
                 </button>
               </div>
@@ -1091,6 +1112,7 @@ function onClipboard(e) {
           </template>
           <template v-else-if="ctxAt?.thumb != null">
             <button class="mi" @click="present(ui.slide)"><Icon name="play" />{{ t('Present from this slide') }}<kbd>P</kbd></button>
+            <button class="mi" :aria-pressed="!!slide.hidden" @click="A.toggleHidden()"><Icon name="eyeOff" />{{ slide.hidden ? t('Show slide') : t('Hide slide') }}</button>
             <hr />
             <button class="mi" @click="A.addSlide()"><Icon name="plus" />{{ t('New slide after') }}<kbd>N</kbd></button>
             <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ keyLabel('mod+shift+d') }}</kbd></button>
@@ -1208,6 +1230,8 @@ function onClipboard(e) {
             <button class="mi" @click="clip('copy')"><Icon name="copy" />{{ t('Copy') }}<kbd>{{ mod }}C</kbd></button>
             <button class="mi" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ mod }}D</kbd></button>
             <button class="mi" @click="A.remove"><Icon name="trash" />{{ selection.length > 1 ? t('Delete {0} elements', selection.length) : t('Delete') }}<kbd>⌫</kbd></button>
+            <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="grid" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
+            <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="grid" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
             <hr />
             <button class="mi" @click="A.order('front')"><Icon name="up" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
             <button class="mi" @click="A.order('forward')"><Icon name="up" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
@@ -1333,6 +1357,22 @@ function onClipboard(e) {
       </form>
     </dialog>
 
+    <dialog ref="snapDialog">
+      <form method="dialog">
+        <h2>{{ t('Version history') }}</h2>
+        <p>{{ t('While you edit, a snapshot is kept every {0} minutes, up to {1} per project (the oldest are dropped). Snapshots stay in this browser and are deleted with the project.', SNAP_EVERY / 60e3, SNAP_MAX) }}</p>
+        <ul v-if="snaps.length" class="pick-list snap-list">
+          <li v-for="s in snaps" :key="s.at">
+            <span>{{ snapTime(s.at) }} · {{ t('{0} slides', s.slides) }}</span>
+            <button type="button" @click="restoreSnap(s.at)">{{ t('Restore') }}</button>
+            <button type="button" :title="t('Delete')" :aria-label="t('Delete')" @click="deleteSnap(s.at)"><Icon name="trash" /></button>
+          </li>
+        </ul>
+        <p v-else>{{ t('No snapshots yet.') }}</p>
+        <menu><button type="button" @click="snapNow">{{ t('Save snapshot') }}</button><button class="primary" value="">{{ t('Close') }}</button></menu>
+      </form>
+    </dialog>
+
     <dialog ref="confirmDialog" @close="confirmDialog.returnValue === 'ok' && confirmAction?.()">
       <form method="dialog">
         <h2>{{ t('Are you sure?') }}</h2>
@@ -1355,12 +1395,14 @@ function onClipboard(e) {
   <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
     @pointerdown="swipeDown" @pointermove="swipeMove" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
-      <SlideView :slide="slide" :index="ui.slide" live :style="{ transform: `scale(${presentScale})` }" />
+      <Transition :name="'tr-' + transition" :css="transition !== 'none'">
+        <div :key="ui.slide" class="pv-slide"><SlideView :slide="slide" :index="ui.slide" live :style="{ transform: `scale(${presentScale})` }" /></div>
+      </Transition>
     </div>
     <aside v-if="presenterView" class="pv-side">
       <div class="pv-next">
         <small>{{ t('Next slide') }}</small>
-        <div v-if="deck.slides[ui.slide + 1]" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[ui.slide + 1]" :index="ui.slide + 1" :style="{ transform: 'scale(0.3)' }" /></div>
+        <div v-if="shownStep(1) !== ui.slide" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[shownStep(1)]" :index="shownStep(1)" :style="{ transform: 'scale(0.3)' }" /></div>
         <p v-else>{{ t('End') }}</p>
       </div>
       <div class="pv-notes">{{ slide.notes || t('No notes') }}</div>

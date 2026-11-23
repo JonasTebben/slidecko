@@ -59,7 +59,8 @@ export function cleanTheme(th) {
   // no '<': the CSS also lands in the <style> of HTML exports
   const css = typeof th.css === 'string' ? th.css.replace(/</g, '').trim().slice(0, 200_000) : ''
   return {
-    name, custom: true, ...(th.dark === true && { dark: true }), vars, ...(css && { css }), ...(th.base === false && { base: false }),
+    // own CSS that could leave its .theme-x block would style the whole app (also the live preview and a stored theme)
+    name, custom: true, ...(th.dark === true && { dark: true }), vars, ...(css && containedCss(css) && { css }), ...(th.base === false && { base: false }),
     ...(layouts.length && { layouts }), ...(/^[\w@/.-]{1,100}$/.test(th.slidev) && { slidev: th.slidev }), ...(/^[\w@/.:#+-]{1,200}$/.test(th.pkg) && { pkg: th.pkg }),
   }
 }
@@ -81,6 +82,7 @@ export function newThemeId(name) {
 export function saveTheme(id, th) {
   const c = cleanTheme(th)
   if (!c || !validThemeId(id) || isBuiltin(id)) throw new Error('invalid theme')
+  if (typeof th.css === 'string' && th.css.replace(/</g, '').trim() && !c.css) throw new Error('invalid theme CSS') // rather than silently dropping what was typed
   THEMES[id] = c
   persistThemes()
   return id
@@ -127,7 +129,6 @@ export function containedCss(css) {
 export function importTheme(d) {
   const c = cleanTheme(d)
   if (!c) throw new Error('invalid theme')
-  if (c.css && !containedCss(c.css)) delete c.css // could close the theme's block and style the whole app
   const id = validThemeId(d.id) && !isBuiltin(d.id) && d.id !== DRAFT ? d.id : newThemeId(c.name)
   return saveTheme(id, c)
 }

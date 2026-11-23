@@ -334,6 +334,7 @@ export async function importPptx(file) {
   const tsDefs = Object.fromEntries(all(await read('ppt/tableStyles.xml') || xml('<x/>'), 'tblStyle').map(t => [t.getAttribute('styleId')?.toUpperCase(), t]))
   function tableStyle(id) {
     id = id?.trim().toUpperCase()
+    if (!id) return null // a table without tableStyleId
     const def = tsDefs[id]
     if (def) return Object.fromEntries(TS_REGIONS.map(reg => {
       const r = kid(def, reg), f = kid(r, 'tcStyle', 'fill'), tx = kid(r, 'tcTxStyle')
@@ -516,12 +517,15 @@ export async function importPptx(file) {
       const tbl = all(n, 'tbl')[0]
       if (tbl) {
         const cols = all(tbl, 'gridCol').map(c => +c.getAttribute('w') || 1), sum = cols.reduce((a, b) => a + b, 0)
-        const cells = kids(tbl, 'tr').map(tr => kids(tr, 'tc').filter(tc => !tc.getAttribute('hMerge') && !tc.getAttribute('vMerge')))
+        // merged-over cells stay (empty), so the cells after them keep their column
+        const cells = kids(tbl, 'tr').map(tr => kids(tr, 'tc'))
+        const merged = tc => /^(1|true)$/.test(tc.getAttribute('hMerge')) || /^(1|true)$/.test(tc.getAttribute('vMerge'))
         const tblPr = kid(tbl, 'tblPr'), st = tableStyle(kid(tblPr, 'tableStyleId')?.textContent)
         const flags = Object.fromEntries(['firstRow', 'lastRow', 'firstCol', 'lastCol', 'bandRow', 'bandCol'].map(f => [f, tblPr?.getAttribute(f) === '1']))
         const look = (r, c) => (st ? tableCell(st, flags, r, c, cells.length, cells[r].length) : {})
         // the style's text colour and bold for runs that set none; the cell's own fill beats the style's
         const rows = cells.map((row, r) => row.map((tc, c) => {
+          if (merged(tc)) return ''
           const l = look(r, c), paras = paragraphs(kid(tc, 'txBody'), [], 1)
           for (const p of paras) for (const run of p.runs) { run.color ||= l.color; if (l.b) run.b = true }
           return parasHtml(paras)
@@ -621,13 +625,14 @@ export async function importPptx(file) {
     const path = presRels[id]?.target
     if (!path || !zip.file(path)) continue
     const s = await part(path)
-    if (s.doc.documentElement.getAttribute('show') === '0') continue // hidden slide
+    const hidden = s.doc.documentElement.getAttribute('show') === '0' // hidden in PowerPoint: stays hidden here
     slideNo++
     const layoutPath = Object.values(s.rels).find(r => r.type === 'slideLayout')?.target
     const layout = layoutPath ? await cached(layouts, layoutPath) : null
     const masterPath = layout && Object.values(layout.rels).find(r => r.type === 'slideMaster')?.target
-    const master = masterPath ? await cached(masters, masterPath) : await part(Object.values(presRels).find(r => r.type === 'slideMaster').target)
-    const showMaster = p => p?.doc.documentElement.getAttribute('showMasterSp') !== '0'
+    const fallback = masterPath || Object.values(presRels).find(r => r.type === 'slideMaster')?.target
+    const master = fallback ? await cached(masters, fallback) : { ph: [], rels: {} } // no master: nothing inherited
+    const showMaster = p => p?.doc?.documentElement.getAttribute('showMasterSp') !== '0'
     const elements = [
       ...await background([s, layout, master].filter(Boolean)),
       ...(showMaster(s) && showMaster(layout) ? await shapes(master, layout, master, undefined, undefined, [1, 1], true) : []),
@@ -637,7 +642,7 @@ export async function importPptx(file) {
     const notesPath = Object.values(s.rels).find(r => r.type === 'notesSlide')?.target
     const notesDoc = notesPath && await read(notesPath)
     const notes = notesDoc ? all(notesDoc, 'sp').filter(sp => all(sp, 'ph')[0]?.getAttribute('type') === 'body').map(sp => all(sp, 'p').map(p => all(p, 't').map(t => t.textContent).join('')).join('\n')).join('\n').trim() : ''
-    slides.push({ layout: 'default', notes, elements })
+    slides.push({ layout: 'default', notes, elements, ...(hidden && { hidden }) })
   }
   const title = all(await read('docProps/core.xml'), 'title')[0]?.textContent?.trim()
   return { title: title || file.name.replace(/\.\w+$/, ''), slides, assets, ...format }
@@ -727,7 +732,8 @@ export async function importOdp(file) {
         continue
       }
       if (tbl) {
-        const cells = all(tbl, 'table-row').map(r => kids(r, 'table-cell'))
+        // covered (merged-over) cells stay as empty cells, so the cells after them keep their column
+        const cells = all(tbl, 'table-row').map(r => kids(r).filter(c => /^(covered-)?table-cell$/.test(c.localName)))
         const rows = cells.map(r => r.map(c => parasHtml(paragraphs(c, []))))
         // cell colour: the cell style's fill (LibreOffice) or background
         // the cell's own style, else its row's or column's default

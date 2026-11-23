@@ -1,6 +1,6 @@
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
-import { fmGet } from './parseSlidev.js'
+import { fmGet, fmHidden, TRANSITIONS } from './parseSlidev.js'
 import { parseRatio } from './format.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss } from './themes.js'
 
@@ -15,6 +15,9 @@ import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, code
 
 const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '*' })
 turndown.use(gfm)
+// text "<" would be read as an HTML tag (List<T> breaks Slidev's Vue compile), "&lt;" as an entity; code is not escaped
+const mdEscape = turndown.escape.bind(turndown)
+turndown.escape = s => mdEscape(s).replace(/&(?=#?\w+;)/g, '&amp;').replace(/</g, '&lt;')
 // markup markdown cannot express stays HTML (Slidev renders inline HTML)
 turndown.keep(node => ['V-CLICKS', 'V-CLICK', 'V-AFTER', 'MARK', 'U', 'SUB', 'SUP', 'KBD'].includes(node.nodeName) ||
   (node.nodeName === 'SPAN' && node.getAttribute('style')) || (node.nodeName === 'DIV' && node.getAttribute('data-callout')) ||
@@ -24,7 +27,7 @@ turndown.addRule('img', {
   replacement: (_, n) => {
     const src = n.getAttribute('src') || ''
     const cls = n.getAttribute('class'), style = n.getAttribute('style'), alt = n.getAttribute('alt') || ''
-    return cls || style ? `<img src="${src}"${cls ? ` class="${cls}"` : ''}${style ? ` style="${style}"` : ''} />` : `![${alt}](${src})`
+    return cls || style ? `<img src="${esc(src)}"${cls ? ` class="${esc(cls)}"` : ''}${style ? ` style="${esc(style)}"` : ''} />` : `![${alt}](${src})`
   },
 })
 
@@ -34,7 +37,8 @@ export function slideHash(slide) {
   for (const c of JSON.stringify([slide.layout, slide.elements.map(({ id, ...e }) => e)])) h = (h * 31 + c.charCodeAt(0)) | 0
   return h
 }
-export const imagePath = src => decodeURI(src).replace(/^\.?\//, '')
+// a malformed escape ("100%.png") stays as written instead of stopping the export
+export const imagePath = src => { try { src = decodeURI(src) } catch { /* keep src */ } return src.replace(/^\.?\//, '') }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 
 function boxStyle(el, extra = '') {
@@ -49,6 +53,7 @@ function boxStyle(el, extra = '') {
   if (el.stroke && el.type === 'text') s += `;border:${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}`
   if ((el.fill || el.stroke) && el.type === 'text') s += ';padding:12px 16px;border-radius:10px'
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
+  if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
   if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`
   return s + extra
 }
@@ -144,12 +149,21 @@ export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<sp
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
   const body = escapeMustache(slide.elements.map(elementMd).join('\n\n') + slideStyle(slide))
-  return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>')}\n-->` : body
+  // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
+  return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
 }
 
-// the slide's own frontmatter, with `layout:` following the layout chosen in the editor
+// the slide's own frontmatter, with `layout:` following the layout chosen in the editor and `hide:` the hidden switch
+// `transition:` follows the editor; one the editor does not offer (slide-right …) stays while the slide follows the project default
+function withTransition(fm, v) {
+  const cur = fmGet(fm, 'transition')
+  if (cur === v || (!v && !TRANSITIONS.includes(cur))) return fm
+  return cur ? fm.replace(/^transition:.*(\n|$)/m, v ? `transition: ${v}$1` : '').trim() : [fm, `transition: ${v}`].filter(Boolean).join('\n')
+}
 function slideFm(slide) {
-  const fm = slide.fm || ''
+  let fm = slide.fm || ''
+  if (!!slide.hidden !== fmHidden(fm)) fm = [fm.replace(/^(hide|disabled):.*\n?/gm, '').trim(), slide.hidden && 'hide: true'].filter(Boolean).join('\n')
+  fm = withTransition(fm, slide.transition)
   if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
   const rest = fm.replace(/^layout:.*\n?/m, '').trim()
   return slide.layout === 'default' && !fmGet(fm, 'layout') ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
@@ -163,7 +177,7 @@ export function slideToMarkdown(slide) {
 // returns { files: { path: text }, images: { path: assetId } }
 // projectFiles: the project's other files (theme, package.json …), written back unchanged
 // shapeFont: element id -> font size the editor shrank its shape text to
-export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth }, projectFiles = {}, { shapeFont = {} } = {}) {
+export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition }, projectFiles = {}, { shapeFont = {} } = {}) {
   entry ||= 'slides.md'
   const dir = entry.split('/').slice(0, -1).join('/')
   // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
@@ -171,6 +185,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   curShapeFont = shapeFont
   const { slidev: own, pkg } = themeOf(theme)
   // consecutive slides of the same file form one part
+  const head = transition !== 'none' ? transition : undefined // Slidev's default is no transition
   const parts = []
   for (const s of slides) {
     const file = s.file || entry
@@ -188,7 +203,8 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   const entrySlides = []
   const used = {}
   for (const part of parts) {
-    const list = part.slides.map(s => ({ fm: slideFm(s), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
+    // slide 1's frontmatter is usually the headmatter, whose transition is the project default
+    const list = part.slides.map(s => ({ fm: slideFm(s === slides[0] && !s.transition ? { ...s, transition: head } : s), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
     if (part.file === entry) { entrySlides.push(...list); continue }
     // a file whose slides were split up by reordering continues in "name-2.md"
     const n = (used[part.file] = (used[part.file] || 0) + 1)
@@ -210,6 +226,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   }
   if (aspectRatio) format('aspectRatio', aspectRatio, v => Math.abs(ratio(v) - ratio(aspectRatio)) < 1e-4, Math.abs(ratio(aspectRatio) - 16 / 9) < 1e-4)
   if (canvasWidth) format('canvasWidth', canvasWidth, v => +v === +canvasWidth, +canvasWidth === 980)
+  first.fm = withTransition(first.fm, head) // Slidev: the headmatter's transition applies to every slide (shortcut: slide 1 cannot have its own)
   write(entry, entrySlides)
   if (!own) files['style.css'] = slidevThemeCss(theme) + (projectFiles['style.css'] ? '\n' + projectFiles['style.css'] : '') // the project's own rules stay
   // project-wide font sizes: Slidev loads style.css from the project root for every slide

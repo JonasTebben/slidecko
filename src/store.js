@@ -1,6 +1,7 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { slideHash } from './toSlidev.js'
+import { TRANSITIONS } from './parseSlidev.js'
 import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile } from './themes.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
@@ -33,7 +34,7 @@ export function setFormat(aspectRatio = '16/9', canvasWidth = 980) {
 // assets: { id: dataURL } – kept out of the slides so undo snapshots and duplicates stay small.
 // files: other files of the Slidev project (theme/, package.json, global components …) as text or
 // data URL, written back unchanged on export so the project keeps working.
-export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, entry: 'slides.md', slides: [], assets: {}, files: {} })
+export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, transition: 'none', entry: 'slides.md', slides: [], assets: {}, files: {} })
 // sel: selected element ids (last = primary); editing: id of the element being typed in
 export const ui = reactive({ slide: 0, sel: [], editing: null, status: '', cell: null, cellEnd: null, cellFill: false, crop: null, cropRatio: null, look: null, painting: false, home: false, save: 'saved', yt: false }) // save: saving | saved | failed; yt: YouTube content allowed in this tab (privacy: nothing loads from Google before a click; kept in sessionStorage)
 export const library = reactive({ list: [] }) // [{ id, title, theme, slides, decks, updated }]
@@ -83,12 +84,24 @@ export function cleanCrop(c) {
   const r = v => Math.round(v * 1e5) / 1e5
   return { x: r(x), y: r(y), w: r(w), h: r(h) }
 }
+// ids plus the other members of their groups, the given ids last (the last one is the primary)
+export const withGroups = (els, ids) => {
+  const g = new Set(els.filter(e => e.group && ids.includes(e.id)).map(e => e.group))
+  return [...els.filter(e => g.has(e.group) && !ids.includes(e.id)).map(e => e.id), ...ids]
+}
+// pasted or duplicated elements get fresh group ids, so copies don't join the original group
+export function regroup(els) {
+  const ids = new Map()
+  for (const e of els) if (e.group) { if (!ids.has(e.group)) ids.set(e.group, uid()); e.group = ids.get(e.group) }
+  return els
+}
 // Normalizes one element; null if it is not usable.
 export function cleanEl(e) {
   if (!e || typeof e !== 'object') return null
   const base = { id: uid(), type: e.type, x: num(e.x), y: num(e.y), w: num(e.w, 4), h: num(e.h, 4) }
   if (e.fontSize) base.fontSize = num(e.fontSize, 4, 400)
   if (e.locked) base.locked = true // not moved or resized in the editor
+  if (/^[\w-]{1,20}$/.test(e.group)) base.group = e.group // elements sharing it are selected and moved together
   if (Object.hasOwn(SHADOWS, e.shadow)) base.shadow = e.shadow
   switch (e.type) {
     case 'text': return {
@@ -139,14 +152,23 @@ function cleanSlide(s) {
   return {
     id: uid(),
     layout: /^[\w-]+$/.test(str(s.layout) ?? '') ? s.layout : 'default', // test(undefined) would pass: it tests the string 'undefined'
+    transition: TRANSITIONS.includes(s.transition) ? s.transition : undefined, // undefined: the project's default
     // Slidev source of the slide: frontmatter, original markdown, file it belongs to, speaker notes
     fm: str(s.fm), md: str(s.md), file: safePath(s.file), notes: str(s.notes) || '',
     hash: Number.isInteger(s.hash) ? s.hash : undefined,
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
+    ...(s.hidden === true && { hidden: true }), // skipped when presenting and exporting
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
   }
 }
-export const cleanSlides = slides => slides.map(cleanSlide)
+export const cleanSlides = slides => slides.filter(s => s && typeof s === 'object').map(cleanSlide)
+// hidden slides: left out of exports, skipped when presenting
+export const shownSlides = slides => slides.filter(s => !s.hidden)
+// index of the next slide not hidden in direction d (+1/-1), or i when there is none
+export function nextShown(slides, i, d) {
+  for (let j = i + d; j >= 0 && j < slides.length; j += d) if (!slides[j].hidden) return j
+  return i
+}
 
 // Replaces the open project's content (keeps its id).
 export function loadDeck(d) {
@@ -161,6 +183,7 @@ export function loadDeck(d) {
   if (d.themeDef && validThemeId(d.theme) && !THEMES[d.theme]) try { importTheme({ ...d.themeDef, id: d.theme }) } catch { /* broken definition: default look */ }
   deck.theme = validThemeId(d.theme) ? d.theme : DEFAULT_THEME
   setFormat(d.aspectRatio, d.canvasWidth)
+  deck.transition = TRANSITIONS.includes(d.transition) ? d.transition : 'none'
   // project-wide type sizes in px (text, title, code); anything else is dropped
   // (from: the theme whose sizes were kept on a theme switch; line/liLine are unitless ratios)
   deck.typo = Object.fromEntries(Object.entries(d.typo || {}).filter(([k, v]) => k === 'from' ? validThemeId(v)
@@ -181,12 +204,16 @@ export function newSlide(layout = 'default', elements) {
   }
 }
 
-export const usedAssets = (slides = deck.slides) => {
+const assetIds = slides => {
   const used = new Set()
   for (const s of slides) for (const e of s.elements) {
     if (e.asset) used.add(e.asset)
     for (const m of JSON.stringify(e.html || e.rows || '').matchAll(/data-asset=\\?"([^"\\]+)/g)) used.add(m[1])
   }
+  return used
+}
+export const usedAssets = (slides = deck.slides) => {
+  const used = assetIds(slides)
   return Object.fromEntries(Object.entries(toRaw(deck.assets)).filter(([k]) => used.has(k)))
 }
 // the user's own text styles: kept in this browser for all projects; a project file carries the ones its slides
@@ -219,7 +246,7 @@ export function mergeTextStyles(list) {
   const add = cleanStyles(list).filter(p => !have.has(p.name))
   if (add.length) saveTextStyles([...textStyles.list, ...add])
 }
-const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, entry: deck.entry, slides: deck.slides })
+const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, entry: deck.entry, slides: deck.slides })
 export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
 export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
@@ -267,6 +294,8 @@ function flush() {
   due = false
   const json = snapshot()
   if (json !== history[at]) {
+    // the state before this change, at most every SNAP_EVERY while editing
+    if (history[at] && Date.now() - lastSnap >= SNAP_EVERY) saveSnapshot(history[at]).catch(snapFailed)
     history.splice(at + 1, Infinity, json) // a new change discards the redo states
     if (history.length > 200) history.shift()
     at = history.length - 1
@@ -289,7 +318,7 @@ export function undo(step = -1) {
   const before = deck.slides[i], after = d.slides[i]
   const prev = new Map(before?.id === after?.id ? before.elements.map(e => [e.id, JSON.stringify(e)]) : [])
   const sel = changed && prev.size ? after.elements.filter(e => JSON.stringify(e) !== prev.get(e.id)).map(e => e.id) : []
-  for (const k of ['title', 'source', 'typo', 'theme', 'entry', 'slides']) if (k in d) deck[k] = d[k]
+  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'entry', 'slides']) if (k in d) deck[k] = d[k]
   setFormat(d.aspectRatio, d.canvasWidth)
   Object.assign(ui, { slide: i, sel, editing: null })
   // saved right away; the watch must not count this as a new edit (it would grey out Redo for 300 ms)
@@ -305,6 +334,7 @@ function startHistory() {
   history.length = 0
   history.push(snapshot())
   at = 0
+  lastSnap = 0 // the first change keeps the state the project was opened with
 }
 export const canUndo = () => at > 0 || dirty()
 export const canRedo = () => !dirty() && at < history.length - 1
@@ -318,10 +348,11 @@ const db = new Promise((res, rej) => {
 })
 // Safari otherwise clears site storage after 7 days without a visit
 globalThis.navigator?.storage?.persist?.().catch(() => {})
+// done when the transaction commits: a full disk (QuotaExceededError) aborts it after the request already succeeded
 const idb = (mode, fn) => db.then(d => new Promise((res, rej) => {
-  const rq = fn(d.transaction('kv', mode).objectStore('kv'))
-  rq.onsuccess = () => res(rq.result)
-  rq.onerror = () => rej(rq.error)
+  const tx = d.transaction('kv', mode), rq = fn(tx.objectStore('kv'))
+  tx.oncomplete = () => res(rq.result)
+  tx.onerror = tx.onabort = () => rej(tx.error || rq.error)
 }))
 const get = k => idb('readonly', s => s.get(k))
 const put = (k, v) => idb('readwrite', s => s.put(v, k))
@@ -405,6 +436,7 @@ function persistAssets() {
 // returns false (and drops it from the list) when the project is gone, e.g. deleted in another tab
 export async function openProject(id) {
   flush() // the last 300 ms of edits belong to the project being left
+  await saving // a read started before the queued writes would get the old state (the same project opened again)
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
   if (!json) {
     library.list = library.list.filter(p => p.id !== id)
@@ -451,9 +483,12 @@ export async function removeProject(id) {
   library.list = library.list.filter(p => p.id !== id)
   removed.add(id)
   added.delete(id)
-  await Promise.all([del('p:' + id), del('a:' + id), del('f:' + id), saveList()])
+  await Promise.all([del('p:' + id), del('a:' + id), del('f:' + id), del('s:' + id), saveList()])
 }
+// the open project's latest edits must be in storage before it is read from there
+const settled = () => { flush(); return saving }
 export async function duplicateProject(id) {
+  await settled()
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
   if (!json) throw new Error(t('Project not found'))
   const d = JSON.parse(json)
@@ -473,6 +508,7 @@ export async function renameProject(id, title) {
 }
 // the same .slides.json as deckFile(), read straight from storage without opening the project
 export async function projectFile(id) {
+  await settled()
   const [json, assets, files] = await Promise.all([get('p:' + id), get('a:' + id), get('f:' + id)])
   if (!json) throw new Error(t('Project not found'))
   const updated = library.list.find(p => p.id === id)?.updated
@@ -487,6 +523,52 @@ export async function restoreProject(d) {
   const older = have && !(d.updated >= have.updated)
   await createProject(older ? { ...d, title: (d.title || t('Presentation')) + ' ' + t('(older backup)') } : d, older ? undefined : id || undefined)
   return have ? (older ? 'copy' : 'replaced') : 'new'
+}
+
+// --- snapshots (version history): s:<id> = { list: [{ at, slides, json }] newest first, assets: the images they use } ---
+export const SNAP_MAX = 20, SNAP_EVERY = 10 * 60e3
+let lastSnap = 0
+// newest first, at most max; the same content as the newest one is not kept twice
+export const addSnap = (list, s, max = SNAP_MAX) => (list[0]?.json === s.json ? list : [s, ...list]).sort((a, b) => b.at - a.at).slice(0, max)
+// only the images a kept snapshot still uses (a deleted image stays restorable while one does)
+export const snapAssets = (list, assets) => {
+  const used = new Set(list.flatMap(s => [...assetIds(JSON.parse(s.json).slides || [])]))
+  return Object.fromEntries(Object.entries(assets || {}).filter(([k]) => used.has(k)))
+}
+const snapFailed = e => { ui.status = t('Snapshot could not be stored ({0}). The project itself is saved as usual.', e.message) }
+const readSnaps = async id => { const v = await get('s:' + id); return { list: Array.isArray(v?.list) ? v.list : [], assets: v?.assets || {} } }
+// its own record and transaction: a full disk fails the snapshot, never the project save.
+// After the queued project writes, so a delete of the project cannot be undone by a late snapshot.
+// shortcut: read-modify-write, two tabs snapshotting the same project at once can drop one snapshot
+function changeSnaps(fn) {
+  const id = deck.id, mine = { ...toRaw(deck.assets) } // in memory: also images deleted since the snapshot's state
+  const p = saving.then(async () => {
+    const v = await readSnaps(id), list = fn(v.list)
+    await put('s:' + id, { list, assets: snapAssets(list, { ...v.assets, ...mine }) })
+  })
+  saving = p.catch(() => {})
+  return p
+}
+export function saveSnapshot(json = snapshot()) {
+  if (!deck.id) return Promise.resolve()
+  lastSnap = Date.now()
+  return changeSnaps(list => addSnap(list, { at: lastSnap, slides: JSON.parse(json).slides.length, json }))
+}
+export async function listSnapshots() {
+  await saving
+  return deck.id ? (await readSnaps(deck.id)).list.map(({ at, slides }) => ({ at, slides })) : []
+}
+export const deleteSnapshot = at => changeSnaps(list => list.filter(s => s.at !== at))
+// the current state becomes a snapshot first, so a restore can itself be restored (and undone: it is a normal edit)
+export async function restoreSnapshot(at) {
+  await settled()
+  const id = deck.id, v = await readSnaps(id), s = v.list.find(s => s.at === at)
+  if (!s) throw new Error(t('Snapshot not found'))
+  await saveSnapshot() // read before: this may drop the oldest one, the one being restored
+  if (deck.id !== id) return
+  const slide = ui.slide
+  loadDeck({ ...JSON.parse(s.json), assets: v.assets, files: toRaw(deck.files) })
+  ui.slide = Math.min(slide, deck.slides.length - 1)
 }
 
 export async function restore(session = {}) {
@@ -509,7 +591,7 @@ export async function restore(session = {}) {
   if (!deck.id || session.home) ui.home = true
 
   // only marks the change: serializing the deck on every drag frame would be too slow (flush does it)
-  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.entry, deck.slides], () => {
+  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.entry, deck.slides], () => {
     if (quiet) return
     clearTimeout(timer)
     due = true

@@ -82,3 +82,14 @@ test('the page and notes thumbnail follow the layout (4:3, portrait)', async () 
   assert.match(content, /<draw:page-thumbnail [^>]*svg:width="5.2000in" svg:height="3.9000in"/)
   assert.match((await page(5.625, 10))[0], /fo:page-width="5.6250in" fo:page-height="10.0000in" style:print-orientation="portrait"/)
 })
+
+test('control characters are dropped (invalid XML)', async () => {
+  const d = new OdpDoc()
+  d.title = 'T\x07'
+  const s = d.addSlide()
+  s.addText([{ text: '\x1b[31mred\x1b[0m\tx', options: {} }], { x: 0, y: 0, w: 1, h: 1 })
+  s.addNotes('n\x0Bote')
+  const zip = await JSZip.loadAsync(await (await d.write()).arrayBuffer())
+  for (const f of ['content.xml', 'meta.xml']) assert.ok(!/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(await zip.file(f).async('string')), f)
+  assert.match(await zip.file('content.xml').async('string'), /\[31mred\[0m<text:tab\/>x/)
+})

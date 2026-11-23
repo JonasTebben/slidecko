@@ -20,7 +20,7 @@ bun test         # parser, export and server tests
 
 - **Import** Slidev projects (a folder with `slides.md`, `src:` includes, images, theme), PowerPoint (`.pptx`/`.potx`, also from Google Slides and Keynote), OpenDocument (`.odp`/`.otp`), PDF (one image slide per page, text in the notes), Slidecko's own HTML exports and images.
 - **Export** to Slidev (`.zip`), PDF (vector, selectable text), PowerPoint (editable, plus a Google Slides variant and an image-only "exact" variant), OpenDocument, a single-file or zipped HTML presentation, and PNG images.
-- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, shapes and YouTube videos, with snapping guides, multi-selection, format painter, alignment, undo/redo and a command palette (⌘K).
+- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, shapes and YouTube videos, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
 - **Themes**: 13 built-in themes and a theme editor (colours, fonts, own CSS) whose themes can be exported and imported as `.theme.json`.
 - **Markdown**: insert slides from Slidev Markdown (e.g. written by an AI) or edit one slide as Markdown.
 - **Present** in full screen or with a presenter view (notes, next slide, timer).
@@ -75,7 +75,7 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 
 | Where | What | How long |
 |---|---|---|
-| IndexedDB `slides-builder` | projects (slides, images, project files), project list | until the project or the site data is deleted |
+| IndexedDB `slides-builder` | projects (slides, images, project files), project list, snapshots (version history: up to 20 per project with the images they use) | until the project or the site data is deleted |
 | localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`) | permanent |
 | sessionStorage `slides-builder:session` | the tab's view (selection, folded decks, scroll position), search term, YouTube consent | until the tab is closed |
 

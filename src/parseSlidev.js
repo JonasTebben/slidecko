@@ -10,6 +10,10 @@ import { marked } from 'marked'
 // Slidev layouts that centre their content; everything else is treated as a normal content slide
 export const COVER = ['cover', 'intro', 'quiz', 'section', 'statement', 'fact', 'center']
 export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'))?.[1].trim().replace(/^['"]|['"]$/g, '')
+// Slidev hides a slide with `hide: true` (alias `disabled: true`)
+// slide transitions the editor offers (Slidev's built-in names); 'none' turns the project's default off for one slide
+export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up']
+export const fmHidden =fm => fmGet(fm, 'hide') === 'true' || fmGet(fm, 'disabled') === 'true'
 
 // the slide format of a Slidev headmatter: { aspectRatio: '4/3', canvasWidth: 980 } (keys only when set);
 // '4:3' and "'16/9'" become '4/3' / '16/9', numbers stay as written ('1.6')
@@ -19,7 +23,8 @@ export const stripNonContent = md => md.replace(/(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*
 export function headFormat(md) {
   const fm = splitSlides(md).find(s => s.fm || s.body.some(l => l.trim()))?.fm // a leading `---` opens the headmatter
   const ar = fmGet(fm, 'aspectRatio')?.replace(/\s+/g, '').replace(':', '/'), cw = +fmGet(fm, 'canvasWidth')
-  return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }) }
+  const tr = fmGet(fm, 'transition') // the project's default transition
+  return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }), ...(TRANSITIONS.includes(tr) && { transition: tr }) }
 }
 
 function splitSlides(md) {
@@ -136,7 +141,8 @@ export function parseSlidev(md, read = () => undefined, path = '', seen = [path]
     // blank lines before the next `---`, so that untouched slides are written back byte for byte
     const gap = s.body.length - 1 - s.body.findLastIndex(l => l.trim())
     // Slidev: the last comment of a slide is its speaker notes; comments are never content
-    const notes = md.match(/<!--([\s\S]*?)-->\s*$/)?.[1].trim() || ''
-    return [{ layout: fmGet(s.fm, 'layout') || 'default', blocks: parseBody(md.replace(/<!--[\s\S]*?-->/g, '')), fm: s.fm, md, file: path, notes, gap }]
+    // (?!<!--): only the last comment, not everything from an earlier one up to it
+    const notes = md.match(/<!--((?:(?!<!--)[\s\S])*?)-->\s*$/)?.[1].trim() || ''
+    return [{ layout: fmGet(s.fm, 'layout') || 'default', transition: fmGet(s.fm, 'transition'), blocks: parseBody(stripNonContent(md)), fm: s.fm, md, file: path, notes, gap, ...(fmHidden(s.fm) && { hidden: true }) }]
   })
 }

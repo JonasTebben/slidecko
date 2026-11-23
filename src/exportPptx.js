@@ -5,6 +5,7 @@ import { OdpDoc } from './exportOdp.js'
 import { onePPr, numberFont } from './pptxFix.js'
 import { W, H, deck } from './store.js'
 import { SHADOWS } from './themes.js'
+import { t } from './i18n.js'
 
 // Builds the PPTX from the rendered slides (root contains one .slide per slide at 1:1), so
 // colours, fonts and sizes come from the theme CSS instead of a second theme definition.
@@ -13,6 +14,15 @@ import { SHADOWS } from './themes.js'
 let IN, PT // slide is 10in wide: inch and pt per css px, set per export from the current format (W)
 // computed colours: rgb(a)(…) or color(srgb r g b / a) with 0–1 channels; null when (nearly) invisible
 function rgba(c) {
+  // oklch(), lab(), color(display-p3 …) stay in their own space when computed: let the canvas convert them to sRGB
+  if (/^(ok)?(lab|lch)\(|^hwb\(|^color\((?!srgb )/.test(c || '')) {
+    ctx.clearRect(0, 0, 1, 1)
+    ctx.fillStyle = '#0000'
+    ctx.fillStyle = c
+    ctx.fillRect(0, 0, 1, 1)
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+    c = `rgba(${r}, ${g}, ${b}, ${a / 255})`
+  }
   const m = (c || '').match(/-?[\d.]+(e-?\d+)?/g)?.map(Number) || []
   if (m.length < 3) return null
   const k = c.startsWith('color(') ? 255 : 1
@@ -293,13 +303,17 @@ function behind(el) {
 const mix = (c, under) => [0, 2, 4].map(i => Math.round(parseInt(c.hex.slice(i, i + 2), 16) * c.a + parseInt(under.slice(i, i + 2), 16) * (1 - c.a)).toString(16).padStart(2, '0')).join('').toUpperCase()
 
 // PPTX only knows png/jpeg/gif reliably; everything else (svg, webp, …) is rasterized
+// null for a picture the browser cannot show (broken, undecodable format) or read (other origin): it is left out
 function pptxImage(img) {
+  if (!img?.naturalWidth) return null
   if (/^data:image\/(png|jpeg|gif)/.test(img.src)) return img.src
   const c = document.createElement('canvas')
-  c.width = img.offsetWidth * 2
-  c.height = img.offsetHeight * 2
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
-  return c.toDataURL('image/png')
+  c.width = Math.max(1, img.offsetWidth * 2)
+  c.height = Math.max(1, img.offsetHeight * 2)
+  try {
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+    return c.toDataURL('image/png')
+  } catch { return null }
 }
 
 // the cropped part of a picture at its own resolution (at most 4096 px a side);
@@ -375,6 +389,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       const type = ['image', 'code', 'table', 'shape', 'video'].find(t => el.classList.contains(t)) || 'text'
       // the element's shadow (straight down, black), in points
       const sh = SHADOWS[m.shadow] && { shadow: { type: 'outer', angle: 90, blur: SHADOWS[m.shadow].blur * PT, offset: SHADOWS[m.shadow].y * PT, color: '000000', opacity: SHADOWS[m.shadow].a } }
+      if (type === 'image' && !el.querySelector('img')?.naturalWidth) continue // broken picture: nothing to export
       if (type === 'image' && m.crop) {
         // cropped: the visible part as its own picture, filling the box
         slide.addImage({ data: croppedImage(el.querySelector('img'), m.crop), x: el.offsetLeft * IN, y: el.offsetTop * IN, w: el.offsetWidth * IN, h: el.offsetHeight * IN, ...sh })
@@ -387,7 +402,8 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         const cx = el.offsetLeft + e('Left'), cy = el.offsetTop + e('Top'), cw = el.offsetWidth - e('Left') - e('Right'), ch = el.offsetHeight - e('Top') - e('Bottom')
         const k = Math.min(cw / (img.naturalWidth || cw), ch / (img.naturalHeight || ch))
         const w = (img.naturalWidth || cw) * k, h = (img.naturalHeight || ch) * k
-        slide.addImage({ data: pptxImage(img), x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh })
+        const data = pptxImage(img)
+        if (data) slide.addImage({ data, x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh })
       } else if (type === 'table') {
         const table = el.querySelector('table')
         const rows = [...table.rows].map(tr => [...tr.cells].map(cell))
@@ -417,7 +433,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         }
       } else if (type === 'video') {
         const link = `https://www.youtube.com/watch?v=${m.youtube}`
-        slide.addText([{ text: '▶  YouTube-Video ansehen', options: { hyperlink: { url: link }, color: 'FFFFFF', bold: true, fontSize: 16 } }],
+        slide.addText([{ text: '▶  ' + t('Watch the YouTube video'), options: { hyperlink: { url: link }, color: 'FFFFFF', bold: true, fontSize: 16 } }],
           { ...box(el), align: 'center', valign: 'middle', fill: { color: '111111' } })
       } else {
         const pre = type === 'code' && el.querySelector('pre')
@@ -468,7 +484,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         }
         emit(content, true)
         // logos etc. inside the text: placed where the browser laid them out
-        if (!pre) for (const img of content.querySelectorAll('img')) if (img.offsetWidth) slide.addImage({ data: pptxImage(img), ...rel(img, node) })
+        if (!pre) for (const img of content.querySelectorAll('img')) { const data = img.offsetWidth && pptxImage(img); if (data) slide.addImage({ data, ...rel(img, node) }) }
       }
     }
     const no = node.querySelector('.pageno')
@@ -476,15 +492,22 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       slide.addText(no.textContent, { x: (W - 60) * IN, y: (H - 28) * IN, w: 52 * IN, h: 20 * IN, align: 'right', fontSize: 9, color: hex(getComputedStyle(no).color) || '000000', margin: 0 })
     }
   }
-  return format === 'odp' ? pptx.write() : insets(await pptx.write({ outputType: 'arraybuffer' }))
+  return format === 'odp' ? pptx.write() : insets(await pptx.write({ outputType: 'arraybuffer' }), slides)
 }
 
 // the invisible bullets of runs() become a plain left margin: marL kept, no hanging indent, no bullet
-async function insets(buf) {
+// pptxgenjs writes control characters as they are (terminal escapes pasted into code, notes): invalid XML, PowerPoint
+// rejects the file, so they are dropped everywhere
+// Slidev plays the earlier slide's transition between two slides; PowerPoint plays it as the next slide's entrance
+const PPT_TRANSITION = { fade: '<p:fade/>', 'slide-left': '<p:push dir="l"/>', 'slide-up': '<p:push dir="u"/>' }
+async function insets(buf, slides) {
   const zip = await JSZip.loadAsync(buf)
-  for (const path of Object.keys(zip.files).filter(p => /^ppt\/slides\/slide\d+\.xml$/.test(p))) {
-    const xml = await zip.file(path).async('string')
-    zip.file(path, numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>'))))
+  for (const path of Object.keys(zip.files).filter(p => p.endsWith('.xml'))) {
+    const xml = (await zip.file(path).async('string')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+    if (!/^ppt\/slides\/slide\d+\.xml$/.test(path)) { zip.file(path, xml); continue }
+    const before = slides[+path.match(/\d+/)[0] - 2], tr = before && PPT_TRANSITION[before.transition || deck.transition]
+    zip.file(path, numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>')))
+      .replace('</p:clrMapOvr>', m => m + (tr ? `<p:transition spd="med">${tr}</p:transition>` : '')))
   }
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
 }

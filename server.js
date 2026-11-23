@@ -1,5 +1,5 @@
 // Serves the built app (dist/, or the folder in DIST). Everything runs in the browser; the server only delivers files.
-import { join, normalize, resolve as absolute } from 'node:path'
+import { join, normalize, sep, resolve as absolute } from 'node:path'
 
 const root = Bun.env.DIST ? absolute(Bun.env.DIST) : join(import.meta.dir, 'dist')
 
@@ -9,7 +9,7 @@ export function resolve(pathname) {
   if (p.includes('\0')) return null // Bun.file throws on NUL
   if (p.endsWith('/')) p += 'index.html'
   const file = normalize(join(root, p))
-  return file.startsWith(root + '/') ? file : null // no ../ out of dist
+  return file.startsWith(root + sep) ? file : null // no ../ out of dist (sep: Windows paths use \)
 }
 
 export function handle(req) {

@@ -87,7 +87,8 @@ const viewerCss = () => `
 html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .deck { position: fixed; inset: 0; touch-action: manipulation; }
 .deck > .slide { position: absolute !important; left: 50% !important; top: 50% !important; width: ${W}px !important; height: ${H}px !important; margin: 0 !important; visibility: hidden; box-shadow: 0 8px 40px #0008; }
-.deck > .slide.on { visibility: visible; }
+.deck > .slide.on, .deck > .slide.moving { visibility: visible; }
+.deck { --tr-w: 100vw; --tr-h: 100vh; }
 .hud { position: fixed; right: 14px; bottom: 10px; padding: 4px 4px 4px 10px; border-radius: 9px; background: #000a; font: 12px/1 system-ui, sans-serif; color: #fffc; user-select: none; opacity: 0; transition: opacity .3s; }
 .hud.show, .hud:hover, .hud:focus-within { opacity: 1; }
 .hud button { font: inherit; color: inherit; background: #fff1; border: 0; border-radius: 6px; padding: 6px 9px; margin-left: 4px; cursor: pointer; }
@@ -103,7 +104,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 
 // arrows/space/click/swipe navigate, F = full screen, the URL hash keeps the slide number
 const viewerJs = () => `
-const assets = JSON.parse(document.getElementById('slides-builder-project').textContent).assets
+const project = JSON.parse(document.getElementById('slides-builder-project').textContent), assets = project.assets
 for (const img of document.querySelectorAll('img[data-a]')) img.src = assets[img.dataset.a]
 const slides = [...document.querySelectorAll('.deck > .slide')], no = document.querySelector('.hud span')
 let i = Math.min(slides.length, Math.max(1, parseInt(location.hash.slice(1)) || 1)) - 1
@@ -114,8 +115,21 @@ function fit() {
     s.style.transform = 'translate(' + (-${W} * k / 2) + 'px, ' + (-${H} * k / 2) + 'px) scale(' + k + ')'
   }
 }
+// as when presenting in the editor: the earlier slide's transition (Slidev's rule), reversed when going back
+const still = matchMedia('(prefers-reduced-motion: reduce)')
+const BACK = { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }
+const settle = s => s.classList.remove('moving', ...[...s.classList].filter(c => c.startsWith('tr-')))
+for (const s of slides) s.addEventListener('animationend', e => { if (e.target === s) settle(s) })
 function go(n) {
-  i = Math.max(0, Math.min(slides.length - 1, n))
+  n = Math.max(0, Math.min(slides.length - 1, n))
+  slides.forEach(settle)
+  const name = (project.slides[Math.min(i, n)] || {}).transition || project.transition || 'none'
+  if (n !== i && name !== 'none' && !still.matches) {
+    const tr = 'tr-' + (n < i ? BACK[name] || name : name)
+    slides[i].classList.add('moving', tr + '-leave-active')
+    slides[n].classList.add('moving', tr + '-enter-active')
+  }
+  i = n
   slides.forEach((s, j) => s.classList.toggle('on', j === i))
   no.textContent = (i + 1) + ' / ' + slides.length
   history.replaceState(null, '', '#' + (i + 1))

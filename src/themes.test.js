@@ -56,3 +56,13 @@ test('imported theme CSS that leaves its .theme-x block is dropped, a normal one
   assert.match(THEMES[id].css, /color: red/)
   deleteTheme(id)
 })
+
+test('own CSS that would leave its theme block is kept out of the editor, the preview and storage', () => {
+  const css = '& h1 { color: red } } body { display: none }'
+  assert.equal(cleanTheme({ name: 'X', css }).css, undefined)
+  assert.throws(() => saveTheme('leak', { name: 'Leak', css })) // the typed CSS is not dropped silently
+  assert.equal(THEMES.leak, undefined)
+  const id = importTheme({ name: 'Leak', css })
+  assert.equal(THEMES[id].css, undefined)
+  deleteTheme(id)
+})

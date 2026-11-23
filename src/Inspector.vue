@@ -28,6 +28,7 @@ const onSelection = () => { listKind.value = listAt(getSelection().anchorNode) }
 onMounted(() => document.addEventListener('selectionchange', onSelection))
 onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelection))
 // the theme's own layouts join the common ones; a slide keeps a layout the theme does not know
+const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-up': 'Slide up' } // Slidev's names (store.js keeps only these)
 const layouts = computed(() => { const l = themeLayouts(deck.theme); return l.some(x => x[0] === slide.value.layout) ? l : [...l, [slide.value.layout, slide.value.layout]] })
 const langs = computed(() => (el.value?.lang && !LANGS.includes(el.value.lang) ? [el.value.lang, ...LANGS] : LANGS))
 // code backgrounds: light editor greys and the usual dark editor themes
@@ -343,14 +344,14 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
         <label class="field">{{ t('Shape') }} <select v-model="el.shape"><option v-for="s in SHAPES" :key="s" :value="s">{{ t(SHAPE_NAMES[s]) }}</option></select></label>
         <div v-if="el.shape !== 'line'" class="field">{{ t('Fill') }}
           <div class="swatches">
-            <button v-for="c in FILLS" :key="c" class="sw" :class="{ on: el.fill === c }" :style="{ background: c }" @click="el.fill = c" />
+            <button v-for="c in FILLS" :key="c" class="sw" :class="{ on: el.fill === c }" :style="{ background: c }" :title="c" @click="el.fill = c" />
             <button class="sw none" :title="t('No fill')" @click="el.fill = 'none'" />
           </div>
         </div>
         <label v-if="el.shape !== 'line' && el.fill !== 'none'" class="field">{{ t('Opacity') }} {{ el.fillAlpha ?? 100 }} % <input type="range" min="0" max="100" step="5" :value="el.fillAlpha ?? 100" @input="el.fillAlpha = +$event.target.value === 100 ? undefined : +$event.target.value" /></label>
         <div class="field">{{ t('Outline') }}
           <div class="swatches">
-            <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.stroke === c }" :style="{ background: c }" @click="el.stroke = c; el.strokeWidth ||= 2" />
+            <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.stroke === c }" :style="{ background: c }" :title="c" @click="el.stroke = c; el.strokeWidth ||= 2" />
             <button class="sw none" :title="t('No outline')" @click="el.stroke = 'none'" />
           </div>
         </div>
@@ -406,6 +407,13 @@ const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || 
         <h3>{{ t('Slide {0}', ui.slide + 1) }} <small v-if="deckOfSlide(ui.slide)">· {{ deckOfSlide(ui.slide).name }}</small></h3>
         <label class="field">{{ t('Layout') }}
           <select v-model="slide.layout"><option v-for="[id, name] in layouts" :key="id" :value="id">{{ t(name) }}</option></select>
+        </label>
+        <!-- plays when presenting, between this slide and the next -->
+        <label class="field">{{ t('Transition to next slide') }}
+          <select :value="slide.transition || ''" @change="slide.transition = $event.target.value || undefined"><option value="">{{ t('Project default ({0})', t(TRANSITIONS[deck.transition])) }}</option><option v-for="(n, k) in TRANSITIONS" :key="k" :value="k">{{ t(n) }}</option></select>
+        </label>
+        <label class="field">{{ t('Default transition (all slides)') }}
+          <select v-model="deck.transition"><option v-for="(n, k) in TRANSITIONS" :key="k" :value="k">{{ t(n) }}</option></select>
         </label>
         <div class="btn-row">
           <button class="ib wide" @click="duplicateSlide()"><Icon name="copy" /> {{ t('Duplicate') }}</button>

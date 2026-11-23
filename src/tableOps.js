@@ -203,7 +203,7 @@ export function cellKey(e, el) {
     commitActive(el)
     const n = r * cols(el) + c + (e.shiftKey ? -1 : 1)
     if (n < 0) return
-    if (n >= el.rows.length * cols(el)) return insertRow(el, el.rows.length)
+    if (n >= el.rows.length * cols(el)) { ui.cell = { r, c: 0 }; return insertRow(el, el.rows.length) } // the new row's first cell, as in office tables
     return focusCell(el, Math.floor(n / cols(el)), n % cols(el))
   }
   const sel = getSelection()

@@ -97,3 +97,13 @@ test('pasting into marked cells: one value fills them all, a fitting block repea
   assert.deepEqual(el.rows, [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']])
   ui.cellEnd = null
 })
+
+test('Tab in the last cell adds a row and goes to its first cell', async () => {
+  const { cellKey } = await import('./tableOps.js')
+  globalThis.getSelection ??= () => ({ rangeCount: 0 })
+  const el = { id: 'tab', rows: [['a', 'b'], ['c', 'd']], align: ['', ''], h: 60 }
+  ui.cell = { r: 1, c: 1 }
+  await cellKey({ key: 'Tab', target: { dataset: { r: '1', c: '1' } }, preventDefault() {} }, el)
+  assert.equal(el.rows.length, 3)
+  assert.deepEqual(ui.cell, { r: 2, c: 0 })
+})

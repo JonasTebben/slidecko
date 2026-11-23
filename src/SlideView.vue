@@ -1,6 +1,6 @@
 <script setup>
 import { nextTick, ref, watch, onBeforeUnmount } from 'vue'
-import { W, H, deck, ui, clean } from './store.js'
+import { W, H, deck, ui, clean, withGroups } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
@@ -17,11 +17,13 @@ const props = defineProps({ slide: Object, index: Number, editable: Boolean, sca
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const root = ref()
 const selected = el => props.editable && ui.sel.includes(el.id)
+const members = el => withGroups(props.slide.elements, [el.id]) // el and its group, el last
 
 // images inside text are stored with their Slidev path (data-src) and shown from the assets
+// (a quote in a crafted asset would end the attribute: escaped)
 const resolveImgs = html => (html?.includes('data-asset') ? html.replace(/<img\b[^>]*>/g, t => {
   const id = t.match(/data-asset="([^"]+)"/)?.[1]
-  return id && deck.assets[id] ? t.replace(/\ssrc="[^"]*"/, ` src="${deck.assets[id]}"`) : t
+  return id && deck.assets[id] ? t.replace(/\ssrc="[^"]*"/, ` src="${deck.assets[id].replace(/"/g, '%22')}"`) : t
 }) : html)
 const unresolveImgs = html => html.replace(/<img\b[^>]*>/g, t => {
   const path = t.match(/data-src="([^"]+)"/)?.[1]
@@ -59,7 +61,8 @@ function down(e, el) {
   if (ui.editing) document.activeElement?.blur()
   if (ui.painting) { pasteLook([el]); ui.painting = false; ui.sel = [el.id]; return }
   if (e.shiftKey || e.metaKey || e.ctrlKey) {
-    ui.sel = selected(el) ? ui.sel.filter(id => id !== el.id) : [...ui.sel, el.id]
+    const m = members(el)
+    ui.sel = selected(el) ? ui.sel.filter(id => !m.includes(id)) : [...new Set([...ui.sel, ...m])]
     return
   }
   // touch: tapping the selected box again starts typing (a double tap is easy to miss on a small slide)
@@ -77,8 +80,9 @@ function down(e, el) {
     addEventListener('pointerup', tap)
     addEventListener('pointercancel', tap)
   }
-  if (!selected(el)) ui.sel = [el.id]
-  else ui.sel = [...ui.sel.filter(id => id !== el.id), el.id] // primary = the one being dragged
+  const m = members(el)
+  if (!selected(el)) ui.sel = m
+  else ui.sel = [...ui.sel.filter(id => !m.includes(id)), ...m] // primary = the one being dragged
   drag(e, el)
 }
 
@@ -218,7 +222,7 @@ function backgroundDown(e) {
     const m = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }
     marquee.value = m
     const hit = props.slide.elements.filter(o => o.x < m.x + m.w && o.x + o.w > m.x && o.y < m.y + m.h && o.y + o.h > m.y).map(o => o.id)
-    ui.sel = [...new Set([...before, ...hit])]
+    ui.sel = [...new Set([...before, ...withGroups(props.slide.elements, hit)])]
   }, ev => {
     marquee.value = null
     if (!touch) return
@@ -391,7 +395,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable ? 0 : null"
       :aria-label="editable ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video' }[el.type]) : null"
-      @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = [el.id])"
+      @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
         v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="resolveImgs(el.html)" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"

@@ -222,3 +222,21 @@ test('toSlidev keeps the shrunken size of shape text', () => {
   assert.match(md({ shapeFont: { s1: '9.5px' } }), /<div style="font-size:9.5px">Langer Text<\/div>/)
   assert.match(md(), /<div>Langer Text<\/div>/)
 })
+
+test('speaker notes are only the last comment; comments in code stay code', () => {
+  const [s] = parseSlidev('# A\n\n<!-- hidden -->\n\ntext\n\n<!-- notes -->')
+  assert.equal(s.notes, 'notes')
+  const [c] = parseSlidev('# A\n\n```html\n<!-- c -->\n<p>x</p>\n```\n')
+  assert.equal(c.blocks[1].code, '<!-- c -->\n<p>x</p>')
+})
+
+test('hidden slides: hide/disabled is read, written as hide: true and kept in the Slidev export', () => {
+  const s = parseSlidev('# A\n\n---\nhide: true\n---\n\n# B\n\n---\ndisabled: true\nlayout: cover\n---\n\n# C\n\n---\nhide: false\n---\n\n# D\n')
+  assert.deepEqual(s.map(x => !!x.hidden), [false, true, true, false])
+  const slides = s.map((x, i) => ({ ...x, elements: [], hash: slideHash({ layout: x.layout, elements: [] }), hidden: [false, true, false, true][i] })) // unchanged: md written back as is
+  const back = parseSlidev(toSlidev({ title: 'T', theme: 'hell', slides }).files['slides.md'])
+  assert.equal(back.length, 4)
+  assert.deepEqual(back.map(x => !!x.hidden), [false, true, false, true])
+  assert.equal(back[2].layout, 'cover') // other frontmatter stays
+  assert.doesNotMatch(back[3].fm, /hide: false/)
+})
