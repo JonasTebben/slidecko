@@ -746,6 +746,14 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
   .app > main { padding-bottom: env(safe-area-inset-bottom); }
 }
 
+/* phones: the find bar's field gets a row of its own, so the option toggles no longer cover what you type */
+@media (max-width: 760px) {
+  .find-row { flex-wrap: wrap; row-gap: 4px; }
+  .find-field { flex-basis: 100%; }
+  .find-field input:not([type]) { font-size: 16px; } /* below 16px iOS zooms the page on focus */
+  .find-count { flex: 1; min-width: 0; }
+}
+
 /* product tour (Tour.vue): spotlight dims around the anchor but lets every click through; the bubble is the only hit area */
 .tour-anchor { display: contents; }
 .tour-spot { position: fixed; z-index: 60; border-radius: 10px; box-shadow: 0 0 0 3px var(--ui-accent), 0 0 0 200vmax #10182859; pointer-events: none; transition: left .2s, top .2s, width .2s, height .2s; }
