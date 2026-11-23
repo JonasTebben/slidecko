@@ -20,6 +20,9 @@ import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 const props = defineProps({ slide: Object, index: Number, editable: Boolean, scale: { type: Number, default: 1 }, live: Boolean, theme: String, step: Number }) // theme: preview in another theme than the deck's; step: click steps revealed (unset: all)
 const steps = computed(() => clickSteps(props.slide))
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+// a short or narrow box drops its middle handles, which would cover the corners (big touch handles on a phone)
+const HSIZE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 18 : 10
+const handlesOf = el => HANDLES.filter(h => !((h === 'e' || h === 'w') && el.h * props.scale < HSIZE * 3.5) && !((h === 'n' || h === 's') && el.w * props.scale < HSIZE * 3.5))
 const root = ref()
 const selected = el => props.editable && ui.sel.includes(el.id)
 const members = el => withGroups(props.slide.elements, [el.id]) // el and its group, el last
@@ -479,8 +482,8 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
       </div>
       <span v-if="editable && el.click && !decor(el)" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
-        <template v-if="ui.crop === el.id"><i v-for="h in HANDLES" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>
-        <template v-else><i v-for="h in HANDLES" :key="h" class="handle" :class="h" @pointerdown.stop="drag($event, el, h)" /></template>
+        <template v-if="ui.crop === el.id"><i v-for="h in handlesOf(el)" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>
+        <template v-else><i v-for="h in handlesOf(el)" :key="h" class="handle" :class="h" @pointerdown.stop="drag($event, el, h)" /></template>
       </template>
     </div>
     <!-- crop mode: the whole picture, dimmed, behind the visible box; dragging it moves the picture -->
