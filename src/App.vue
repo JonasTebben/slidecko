@@ -570,6 +570,9 @@ function addVideo() {
 // --- presenting ---
 // the same query as the phone layout in app.css: narrow screens and phones held sideways
 const phone = matchMedia('(max-width: 760px), (max-height: 500px) and (pointer: coarse)')
+// phones: the properties fold away under the slide strip; choosing an element opens them at the top
+const sheet = ref(true)
+watch(() => selection.value.map(e => e.id).join(), ids => { if (ids && phone.matches) { sheet.value = true; nextTick(() => document.querySelector('.inspector')?.scrollTo(0, 0)) } })
 const fitPresenter = () => {
   const narrow = phone.matches // phones: presenter view stacks slide, next slide and notes
   presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
@@ -1131,7 +1134,7 @@ function onClipboard(e) {
       </div>
     </header>
 
-    <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props }">
+    <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props, 'sheet-closed': !sheet }">
       <MasterPanel v-if="ui.master" @ask="ask" />
       <nav v-else class="slides-panel" data-tour="slides" :aria-label="t('Slides')">
         <div class="panel-head">
@@ -1419,6 +1422,7 @@ function onClipboard(e) {
         <div class="stage-info" :class="{ zoomed: zoom != null }">{{ ui.slide + 1 }} / {{ deck.slides.length }}<span class="stage-zoom"> · </span><button type="button" class="zoom-btn stage-zoom" :aria-label="`${t('Zoom')}: ${Math.round(scale * 100)} %`" :title="t('Zoom')" @click="cycleZoom">{{ Math.round(scale * 100) }} %</button></div>
       </section>
 
+      <button class="sheet-toggle" :aria-expanded="sheet" @click="sheet = !sheet"><Icon name="layout" :size="16" />{{ t('Properties') }}<Icon name="chevron" :size="16" class="sec-chev" /></button>
       <Inspector data-tour="inspector" @link="openLink" @markdown="openMarkdown('slide')" />
     </main>
     <AppFooter />

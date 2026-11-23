@@ -688,6 +688,64 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 .menu .mh > .icon { vertical-align: -2px; margin-right: 5px; }
 .panel-toggle:hover { color: var(--ui-fg); }
 
+/* D: phone layout */
+.sheet-toggle { display: none; } /* phones only: folds the properties away */
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  /* one toolbar row: undo/redo pinned left, Present pinned right, the rest scrolls between them */
+  .topbar { row-gap: 2px; padding-bottom: 2px; }
+  .logo { width: 32px; height: 32px; }
+  .bar { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .bar::-webkit-scrollbar { display: none; }
+  .tools, .right { display: contents; }
+  .bar .chev, .bar .divider { display: none; }
+  .tools > :nth-last-child(-n + 2) { order: -1; position: sticky; z-index: 1; background: var(--ui-panel); }
+  .tools > :nth-last-child(2) { left: 0; }
+  .tools > :nth-last-child(-n + 2):disabled { opacity: 1; color: color-mix(in srgb, var(--ui-fg) 40%, var(--ui-panel)); } /* opacity would let the scrolled icons show through */
+  .tools > :last-child { left: 40px; margin-right: 6px; box-shadow: 10px 0 8px -4px var(--ui-panel); } /* the icons fade in under it */
+  .right > .tb.primary { position: sticky; right: 0; z-index: 1; margin-left: auto; box-shadow: -10px 0 8px 2px var(--ui-panel); }
+  @media (max-width: 480px) { .right > .tb.primary > span { display: none; } } /* its title still names it */
+  /* slide strip: the add buttons stand in a fixed column on the left, the thumbnails scroll and fade out on the right */
+  .slides-panel { flex-direction: row; align-items: stretch; }
+  .slides-panel > .panel-head { flex: none; padding: 4px 2px 4px max(4px, env(safe-area-inset-left)); border-right: 1px solid var(--ui-line); }
+  .slides-panel > .panel-head > span:first-child { display: none; } /* "Slides" / "Decks": the strip says it */
+  .panel-actions { flex-direction: column; gap: 4px; }
+  .slide-list { flex: 1; min-width: 0; gap: 10px; padding: 6px 32px 8px 10px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+  .add-slide-split, .master-panel .slide-list > .add-slide { display: none; } /* the column on the left adds */
+  .deck-head { gap: 0; padding: 0 0 2px; font-size: 12px; }
+  .deck-head .tb, .deck-head .tb.icon, .deck-head .menu-wrap .tb { height: 32px; width: 32px; }
+  .deck-head .count { padding: 0 5px; }
+  .deck-head .tb[aria-expanded] { background: none; }
+  .num { font-size: 11px; line-height: 14px; }
+  .master-panel { flex-wrap: wrap; }
+  .master-panel .ms-props { order: 1; flex: 1 0 100%; max-height: 28dvh; overflow-y: auto; padding-top: 8px; border-top: 1px solid var(--ui-line); border-bottom: 0; font-size: 14px; }
+  .master-panel .ms-item { padding: 0; }
+  .master-panel .ms-name { max-width: 100px; }
+  /* properties: readable but compact, every control at least 40px */
+  .inspector { font-size: 14px; }
+  .inspector section { padding: 8px 14px 12px; gap: 10px; }
+  .inspector .sec-head { font-size: 12.5px; }
+  .inspector :is(.field, .grid3 label, .slider) { font-size: 13px; }
+  .inspector .hint, .inspector .hint-box { font-size: 13px; }
+  .inspector :is(select, input:not([type]), input[type='text'], input[type='number']) { height: 40px; padding-block: 0; }
+  .inspector .btn-row > select.size { width: 96px; } /* "Theme" at 16px */
+  .inspector .ib { padding: 0 10px; }
+  .inspector .ib.wide { flex: 1 1 auto; }
+}
+/* portrait phones: no page scrolling; slide, strip and a properties panel that scrolls on its own */
+@media (max-width: 760px) and (min-height: 501px) {
+  .app { height: 100%; height: 100dvh; }
+  .stage { position: relative; height: auto; flex: 0 0 min(62vw, 46dvh); }
+  main:is(.sheet-closed, :has(> .inspector:empty)) > .stage { flex-grow: 1; }
+  .sheet-toggle:has(+ .inspector:empty), main > .inspector:empty { display: none; } /* master mode with nothing selected */
+  .sheet-toggle { flex: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--ui-line); background: var(--ui-panel); color: var(--ui-muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+  .sheet-toggle .sec-chev { margin-left: auto; transition: transform .12s; }
+  .sheet-toggle[aria-expanded='false'] .sec-chev { transform: rotate(180deg); }
+  .inspector { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  main.sheet-closed > .inspector { display: none; }
+  .app > .app-foot { display: none; } /* every pixel goes to the panel; language and light/dark are on the start page */
+  .app > main { padding-bottom: env(safe-area-inset-bottom); }
+}
+
 /* product tour (Tour.vue): spotlight dims around the anchor but lets every click through; the bubble is the only hit area */
 .tour-anchor { display: contents; }
 .tour-spot { position: fixed; z-index: 60; border-radius: 10px; box-shadow: 0 0 0 3px var(--ui-accent), 0 0 0 200vmax #10182859; pointer-events: none; transition: left .2s, top .2s, width .2s, height .2s; }

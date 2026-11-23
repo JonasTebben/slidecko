@@ -106,10 +106,10 @@ The letters follow what they do: **L**aser, **D**raw, **A**rrow, **E**rase, **B*
 
 ## Phone and tablet
 
-- Up to 760 px wide the app becomes one column: the slide stays on top, the slide strip (horizontal) and the properties follow, the toolbar wraps into two rows.
+- Up to 760 px wide the app becomes one column that fills the screen without page scrolling: menus and one toolbar row (undo/redo stay at the left, Present at the right, the other tools scroll in between), the slide at full width, a horizontal slide strip (New slide and New deck fixed at its left, the strip fades out where more thumbnails follow; several decks show as compact headers), and the properties as a panel below that scrolls on its own. "Properties" folds the panel away so the slide gets the room; selecting an element opens it again at the top. Language and light/dark are on the start page there.
 - On touch screens buttons and handles are larger (handles keep their screen size at any zoom). Two fingers pinch-zoom the slide (a pinch started while dragging puts the element back), a double tap beside the slide fits it again. A second tap on the selected element starts typing, a long press opens the context menu (also on iPhone and iPad, where Safari has none).
 - When presenting, a swipe changes the slide, a tap on the left edge goes back one slide, double taps do not zoom and the controls stay visible.
-- Phones held sideways (up to 500 px high) get the phone layout too; content stays clear of the notch.
+- Phones held sideways (up to 500 px high) get the phone layout too, but scroll as a page; content stays clear of the notch.
 - Form fields are 16 px on touch screens so iOS does not zoom in.
 - The app asks the browser to keep its storage. Safari otherwise deletes site data after 7 days without a visit; add Slidecko to the home screen or save projects as files to be safe.
 - Pending changes are saved the moment the page is hidden or closed, because iOS freezes hidden tabs and has no leave warning.
