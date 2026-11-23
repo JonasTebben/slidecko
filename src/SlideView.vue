@@ -1,4 +1,5 @@
 <script setup>
+import { gapSnaps, nearestGap } from './spacing.js'
 import { computed, nextTick, ref, watch, onBeforeUnmount } from 'vue'
 import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, underlay } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
@@ -44,7 +45,7 @@ const unresolveImgs = html => html.replace(/<img\b[^>]*>/g, t => {
 // Edges and centres stick to the slide's edges, margins and centre and to the other elements;
 // magenta guides show what they stick to. Alt switches snapping off.
 const SNAP = 6
-const guides = ref({ x: null, y: null })
+const guides = ref({ x: null, y: null, gaps: [] })
 const measure = ref(null) // the box being moved or resized: its position or size shown next to it
 const marquee = ref(null)
 function nearest(edges, lines) {
@@ -56,7 +57,7 @@ function track(e, move, done, cancel) {
   // a touch the browser takes over (scrolling, a system gesture) ends with pointercancel instead of pointerup
   // only the pointer that started it moves the box; a second finger (a pinch zoom) stops the gesture and calls cancel
   const mv = ev => ev.pointerId === e.pointerId && move(ev)
-  const stop = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('pointerdown', second, true); guides.value = { x: null, y: null }; measure.value = null }
+  const stop = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('pointerdown', second, true); guides.value = { x: null, y: null, gaps: [] }; measure.value = null }
   const up = ev => { if (ev.pointerId !== e.pointerId) return; stop(); done?.(ev) }
   const second = ev => { if (ev.pointerId === e.pointerId) return; stop(); cancel ? cancel() : done?.({ type: 'pointercancel' }) }
   addEventListener('pointermove', mv)
@@ -108,6 +109,8 @@ function drag(e, el, dir = '') {
     xs.push(other.x, other.x + other.w / 2, other.x + other.w)
     ys.push(other.y, other.y + other.h / 2, other.y + other.h)
   }
+  const others = props.slide.elements.filter(x => !start.has(x))
+  const gx = dir ? [] : gapSnaps(others, o.w, 'x'), gy = dir ? [] : gapSnaps(others, o.h, 'y')
   const ratio = o.w / o.h
   let held = e.pointerType === 'touch' // a finger wobbles: a tap must not move the box (nor add an undo step)
   track(e, ev => {
@@ -122,6 +125,10 @@ function drag(e, el, dir = '') {
     if (Sd) b += dy
     const sx = ev.altKey ? {} : nearest(!dir ? [l, (l + r) / 2, r] : Wd ? [l] : Ed ? [r] : [], xs)
     const sy = ev.altKey ? {} : nearest(!dir ? [t, (t + b) / 2, b] : Nd ? [t] : Sd ? [b] : [], ys)
+    // equal spacing wins over an edge only when it is closer
+    const ex = ev.altKey ? null : nearestGap(gx, l, [t, b], sx.dist), ey = ev.altKey ? null : nearestGap(gy, t, [l, r], sy.dist)
+    if (ex) Object.assign(sx, { d: ex.d, line: null })
+    if (ey) Object.assign(sy, { d: ey.d, line: null })
     if (Wd) l += sx.d || 0
     if (Ed) r += sx.d || 0
     if (Nd) t += sy.d || 0
@@ -142,7 +149,10 @@ function drag(e, el, dir = '') {
     if (b - t < 8) Nd ? (t = b - 8) : (b = t + 8)
     if (dir) Object.assign(el, { x: Math.round(l), y: Math.round(t), w: Math.round(r - l), h: Math.round(b - t) })
     else for (const [g, s] of start) Object.assign(g, { x: Math.round(s.x + l - o.x), y: Math.round(s.y + t - o.y) })
-    guides.value = { x: sx.line ?? null, y: sy.line ?? null }
+    const mid = (c, a, z) => (Math.max(c[0], a) + Math.min(c[1], z)) / 2 // the gap marks run through the shared part of the row
+    guides.value = { x: sx.line ?? null, y: sy.line ?? null, gaps: [
+      ...(ex ? ex.gaps.map(([a, z]) => ({ x: a, y: mid(ex.cross, t + (sy.d || 0), b + (sy.d || 0)), w: z - a, h: 0, n: Math.round(z - a) })) : []),
+      ...(ey ? ey.gaps.map(([a, z]) => ({ x: mid(ey.cross, l + (sx.d || 0), r + (sx.d || 0)), y: a, w: 0, h: z - a, n: Math.round(z - a) })) : [])] }
     measure.value = { x: Math.round(l), y: Math.round(t), w: Math.round(r - l), h: Math.round(b - t), size: !!dir }
   }, null, () => { for (const [g, p] of start) Object.assign(g, p) }) // back where it started: the same state, so no undo step
 }
@@ -479,6 +489,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
     </div>
     <i v-if="guides.x != null" class="guide x" :style="{ left: guides.x + 'px' }" />
     <i v-if="guides.y != null" class="guide y" :style="{ top: guides.y + 'px' }" />
+    <i v-for="(g, i) in guides.gaps" :key="'g' + i" class="gap-mark" :class="g.w ? 'x' : 'y'" :style="{ left: g.x + 'px', top: g.y + 'px', width: g.w + 'px', height: g.h + 'px' }"><b>{{ g.n }}</b></i>
     <span v-if="measure" class="measure" :style="{ left: measure.x + measure.w / 2 + 'px', top: measure.y + measure.h + 'px' }">{{ measure.size ? `${measure.w} × ${measure.h}` : `X ${measure.x}  Y ${measure.y}` }}</span>
     <i v-if="marquee" class="marquee" :style="{ left: marquee.x + 'px', top: marquee.y + 'px', width: marquee.w + 'px', height: marquee.h + 'px' }" />
     <div class="pageno">{{ index + 1 }}</div>
