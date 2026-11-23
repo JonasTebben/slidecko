@@ -1,8 +1,9 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
-import { slideHash } from './toSlidev.js'
+import { slideHash, layoutOf, decorations, readLayers } from './toSlidev.js'
 import { TRANSITIONS } from './parseSlidev.js'
-import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile } from './themes.js'
+import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from './themes.js'
+import { SLIDE_PRESETS } from './presets.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
 
@@ -34,9 +35,11 @@ export function setFormat(aspectRatio = '16/9', canvasWidth = 980) {
 // assets: { id: dataURL } – kept out of the slides so undo snapshots and duplicates stay small.
 // files: other files of the Slidev project (theme/, package.json, global components …) as text or
 // data URL, written back unchanged on export so the project keeps working.
-export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, transition: 'none', entry: 'slides.md', slides: [], assets: {}, files: {} })
+export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, transition: 'none', entry: 'slides.md', slides: [], master: [], layouts: [], assets: {}, files: {} })
+// master: elements on every slide; layouts (slide types): { id, name, layout: its Slidev layout, elements } where
+// placeholder elements are copied into a new slide and the others are drawn behind every slide using it
 // sel: selected element ids (last = primary); editing: id of the element being typed in
-export const ui = reactive({ slide: 0, sel: [], editing: null, status: '', cell: null, cellEnd: null, cellFill: false, crop: null, cropRatio: null, look: null, painting: false, home: false, save: 'saved', yt: false }) // save: saving | saved | failed; yt: YouTube content allowed in this tab (privacy: nothing loads from Google before a click; kept in sessionStorage)
+export const ui = reactive({ master: null, slide: 0, sel: [], editing: null, status: '', cell: null, cellEnd: null, cellFill: false, crop: null, cropRatio: null, look: null, painting: false, home: false, save: 'saved', yt: false }) // save: saving | saved | failed; yt: YouTube content allowed in this tab (privacy: nothing loads from Google before a click; kept in sessionStorage)
 export const library = reactive({ list: [] }) // [{ id, title, theme, slides, decks, updated }]
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
@@ -101,6 +104,7 @@ export function cleanEl(e) {
   const base = { id: uid(), type: e.type, x: num(e.x), y: num(e.y), w: num(e.w, 4), h: num(e.h, 4) }
   if (e.fontSize) base.fontSize = num(e.fontSize, 4, 400)
   if (e.locked) base.locked = true // not moved or resized in the editor
+  if (e.placeholder === true) base.placeholder = true // in a layout: copied into new slides instead of drawn behind them
   if (/^[\w-]{1,20}$/.test(e.group)) base.group = e.group // elements sharing it are selected and moved together
   if (Object.hasOwn(SHADOWS, e.shadow)) base.shadow = e.shadow
   if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
@@ -175,10 +179,53 @@ function cleanSlide(s) {
     flow: Number.isInteger(s.flow) ? s.flow : undefined, // arrangement of a new slide, see flowHash
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
     ...(s.hidden === true && { hidden: true }), // skipped when presenting and exporting
+    ...(s.hideMaster === true && { hideMaster: true }), // the master's elements are not drawn on it
+    type: /^[\w-]{1,40}$/.test(str(s.type) ?? '') ? s.type : undefined, // its project layout (see layoutOf)
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
   }
 }
 export const cleanSlides = slides => slides.filter(s => s && typeof s === 'object').map(cleanSlide)
+const cleanEls = list => (Array.isArray(list) ? list : []).map(cleanEl).filter(Boolean)
+export function cleanLayouts(list) {
+  const ids = new Set()
+  return (Array.isArray(list) ? list : []).filter(l => l && typeof l === 'object').map(l => {
+    const id = /^[\w-]{1,40}$/.test(str(l.id) ?? '') && !ids.has(l.id) ? l.id : uid()
+    ids.add(id)
+    return { id, name: (str(l.name) || '').trim().slice(0, 60) || t('Layout'), layout: /^[\w-]+$/.test(str(l.layout) ?? '') ? l.layout : 'default', elements: cleanEls(l.elements) }
+  })
+}
+// the starting layouts of a project: today's "New slide" presets, their elements as placeholders (translated when created)
+export const presetLayouts = () => SLIDE_PRESETS.map(p => ({ id: p.id, name: t(p.name), layout: p.layout, elements: p.make().map(e => ({ ...e, placeholder: true })) }))
+// project layouts for loaded data: stored ones; else read back from a Slidev export of Slidecko (layouts/*.vue, whose
+// slides name the file) plus the presets; every Slidev layout a slide uses gets one, and every slide its type
+export function setupLayouts(d, slides, files = {}, theme = DEFAULT_THEME) {
+  const read = Array.isArray(d.layouts) ? null : readLayers(files)
+  const own = read?.layouts || []
+  for (const s of slides) {
+    const l = own.find(l => l.slug === s.layout)
+    if (l) Object.assign(s, { type: l.id, layout: /^[\w-]+$/.test(l.layout) ? l.layout : 'default' })
+  }
+  const layouts = cleanLayouts(read ? [...own, ...presetLayouts().filter(p => !own.some(l => l.id === p.id))] : d.layouts)
+  for (const s of slides) {
+    if (!layoutOf(s, layouts)) layouts.push({ id: layouts.some(l => l.id === s.layout) ? uid() : s.layout, name: t(themeLayouts(theme).find(x => x[0] === s.layout)?.[1] || s.layout), layout: s.layout, elements: [] })
+    s.type = layoutOf(s, layouts).id
+  }
+  return { layouts, master: cleanEls(Array.isArray(d.master) ? d.master : read?.master) }
+}
+// what is drawn behind a slide: the master (unless switched off on it) and its layout's decorations;
+// a layout shows the master behind it, the master nothing
+export function underlay(s, d = deck) {
+  if (!s || s.id === 'master') return []
+  if (d.layouts.includes(s)) return d.master
+  return [...(s.hideMaster ? [] : d.master), ...decorations(layoutOf(s, d.layouts))]
+}
+// a layout is removed: its slides go to the first layout with Slidev's default layout (or the first one), keeping their content
+export function removeLayout(id, d = deck) {
+  if (d.layouts.length < 2) return
+  d.layouts = d.layouts.filter(l => l.id !== id)
+  const to = d.layouts.find(l => l.layout === 'default') || d.layouts[0]
+  for (const s of d.slides) if (s.type === id) Object.assign(s, { type: to.id, layout: to.layout })
+}
 // hidden slides: left out of exports, skipped when presenting
 export const shownSlides = slides => slides.filter(s => !s.hidden)
 // index of the next slide not hidden in direction d (+1/-1), or i when there is none
@@ -220,10 +267,11 @@ export function loadDeck(d) {
       : ['line', 'liLine'].includes(k) && Number.isFinite(v) && v > 0.5 && v < 4))
   deck.entry = /^[\w./-]+\.md$/.test(d.entry) ? d.entry.replace(/^\/+/, '') : 'slides.md'
   deck.slides = cleanSlides(d.slides)
+  Object.assign(deck, setupLayouts(d, deck.slides, deck.files, deck.theme))
   // freshly imported slides: remember their content, so the Slidev export can tell if they changed
   for (const s of deck.slides) if (s.md != null) s.hash ??= slideHash(s)
   if (!deck.slides.length) deck.slides.push(newSlide())
-  Object.assign(ui, { slide: 0, sel: [], editing: null })
+  Object.assign(ui, { slide: 0, sel: [], editing: null, master: null })
 }
 
 export function newSlide(layout = 'default', elements) {
@@ -233,16 +281,18 @@ export function newSlide(layout = 'default', elements) {
   }
 }
 
+// slides plus the master and the layouts: their images count as used too
+const withLayers = d => [...d.slides, { elements: d.master || [] }, ...(d.layouts || [])]
 const assetIds = slides => {
   const used = new Set()
-  for (const s of slides) for (const e of s.elements) {
+  for (const s of slides) for (const e of s.elements || []) {
     if (e.asset) used.add(e.asset)
     for (const m of JSON.stringify(e.html || e.rows || '').matchAll(/data-asset=\\?"([^"\\]+)/g)) used.add(m[1])
   }
   return used
 }
 export const usedAssets = (slides = deck.slides) => {
-  const used = assetIds(slides)
+  const used = assetIds(withLayers({ ...deck, slides }))
   return Object.fromEntries(Object.entries(toRaw(deck.assets)).filter(([k]) => used.has(k)))
 }
 // the user's own text styles: kept in this browser for all projects; a project file carries the ones its slides
@@ -275,7 +325,7 @@ export function mergeTextStyles(list) {
   const add = cleanStyles(list).filter(p => !have.has(p.name))
   if (add.length) saveTextStyles([...textStyles.list, ...add])
 }
-const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, entry: deck.entry, slides: deck.slides })
+const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, entry: deck.entry, slides: deck.slides, master: deck.master, layouts: deck.layouts })
 export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
 export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
@@ -347,7 +397,8 @@ export function undo(step = -1) {
   const before = deck.slides[i], after = d.slides[i]
   const prev = new Map(before?.id === after?.id ? before.elements.map(e => [e.id, JSON.stringify(e)]) : [])
   const sel = changed && prev.size ? after.elements.filter(e => JSON.stringify(e) !== prev.get(e.id)).map(e => e.id) : []
-  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'entry', 'slides']) if (k in d) deck[k] = d[k]
+  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'entry', 'slides', 'master', 'layouts']) if (k in d) deck[k] = d[k]
+  if (ui.master && ui.master !== 'master' && !deck.layouts.some(l => l.id === ui.master)) ui.master = 'master' // the layout being edited is gone
   setFormat(d.aspectRatio, d.canvasWidth)
   Object.assign(ui, { slide: i, sel, editing: null })
   // saved right away; the watch must not count this as a new edit (it would grey out Redo for 300 ms)
@@ -561,7 +612,7 @@ let lastSnap = 0
 export const addSnap = (list, s, max = SNAP_MAX) => (list[0]?.json === s.json ? list : [s, ...list]).sort((a, b) => b.at - a.at).slice(0, max)
 // only the images a kept snapshot still uses (a deleted image stays restorable while one does)
 export const snapAssets = (list, assets) => {
-  const used = new Set(list.flatMap(s => [...assetIds(JSON.parse(s.json).slides || [])]))
+  const used = new Set(list.flatMap(s => { const d = JSON.parse(s.json); return [...assetIds(withLayers({ ...d, slides: d.slides || [] }))] }))
   return Object.fromEntries(Object.entries(assets || {}).filter(([k]) => used.has(k)))
 }
 const snapFailed = e => { ui.status = t('Snapshot could not be stored ({0}). The project itself is saved as usual.', e.message) }
@@ -620,7 +671,7 @@ export async function restore(session = {}) {
   if (!deck.id || session.home) ui.home = true
 
   // only marks the change: serializing the deck on every drag frame would be too slow (flush does it)
-  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.entry, deck.slides], () => {
+  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.entry, deck.slides, deck.master, deck.layouts], () => {
     if (quiet) return
     clearTimeout(timer)
     due = true

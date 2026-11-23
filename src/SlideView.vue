@@ -1,10 +1,10 @@
 <script setup>
 import { computed, nextTick, ref, watch, onBeforeUnmount } from 'vue'
-import { W, H, deck, ui, clean, withGroups, clickSteps, revealed } from './store.js'
+import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, underlay } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
-import { shapeSvg } from './toSlidev.js'
+import { shapeSvg, fillFields } from './toSlidev.js'
 import TableEl from './TableEl.vue'
 import { pasteHtml } from './paste.js'
 import { toggleList, undoList, typed, indent, autoList } from './lists.js'
@@ -22,6 +22,12 @@ const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const root = ref()
 const selected = el => props.editable && ui.sel.includes(el.id)
 const members = el => withGroups(props.slide.elements, [el.id]) // el and its group, el last
+// master and layout elements behind the slide's own: drawn like them, but not selectable here
+const under = computed(() => underlay(props.slide))
+const all = computed(() => [...under.value, ...props.slide.elements])
+const decor = el => under.value.includes(el)
+// slide number, count and project title in field spans (shortcut: the count includes hidden slides)
+const fields = html => fillFields(html, { page: (props.index ?? 0) + 1, total: deck.slides.length, title: deck.title })
 
 // images inside text are stored with their Slidev path (data-src) and shown from the assets
 // (a quote in a crafted asset would end the attribute: escaped)
@@ -405,18 +411,18 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
 <template>
   <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown">
     <div
-      v-for="el in slide.elements" :key="el.id" :data-el="el.id"
+      v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
       :data-click="el.click || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
-      class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), editing: editable && ui.editing === el.id, board: el.board }]"
+      class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
-      :tabindex="editable ? 0 : null"
-      :aria-label="editable ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker' }[el.type]) : null"
+      :tabindex="editable && !decor(el) ? 0 : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
-        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="resolveImgs(el.html)" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
+        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="fields(resolveImgs(el.html))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event)" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"
@@ -433,7 +439,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
              the edit can still save it on blur -->
         <div v-if="el.shape !== 'line'" :ref="shapeText" class="shape-text">
           <div
-            class="content" v-html="resolveImgs(el.html || '')"
+            class="content" v-html="fields(resolveImgs(el.html || ''))"
             :contenteditable="editable && ui.editing === el.id"
             @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); shrinkShapeText($event.currentTarget.parentElement)" @paste.prevent="pasteText"
           />
@@ -461,7 +467,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         </div>
         <button v-if="live" class="quiz-reveal" @pointerdown.prevent @click="toggleSolution(el.id)">{{ quiz.shown[el.id] ? t('Hide') : t('Reveal') }}</button>
       </div>
-      <span v-if="editable && el.click" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
+      <span v-if="editable && el.click && !decor(el)" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
         <template v-if="ui.crop === el.id"><i v-for="h in HANDLES" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>
         <template v-else><i v-for="h in HANDLES" :key="h" class="handle" :class="h" @pointerdown.stop="drag($event, el, h)" /></template>

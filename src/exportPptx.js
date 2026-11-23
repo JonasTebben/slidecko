@@ -360,7 +360,8 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
   pptx.layout = 'slides'
   pptx.title = name
   const masters = {} // background key -> master name
-  const model = new Map(slides.flatMap(s => s.elements.map(e => [e.id, e])))
+  // the master's and layouts' elements are rendered on the slides too (behind their own), and exported like them
+  const model = new Map([...slides, { elements: deck.master }, ...deck.layouts].flatMap(s => s.elements.map(e => [e.id, e])))
 
   for (const [index, node] of [...root.querySelectorAll('.slide')].entries()) {
     // decorated backgrounds (title bar, cover photo with gradient overlay, frame) are rendered by the

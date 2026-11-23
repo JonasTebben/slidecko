@@ -1,6 +1,6 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent, clickOf } from './parseSlidev.js'
-import { imagePath } from './toSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, clickOf, fmGet } from './parseSlidev.js'
+import { imagePath, readLayers } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
 import { CENTERED, themeStyle, fontKey, SHADOWS } from './themes.js'
@@ -56,6 +56,10 @@ export async function importSlidev(path, files, theme) {
     return (bySrc[src] = file ? storeAsset(await readDataUrl(file)) : null)
   }
 
+  // layouts a Slidecko export wrote (layouts/<name>.vue): their slides are measured with the Slidev layout they stand for
+  const vue = Object.fromEntries(await Promise.all([...files].filter(([p]) => /(^|\/)layouts\/[\w-]+\.vue$/.test(p)).map(async ([p, f]) => [p, typeof f === 'string' ? f : await f.text()])))
+  const ownLayouts = readLayers(vue).layouts
+  const baseOf = l => ownLayouts.find(o => o.slug === l)?.layout || l
   const parsed = parseSlidev(texts.get(path), read, path)
   // measured at the deck's own size; createProject() applies the returned format
   const format = headFormat(texts.get(path))
@@ -70,8 +74,8 @@ export async function importSlidev(path, files, theme) {
   const slides = []
   try {
     for (const [i, s] of parsed.entries()) {
-      const centered = CENTERED.includes(s.layout)
-      const slide = Object.assign(document.createElement('div'), { className: `slide theme-${theme} layout-${s.layout}` })
+      const centered = CENTERED.includes(baseOf(s.layout))
+      const slide = Object.assign(document.createElement('div'), { className: `slide theme-${theme} layout-${baseOf(s.layout)}` })
       for (const [k, v] of Object.entries(themeStyle(theme))) slide.style.setProperty(k, v)
       Object.assign(slide.style, { width: size.w + 'px', height: size.h + 'px' })
       slide.innerHTML = `<div class="flow${centered ? ' center' : ''}">${centered ? `<div class="center-wrap">${htmls[i]}</div>` : htmls[i]}</div>`
@@ -88,7 +92,7 @@ export async function importSlidev(path, files, theme) {
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
-      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition })
+      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true' })
     }
   } finally {
     host.remove()

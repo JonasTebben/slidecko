@@ -7,6 +7,7 @@ import SlideView from './SlideView.vue'
 import Inspector from './Inspector.vue'
 import Home from './Home.vue'
 import ThemeEditor from './ThemeEditor.vue'
+import MasterPanel from './MasterPanel.vue'
 import { tour, begin } from './tour.js'
 const Tour = defineAsyncComponent(() => import('./Tour.vue')) // loaded only when someone takes the tour
 import { tutorial, openTutorial } from './tutorial.js'
@@ -17,7 +18,7 @@ import { parseRatio } from './format.js'
 import { slidePoint, arrowHead } from './draw.js'
 import { toggleSolution, resetQuiz } from './quiz.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
-import { SLIDE_PRESETS, PALETTE, FILLS } from './presets.js'
+import { PALETTE, FILLS } from './presets.js'
 import { shapeSvg } from './toSlidev.js'
 import { applyUno } from './uno.js'
 import * as A from './actions.js'
@@ -572,6 +573,7 @@ const fitPresenter = () => {
   presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
 }
 async function present(from = ui.slide) {
+  ui.master = null
   ui.sel = []
   ui.editing = null
   A.go(deck.slides[from]?.hidden ? nextShown(deck.slides, from, 1) : from) // a hidden slide is skipped, unless nothing follows it
@@ -705,7 +707,6 @@ const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - s
 // what the theme gallery shows: big enough to read at 13 %
 // menu previews: built once (again on a language switch), not on every render
 const PREVIEW_STYLE = { transform: 'scale(0.13)' }
-const PRESET_PREVIEWS = computed(() => (lang.value, SLIDE_PRESETS.map(p => ({ layout: p.layout, elements: p.make() }))))
 const THEME_PREVIEW = computed(() => ({ layout: 'default', elements: [
   { id: 't', type: 'text', title: true, x: 56, y: 30, w: 868, h: 60, html: `<h1>${t('Title')}</h1>`, fontSize: 30 },
   { id: 'l', type: 'text', x: 56, y: 130, w: 520, h: 300, html: `<ul><li>${t('Item one')}</li><li>${t('Item')} <a href="#">${t('two')}</a></li><li><code>code</code></li></ul>`, fontSize: 40 },
@@ -716,7 +717,7 @@ const pickImage = () => document.querySelector('.topbar input[type=file][accept^
 const commands = computed(() => [
   [t('New slide'), () => A.addSlide(), 'n'], [t('Duplicate slide'), () => A.duplicateSlide(), 'mod+shift+d'], [t('Delete slide'), () => A.deleteSlide(), 'mod+shift+backspace'],
   [t('Move slide up'), () => A.moveSlide(ui.slide, ui.slide - 1), 'alt+arrowup'], [t('Move slide down'), () => A.moveSlide(ui.slide, ui.slide + 1), 'alt+arrowdown'],
-  ...SLIDE_PRESETS.map(p => [t('New slide: {0}', t(p.name)), () => A.addSlide(p)]),
+  ...deck.layouts.map(l => [t('New slide: {0}', l.name), () => A.addSlide(l)]), [t('Edit master and layouts'), () => A.editMaster()],
   [t('Insert text'), () => A.insert('text'), 't'], [t('Insert heading'), () => A.insert('heading'), 'h'], [t('Insert bullet list'), () => A.insert('list'), 'l'],
   [t('Insert numbered list'), () => A.insert('olist'), 'shift+l'], [t('Insert quote'), () => A.insert('quote'), 'q'], [t('Insert code'), () => A.insert('code'), 'c'],
   [t('Insert image'), pickImage, 'i'],
@@ -859,6 +860,13 @@ function onThumbContext(e, i) {
   ctxAt.value = { thumb: i }
   ctx.value.openAt(e.clientX, e.clientY)
 }
+// "⋯" on a thumbnail: the same menu, below the button
+function openThumbMenu(e, i) {
+  const r = e.currentTarget.getBoundingClientRect()
+  Object.assign(ui, { slide: i, sel: [] })
+  ctxAt.value = { thumb: i }
+  ctx.value.openAt(r.left, r.bottom)
+}
 // right-click on a deck header: the deck's actions (the entry deck can't be renamed, moved or removed)
 function onDeckContext(e, g) {
   e.preventDefault()
@@ -943,10 +951,10 @@ function onClipboard(e) {
             <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
-            <button class="mi" @click="openTutorial()"><Icon name="markdown" />{{ t('Markdown tutorial …') }}</button>
+            <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
             <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ mod }}S</kbd></button>
-            <button class="mi" @click="openSnaps"><Icon name="undo" />{{ t('Version history …') }}</button>
+            <button class="mi" @click="openSnaps"><Icon name="history" />{{ t('Version history …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
             <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ mod }}Z</kbd></button>
@@ -955,43 +963,98 @@ function onClipboard(e) {
             <button class="mi" @click="openFind()"><Icon name="search" />{{ t('Find …') }}<kbd>{{ mod }}F</kbd></button>
             <button class="mi" @click="openFind(true)"><Icon name="search" />{{ t('Replace …') }}<kbd>{{ keyLabel('mod+alt+f') }}</kbd></button>
             <hr />
-            <button class="mi" @click="A.selectAll"><Icon name="grid" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
+            <button class="mi" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
             <button class="mi" :disabled="!selection.length" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ mod }}D</kbd></button>
             <button class="mi" :disabled="!selection.length" @click="A.remove"><Icon name="trash" />{{ t('Delete') }}<kbd>⌫</kbd></button>
             <hr />
-            <button class="mi" @click="openPalette"><Icon name="search" />{{ t('All commands & shortcuts …') }}<kbd>{{ mod }}K</kbd></button>
-            <button class="mi" @click="begin(false)"><Icon name="play" />{{ t('Take the tour') }}</button>
+            <button class="mi" @click="openPalette"><Icon name="keyboard" />{{ t('All commands & shortcuts …') }}<kbd>{{ mod }}K</kbd></button>
+            <button class="mi" @click="begin(false)"><Icon name="info" />{{ t('Take the tour') }}</button>
+          </Menu>
+          <Menu :label="t('Insert')">
+            <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Text') }}<kbd>{{ keyLabel('t') }}</kbd></button>
+            <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ keyLabel('h') }}</kbd></button>
+            <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ keyLabel('l') }}</kbd></button>
+            <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ keyLabel('shift+l') }}</kbd></button>
+            <button class="mi" @click="A.insert('quote')"><Icon name="quote" />{{ t('Quote') }}<kbd>{{ keyLabel('q') }}</kbd></button>
+            <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ keyLabel('c') }}</kbd></button>
+            <button class="mi" @click="pickImage"><Icon name="image" />{{ t('Image …') }}<kbd>{{ keyLabel('i') }}</kbd></button>
+            <hr />
+            <button class="mi" @click="A.insert('table', TABLE_PRESETS[0][0])"><Icon name="table" />{{ t('Table') }}<kbd>{{ keyLabel('b') }}</kbd></button>
+            <div class="shape-row">
+              <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="SHAPE_NAMES[s][1] ? `${t(SHAPE_NAMES[s][0])} (${keyLabel(SHAPE_NAMES[s][1])})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
+                <svg viewBox="0 0 40 28"><rect v-if="s === 'rect'" x="4" y="4" width="32" height="20" /><rect v-if="s === 'rounded'" x="4" y="4" width="32" height="20" rx="6" /><ellipse v-if="s === 'ellipse'" cx="20" cy="14" rx="16" ry="10" /><polygon v-if="s === 'triangle'" points="20,3 36,25 4,25" /><polygon v-if="s === 'arrow'" points="3,9 24,9 24,3 37,14 24,25 24,19 3,19" /><line v-if="s === 'line'" x1="4" y1="14" x2="36" y2="14" /></svg>
+              </button>
+            </div>
+            <hr />
+            <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
+            <hr />
+            <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ keyLabel('y') }}</kbd></button>
+            <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
+            <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
+            <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
+            <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
+            <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ keyLabel('shift+m') }}</kbd></button>
+          </Menu>
+          <Menu :label="t('Arrange')">
+            <button class="mi" :disabled="!selection.length" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!selection.length" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!selection.length" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!selection.length" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <hr />
+            <button class="mi" :disabled="selection.length < 2" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
+            <button class="mi" :disabled="!selection.some(e => e.group)" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
+            <hr />
+            <div class="mi-row" role="group" :aria-label="selection.length > 1 ? t('Align to each other') : t('Align on slide')">
+              <button v-for="[a, i, tip] in [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]" :key="a"
+                class="mi" :disabled="!selection.length" :title="t(selection.length > 1 ? '{0} (to each other)' : '{0} (on slide)', t(tip))" :aria-label="t(tip)" @click="A.align(a)"><Icon :name="i" /></button>
+            </div>
+            <button class="mi" :disabled="selection.length < 3" @click="A.distribute('h')"><Icon name="distH" />{{ t('Distribute horizontally') }}</button>
+            <button class="mi" :disabled="selection.length < 3" @click="A.distribute('v')"><Icon name="distV" />{{ t('Distribute vertically') }}</button>
           </Menu>
           <Menu :label="t('View')">
             <button class="mi" @click="present()"><Icon name="play" />{{ t('Present') }}<kbd>P</kbd></button>
             <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Present from beginning') }}<kbd>⇧P</kbd></button>
             <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Presenter view') }}<kbd>{{ keyLabel('alt+p') }}</kbd></button>
             <hr />
+            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
+            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ keyLabel('mod+0') }}</kbd></button>
+            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />{{ t('Zoom to 100 %') }}<kbd>{{ keyLabel('shift+0') }}</kbd></button>
+            <hr />
             <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ keyLabel('alt+b') }}</kbd></button>
             <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ keyLabel('alt+e') }}</kbd></button>
+            <hr />
+            <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
           </Menu>
         </div>
       </div>
 
       <div class="bar">
       <div class="tools">
-        <Menu v-slot="{ open }" icon="plus" :label="t('Slide')" :title="t('New slide (N)')" wide>
+        <Menu v-slot="{ open }" icon="slidePlus" :label="t('Slide')" :title="t('New slide (N)')" wide>
           <div class="preset-grid">
-            <button v-for="(p, k) in SLIDE_PRESETS" :key="p.id" class="preset-card" @click="A.addSlide(p)">
-              <span class="mini-slide"><SlideView v-if="open" :slide="PRESET_PREVIEWS[k]" :index="0" :style="PREVIEW_STYLE" inert /></span>
-              {{ t(p.name) }}
+            <button v-for="l in deck.layouts" :key="l.id" class="preset-card" @click="A.addSlide(l)">
+              <span class="mini-slide"><SlideView v-if="open" :slide="l" :index="0" :style="PREVIEW_STYLE" inert /></span>
+              {{ l.name }}
             </button>
           </div>
         </Menu>
         <span class="divider" />
-        <button class="tb" :title="t('Text (T)')" @click="A.insert('text')"><Icon name="text" /><span>Text</span></button>
+        <button class="tb" :title="t('Text (T)')" @click="A.insert('text')"><Icon name="text" /><span>{{ t('Text') }}</span></button>
         <label class="tb" :title="t('Image (I) – also via drag & drop or paste')"><Icon name="image" /><span>{{ t('Image') }}</span><input type="file" accept="image/*" multiple hidden @change="A.addImages([...$event.target.files]); $event.target.value = ''" /></label>
-        <Menu icon="table" :label="t('Table')">
+        <Menu icon="table" :label="t('Table')" :title="t('Table')">
           <button v-for="[id, n] in TABLE_PRESETS" :key="id" class="mi" @click="A.insert('table', id)">
             <span class="slide mini-tbl" :class="`theme-${deck.theme}`"><span class="tbl-wrap" :data-table="id"><table><thead><tr><th /><th /><th /></tr></thead><tbody><tr><td /><td /><td /></tr><tr><td /><td /><td /></tr></tbody></table></span></span>{{ t(n) }}
           </button>
         </Menu>
-        <span data-tour="insert" class="tour-anchor"><Menu icon="shapes" :label="t('Insert')">
+        <Menu icon="shapes" :label="t('Shape')" :title="t('Shape')">
+          <div class="shape-row shape-grid">
+            <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="SHAPE_NAMES[s][1] ? `${t(SHAPE_NAMES[s][0])} (${keyLabel(SHAPE_NAMES[s][1])})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
+              <svg viewBox="0 0 40 28"><rect v-if="s === 'rect'" x="4" y="4" width="32" height="20" /><rect v-if="s === 'rounded'" x="4" y="4" width="32" height="20" rx="6" /><ellipse v-if="s === 'ellipse'" cx="20" cy="14" rx="16" ry="10" /><polygon v-if="s === 'triangle'" points="20,3 36,25 4,25" /><polygon v-if="s === 'arrow'" points="3,9 24,9 24,3 37,14 24,25 24,19 3,19" /><line v-if="s === 'line'" x1="4" y1="14" x2="36" y2="14" /></svg>
+            </button>
+          </div>
+        </Menu>
+        <span data-tour="insert" class="tour-anchor"><Menu icon="insert" :label="t('Insert')" :title="t('Insert')">
           <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ keyLabel('h') }}</kbd></button>
           <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ keyLabel('l') }}</kbd></button>
           <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ keyLabel('shift+l') }}</kbd></button>
@@ -999,12 +1062,6 @@ function onClipboard(e) {
           <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ keyLabel('c') }}</kbd></button>
           <hr />
           <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
-          <hr />
-          <div class="shape-row">
-            <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :title="t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
-              <svg viewBox="0 0 40 28"><rect v-if="s === 'rect'" x="4" y="4" width="32" height="20" /><rect v-if="s === 'rounded'" x="4" y="4" width="32" height="20" rx="6" /><ellipse v-if="s === 'ellipse'" cx="20" cy="14" rx="16" ry="10" /><polygon v-if="s === 'triangle'" points="20,3 36,25 4,25" /><polygon v-if="s === 'arrow'" points="3,9 24,9 24,3 37,14 24,25 24,19 3,19" /><line v-if="s === 'line'" x1="4" y1="14" x2="36" y2="14" /></svg>
-            </button>
-          </div>
           <hr />
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
           <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
@@ -1020,6 +1077,18 @@ function onClipboard(e) {
 
       <div class="right">
         <button class="tb icon" data-tour="palette" :title="`${t('Search commands')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
+        <div class="zoom-ctl" role="group" :aria-label="t('Zoom')">
+          <button class="tb icon small" :aria-label="t('Zoom out')" :title="`${t('Zoom out')} (${keyLabel('mod+-')})`" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" :size="16" /></button>
+          <Menu :label="`${Math.round(scale * 100)} %`" :title="t('Zoom')">
+            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
+            <hr />
+            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ keyLabel('mod+0') }}</kbd></button>
+            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />100 %<kbd>{{ keyLabel('shift+0') }}</kbd></button>
+            <button class="mi" @click="setZoom(2)"><Icon name="check" :style="{ visibility: zoom === 2 ? null : 'hidden' }" />200 %</button>
+          </Menu>
+          <button class="tb icon small" :aria-label="t('Zoom in')" :title="`${t('Zoom in')} (${keyLabel('mod+=')})`" @click="zoomBy(1.25)"><Icon name="zoomIn" :size="16" /></button>
+        </div>
         <span data-tour="theme" class="tour-anchor"><Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
           <template v-for="own in [false, true]" :key="own">
             <h4 class="mh">{{ own ? t('Own themes') : t('Built-in themes') }}</h4>
@@ -1032,7 +1101,7 @@ function onClipboard(e) {
             <p v-if="own && !themeIds(true).length" class="mh-note">{{ t('None yet – edit a theme or import a .theme.json.') }}</p>
           </template>
           <div class="mi-row theme-actions">
-            <button class="mi" @click="themeEditor.open(deck.theme)"><Icon name="text" />{{ THEMES[deck.theme]?.custom ? t('Edit theme …') : t('Customize as own theme …') }}</button>
+            <button class="mi" @click="themeEditor.open(deck.theme)"><Icon name="pen" />{{ THEMES[deck.theme]?.custom ? t('Edit theme …') : t('Customize as own theme …') }}</button>
             <label class="mi"><Icon name="upload" />{{ t('Import …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
           </div>
           <label class="check keep-sizes" data-keep :title="t('The new theme brings its colors and fonts but keeps the current font sizes – so no layout shifts')"><input v-model="keepSizes" type="checkbox" /> {{ t('Keep font sizes when switching') }}<small v-if="deck.typo.from">{{ t('currently: sizes from “{0}”', themeName(deck.typo.from)) }}</small></label>
@@ -1052,7 +1121,7 @@ function onClipboard(e) {
           <h4 class="mh">{{ t('Everything · {0} slides', deck.slides.length) }}</h4>
           <button v-for="f in EXPORTS" :key="f.id" class="mi" @click="A.exportAs(f.id)"><Icon :name="f.id === 'slidev' ? 'markdown' : 'file'" />{{ t(f.name) }} <small class="mi-ext">{{ f.ext }}</small></button>
           <hr />
-          <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }} <small class="mi-ext">{{ keyLabel('mod+e') }}</small></button>
+          <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}<kbd>{{ keyLabel('mod+e') }}</kbd></button>
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Export single deck …') }}</button>
         </Menu></span>
         <button class="tb primary" data-tour="present" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
@@ -1061,34 +1130,42 @@ function onClipboard(e) {
     </header>
 
     <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props }">
-      <nav class="slides-panel" data-tour="slides" :aria-label="t('Slides')">
+      <MasterPanel v-if="ui.master" />
+      <nav v-else class="slides-panel" data-tour="slides" :aria-label="t('Slides')">
         <div class="panel-head">
-          <span>{{ t('Decks') }}</span>
-          <button class="tb icon small" :title="t('New deck')" @click="newDeck"><Icon name="plus" :size="16" /></button>
+          <span>{{ groups.length > 1 ? t('Decks') : t('Slides') }}</span>
+          <span class="panel-actions">
+            <button class="tb icon small" :aria-label="t('New slide')" :title="`${t('New slide')} (N)`" @click="A.addSlide()"><Icon name="slidePlus" :size="16" /></button>
+            <button class="tb icon small" :aria-label="t('New deck')" :title="`${t('New deck')} (${keyLabel('shift+n')})`" @click="newDeck"><Icon name="folder" :size="16" /></button>
+          </span>
         </div>
         <div class="slide-list">
           <section v-for="(g, gi) in groups" :key="g.file + gi" class="deck-group"
             :class="{ 'drop-before': dropDeck === gi && deckFrom !== gi, 'drop-after': dropDeck === gi + 1 && gi === groups.length - 1 }"
             @dragover.prevent="deckOver($event, gi)" @drop.prevent="dropDeckAt()">
-            <header class="deck-head" :class="{ entry: g.file === deck.entry }" draggable="true" :title="t('Drag to move the deck')"
+            <header v-if="groups.length > 1" class="deck-head" :class="{ entry: g.file === deck.entry }" draggable="true" :title="t('Drag to move the deck')"
               @dragstart="deckDragStart($event, gi)" @dragend="deckFrom = null; dropDeck = null" @contextmenu="onDeckContext($event, g)">
               <button class="tb icon small" :aria-expanded="!collapsed.has(g.file)" :aria-label="t(collapsed.has(g.file) ? 'Expand {0}' : 'Collapse {0}', g.name || t('Deck'))" :title="collapsed.has(g.file) ? t('Expand') : t('Collapse')" @click="toggle(g.file)"><Icon :name="collapsed.has(g.file) ? 'chevronR' : 'chevron'" :size="14" /></button>
               <span class="deck-name" :title="g.file">{{ g.name }}</span>
               <span v-if="deckHits(g)" class="find-badge inline" :title="t('{0} matches in this deck', deckHits(g))">{{ deckHits(g) }}</span>
               <span class="count">{{ g.count }}</span>
-              <Menu v-if="g.file !== deck.entry" icon="more" :title="t('Deck')">
-                <button class="mi" @click="renameDeckAsk(g)">{{ t('Rename …') }}</button>
-                <button class="mi" @click="A.moveDeck(g.file, -1)"><Icon name="up" />{{ t('Move up') }}</button>
-                <button class="mi" @click="A.moveDeck(g.file, 1)"><Icon name="down" />{{ t('Move down') }}</button>
-                <hr />
+              <Menu icon="more" :title="t('Deck actions')">
+                <template v-if="g.file !== deck.entry">
+                  <button class="mi" @click="renameDeckAsk(g)"><Icon name="pen" />{{ t('Rename …') }}</button>
+                  <button class="mi" :disabled="!canMoveDeck(g, -1)" @click="A.moveDeck(g.file, -1)"><Icon name="up" />{{ t('Move up') }}</button>
+                  <button class="mi" :disabled="!canMoveDeck(g, 1)" @click="A.moveDeck(g.file, 1)"><Icon name="down" />{{ t('Move down') }}</button>
+                  <hr />
+                </template>
                 <button class="mi" @click="A.pdf(g.file)"><Icon name="file" />{{ t('Export as PDF') }}</button>
                 <button class="mi" @click="A.pptx(g.file)"><Icon name="file" />{{ t('Export as PPTX') }}</button>
                 <button class="mi" @click="openExport(g.file)"><Icon name="download" />{{ t('More formats …') }}</button>
-                <hr />
-                <button class="mi danger" @click="ask(t('Remove deck “{0}” with {1} slides?', g.name, g.count), () => A.removeDeck(g.file))"><Icon name="trash" />{{ t('Remove') }}</button>
+                <template v-if="g.file !== deck.entry">
+                  <hr />
+                  <button class="mi danger" @click="ask(t('Remove deck “{0}” with {1} slides?', g.name, g.count), () => A.removeDeck(g.file))"><Icon name="trash" />{{ t('Remove') }}</button>
+                </template>
               </Menu>
             </header>
-            <div v-if="!collapsed.has(g.file)" class="thumbs">
+            <div v-if="groups.length === 1 || !collapsed.has(g.file)" class="thumbs">
               <div v-for="(s, j) in g.slides" :key="s.id" class="thumb-row" @dragover.prevent @drop.prevent="drop($event, g.start + j, g.file)">
                 <span class="num">{{ g.start + j + 1 }}</span>
                 <button class="thumb" :class="{ 'is-hidden': s.hidden }" :style="{ height: Math.round(format.h * THUMB) + 4 + 'px' }" :aria-current="g.start + j === ui.slide" :aria-label="t('Slide {0}', g.start + j + 1) + (s.hidden ? ` (${t('hidden')})` : '')" draggable="true"
@@ -1097,10 +1174,26 @@ function onClipboard(e) {
                   <span v-if="s.hidden" class="hidden-badge" :title="t('Hidden: skipped when presenting and exporting')"><Icon name="eyeOff" :size="14" /></span>
                   <span v-if="findOpen && hitsOn[g.start + j]" class="find-badge" :title="t('{0} matches', hitsOn[g.start + j])">{{ hitsOn[g.start + j] }}</span>
                 </button>
+                <div class="thumb-actions" role="group" :aria-label="t('Slide {0}', g.start + j + 1)">
+                  <button class="tb icon small" :aria-label="s.hidden ? t('Show slide') : t('Hide slide')" :title="s.hidden ? t('Show slide') : t('Hide slide')" :aria-pressed="!!s.hidden" @click="A.toggleHidden(g.start + j)"><Icon :name="s.hidden ? 'eye' : 'eyeOff'" :size="14" /></button>
+                  <button class="tb icon small" :aria-label="t('Duplicate slide')" :title="`${t('Duplicate slide')} (${keyLabel('mod+shift+d')})`" @click="A.duplicateSlide(g.start + j)"><Icon name="copy" :size="14" /></button>
+                  <button class="tb icon small" :aria-label="t('More actions')" :title="t('More actions')" @click="openThumbMenu($event, g.start + j)"><Icon name="more" :size="14" /></button>
+                </div>
               </div>
             </div>
           </section>
-          <button class="add-slide" @click="A.addSlide()"><Icon name="plus" :size="16" /> {{ t('New slide') }}</button>
+          <div class="add-slide-split">
+            <button class="add-slide" :title="`${t('New slide')} (N)`" @click="A.addSlide()"><Icon name="slidePlus" :size="16" /> {{ t('New slide') }}</button>
+            <!-- the project's layouts (store.js setupLayouts), the same list "New slide" uses -->
+            <Menu v-slot="{ open }" icon="layout" :title="t('New slide with layout')" wide>
+              <div class="preset-grid">
+                <button v-for="l in deck.layouts" :key="l.id" class="preset-card" @click="A.addSlide(l)">
+                  <span class="mini-slide"><SlideView v-if="open" :slide="l" :index="0" :style="PREVIEW_STYLE" inert /></span>
+                  {{ l.name }}
+                </button>
+              </div>
+            </Menu>
+          </div>
         </div>
       </nav>
 
@@ -1157,11 +1250,11 @@ function onClipboard(e) {
               <button class="mi" :disabled="!g.count" @click="present(g.start)"><Icon name="play" />{{ t('Present from this deck') }}</button>
               <button class="mi" @click="toggle(g.file)"><Icon :name="collapsed.has(g.file) ? 'chevronR' : 'chevron'" />{{ collapsed.has(g.file) ? t('Expand') : t('Collapse') }}</button>
               <template v-if="g.file !== deck.entry">
-                <button class="mi" @click="renameDeckAsk(g)"><Icon name="text" />{{ t('Rename …') }}</button>
+                <button class="mi" @click="renameDeckAsk(g)"><Icon name="pen" />{{ t('Rename …') }}</button>
                 <button class="mi" :disabled="!canMoveDeck(g, -1)" @click="A.moveDeck(g.file, -1)"><Icon name="up" />{{ t('Move up') }}</button>
                 <button class="mi" :disabled="!canMoveDeck(g, 1)" @click="A.moveDeck(g.file, 1)"><Icon name="down" />{{ t('Move down') }}</button>
               </template>
-              <button class="mi" @click="newDeck"><Icon name="plus" />{{ t('New deck') }}<kbd>{{ keyLabel('shift+n') }}</kbd></button>
+              <button class="mi" @click="newDeck"><Icon name="folder" />{{ t('New deck') }}<kbd>{{ keyLabel('shift+n') }}</kbd></button>
               <hr />
               <button class="mi" :disabled="!g.count" @click="A.pdf(g.file)"><Icon name="file" />{{ t('Export as PDF') }}</button>
               <button class="mi" :disabled="!g.count" @click="A.pptx(g.file)"><Icon name="file" />{{ t('Export as PPTX') }}</button>
@@ -1174,9 +1267,9 @@ function onClipboard(e) {
           </template>
           <template v-else-if="ctxAt?.thumb != null">
             <button class="mi" @click="present(ui.slide)"><Icon name="play" />{{ t('Present from this slide') }}<kbd>P</kbd></button>
-            <button class="mi" :aria-pressed="!!slide.hidden" @click="A.toggleHidden()"><Icon name="eyeOff" />{{ slide.hidden ? t('Show slide') : t('Hide slide') }}</button>
+            <button class="mi" :aria-pressed="!!slide.hidden" @click="A.toggleHidden()"><Icon :name="slide.hidden ? 'eye' : 'eyeOff'" />{{ slide.hidden ? t('Show slide') : t('Hide slide') }}</button>
             <hr />
-            <button class="mi" @click="A.addSlide()"><Icon name="plus" />{{ t('New slide after') }}<kbd>N</kbd></button>
+            <button class="mi" @click="A.addSlide()"><Icon name="slidePlus" />{{ t('New slide after') }}<kbd>N</kbd></button>
             <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ keyLabel('mod+shift+d') }}</kbd></button>
             <button class="mi" @click="openMarkdown('slide')"><Icon name="markdown" />{{ t('Edit this slide’s Markdown') }}<kbd>M</kbd></button>
             <button v-if="A.canRevert(slide)" class="mi" @click="A.revertSlides([slide])"><Icon name="undo" />{{ t('Revert to imported version') }}</button>
@@ -1191,7 +1284,7 @@ function onClipboard(e) {
             <button v-for="[k, n] in A.CROP_RATIOS" :key="n" class="mi" :class="{ on: ui.cropRatio === k }" :aria-pressed="ui.cropRatio === k" @click="A.setCropRatio(ctxAt.cropEl, k)"><Icon name="check" :style="{ visibility: ui.cropRatio === k ? null : 'hidden' }" />{{ t(n) }}</button>
             <hr />
             <button class="mi" @click="A.resetCrop(ctxAt.cropEl)"><Icon name="undo" />{{ t('Reset crop') }}</button>
-            <button class="mi" @click="A.endCrop()"><Icon name="image" />{{ t('Finish cropping') }}<kbd>↵</kbd></button>
+            <button class="mi" @click="A.endCrop()"><Icon name="crop" />{{ t('Finish cropping') }}<kbd>↵</kbd></button>
           </template>
           <template v-else-if="ctxAt?.shapeText !== undefined && ctxAt?.el?.type === 'shape'">
             <button class="mi" :disabled="!ctxAt.text" @click="copyText(ctxAt.text)"><Icon name="copy" />{{ t('Copy selection') }}<kbd>{{ mod }}C</kbd></button>
@@ -1217,8 +1310,8 @@ function onClipboard(e) {
           <template v-else-if="ctxAt?.code">
             <button class="mi" :disabled="!ctxAt.hasSel" @click="codeCut(ctxAt.code)"><Icon name="cut" />{{ t('Cut') }}<kbd>{{ mod }}X</kbd></button>
             <button class="mi" :disabled="!ctxAt.hasSel" @click="copyText(taText(ctxAt.code))"><Icon name="copy" />{{ t('Copy') }}<kbd>{{ mod }}C</kbd></button>
-            <button class="mi" @click="codePaste(ctxAt.code)"><Icon name="file" />{{ t('Paste') }}<kbd>{{ mod }}V</kbd></button>
-            <button class="mi" @click="ctxAt.code.select()"><Icon name="grid" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
+            <button class="mi" @click="codePaste(ctxAt.code)"><Icon name="clipboard" />{{ t('Paste') }}<kbd>{{ mod }}V</kbd></button>
+            <button class="mi" @click="ctxAt.code.select()"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
             <hr />
             <button class="mi" @click="taLines(ctxAt.code, l => '  ' + l)"><Icon name="chevronR" />{{ t('Indent') }}<kbd>Tab</kbd></button>
             <button class="mi" @click="taLines(ctxAt.code, l => l.replace(/^( {1,2}|\t)/, ''))"><Icon name="chevronL" />{{ t('Outdent') }}</button>
@@ -1246,10 +1339,10 @@ function onClipboard(e) {
             <button class="mi" @click="ui.editing = null"><Icon name="x" />{{ t('Stop editing') }}<kbd>Esc</kbd></button>
           </template>
           <template v-else-if="ctxAt?.el">
-            <button v-if="selection.length === 1 && ['text', 'code', 'table'].includes(ctxAt.el.type)" class="mi" @click="ctxEdit"><Icon name="text" />{{ ctxAt.el.type === 'table' ? t('Edit cell') : t('Edit') }}<kbd>↵</kbd></button>
+            <button v-if="selection.length === 1 && ['text', 'code', 'table'].includes(ctxAt.el.type)" class="mi" @click="ctxEdit"><Icon name="pen" />{{ ctxAt.el.type === 'table' ? t('Edit cell') : t('Edit') }}<kbd>↵</kbd></button>
             <label v-if="selection.length === 1 && ctxAt.el.type === 'image'" class="mi"><Icon name="image" />{{ t('Replace image …') }}<input type="file" accept="image/*" hidden @change="A.run(() => A.replaceImage(ctxAt.el, $event.target.files[0]))" /></label>
             <template v-if="selection.length === 1 && ctxAt.el.type === 'image' && !ctxAt.el.locked">
-              <button class="mi" @click="A.run(() => A.startCrop(ctxAt.el))"><Icon name="image" />{{ t('Crop') }}</button>
+              <button class="mi" @click="A.run(() => A.startCrop(ctxAt.el))"><Icon name="crop" />{{ t('Crop') }}</button>
               <button v-if="ctxAt.el.crop" class="mi" @click="A.resetCrop(ctxAt.el)"><Icon name="undo" />{{ t('Remove crop') }}</button>
             </template>
             <button v-if="selection.length === 1 && ctxAt.el.type === 'text'" class="mi" @click="A.fitHeight(ctxAt.el)"><Icon name="alignB" />{{ t('Fit height to text') }}</button>
@@ -1271,13 +1364,13 @@ function onClipboard(e) {
                 </button>
               </div>
               <template v-if="ctxAt.el.shape !== 'line'">
-                <h4 class="mh">{{ t('Fill') }}</h4>
+                <h4 class="mh"><Icon name="fill" :size="14" />{{ t('Fill') }}</h4>
                 <div class="swatches ctx-sw" data-keep>
                   <button v-for="c in FILLS" :key="c" class="sw" :class="{ on: ctxAt.el.fill === c }" :style="{ background: c }" :title="c" :aria-label="c" @click="ctxAt.el.fill = c" />
                   <button class="sw none" :title="t('No fill')" :aria-label="t('No fill')" @click="ctxAt.el.fill = 'none'" />
                 </div>
               </template>
-              <h4 class="mh">{{ t('Outline') }}</h4>
+              <h4 class="mh"><Icon name="outline" :size="14" />{{ t('Outline') }}</h4>
               <div class="swatches ctx-sw" data-keep>
                 <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: ctxAt.el.stroke === c }" :style="{ background: c }" :title="c" :aria-label="c" @click="ctxAt.el.stroke = c; ctxAt.el.strokeWidth ||= 2" />
                 <button class="sw none" :title="t('No outline')" :aria-label="t('No outline')" @click="ctxAt.el.stroke = 'none'" />
@@ -1292,13 +1385,13 @@ function onClipboard(e) {
             <button class="mi" @click="clip('copy')"><Icon name="copy" />{{ t('Copy') }}<kbd>{{ mod }}C</kbd></button>
             <button class="mi" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ mod }}D</kbd></button>
             <button class="mi" @click="A.remove"><Icon name="trash" />{{ selection.length > 1 ? t('Delete {0} elements', selection.length) : t('Delete') }}<kbd>⌫</kbd></button>
-            <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="grid" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
-            <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="grid" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
+            <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
+            <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
             <hr />
-            <button class="mi" @click="A.order('front')"><Icon name="up" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
-            <button class="mi" @click="A.order('forward')"><Icon name="up" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
-            <button class="mi" @click="A.order('backward')"><Icon name="down" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
-            <button class="mi" @click="A.order('back')"><Icon name="down" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <button class="mi" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
+            <button class="mi" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
+            <button class="mi" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
+            <button class="mi" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
             <hr />
             <div class="mi-row" role="group" :aria-label="selection.length > 1 ? t('Align to each other') : t('Align on slide')">
               <button v-for="[a, i, tip] in [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]" :key="a"
@@ -1313,15 +1406,15 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Insert text') }}<kbd>T</kbd></button>
             <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Insert heading') }}<kbd>H</kbd></button>
             <button class="mi" @click="pickImage"><Icon name="image" />{{ t('Insert image …') }}<kbd>I</kbd></button>
-            <button class="mi" :disabled="!slide.elements.length" @click="A.selectAll"><Icon name="grid" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
+            <button class="mi" :disabled="!slide.elements.length" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
             <hr />
-            <button class="mi" @click="A.addSlide()"><Icon name="plus" />{{ t('New slide') }}<kbd>N</kbd></button>
+            <button class="mi" @click="A.addSlide()"><Icon name="slidePlus" />{{ t('New slide') }}<kbd>N</kbd></button>
             <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ keyLabel('mod+shift+d') }}</kbd></button>
             <button class="mi" @click="openMarkdown('slide')"><Icon name="markdown" />{{ t('Edit this slide’s Markdown') }}<kbd>M</kbd></button>
             <button class="mi" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}</button>
           </template>
         </Menu>
-        <div class="stage-info" :class="{ zoomed: zoom != null }">{{ ui.slide + 1 }} / {{ deck.slides.length }} · <button type="button" class="zoom-btn" :aria-label="`${t('Zoom')}: ${Math.round(scale * 100)} %`" :title="t('Zoom')" @click="cycleZoom">{{ Math.round(scale * 100) }} %</button></div>
+        <div class="stage-info" :class="{ zoomed: zoom != null }">{{ ui.slide + 1 }} / {{ deck.slides.length }}<span class="stage-zoom"> · </span><button type="button" class="zoom-btn stage-zoom" :aria-label="`${t('Zoom')}: ${Math.round(scale * 100)} %`" :title="t('Zoom')" @click="cycleZoom">{{ Math.round(scale * 100) }} %</button></div>
       </section>
 
       <Inspector data-tour="inspector" @link="openLink" @markdown="openMarkdown('slide')" />
@@ -1483,6 +1576,12 @@ function onClipboard(e) {
       <h2>{{ t('Keys while presenting') }}</h2>
       <dl><template v-for="[k, what] in PRESENT_KEYS" :key="k"><dt><kbd v-for="x in k.split('  ')" :key="x">{{ x }}</kbd></dt><dd>{{ t(what) }}</dd></template></dl>
     </div>
+    <!-- pen options in a row of their own above the bar, so the tools and the way out stay in reach on a phone -->
+    <div class="pv-bars">
+    <div v-if="drawing" class="pv-bar pv-ink-bar" @click.stop>
+      <button v-for="c in INKS" :key="c" class="pv-swatch" :class="{ on: ink.color === c }" :style="{ background: c }" :title="c" :aria-label="t('Pen colour {0}', c)" :aria-pressed="ink.color === c" @click="ink.color = c" />
+      <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
+    </div>
     <div class="pv-bar">
       <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
       <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
@@ -1490,14 +1589,12 @@ function onClipboard(e) {
       <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="t('Laser pointer') + ' (L)'" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="t('Pen') + ' (D)'" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="t('Arrow') + ' (A)'" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
-      <template v-if="drawing">
-        <button v-for="c in INKS" :key="c" class="pv-swatch" :class="{ on: ink.color === c }" :style="{ background: c }" :title="c" :aria-label="t('Pen colour {0}', c)" :aria-pressed="ink.color === c" @click.stop="ink.color = c" />
-        <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click.stop="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
-      </template>
       <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
       <button v-if="strokes.length" class="tb icon small" :title="t('Clear drawing') + ' (E)'" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
       <button class="tb icon small" :title="t('Presenter view (P)')" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
-      <button class="tb icon small" :title="t('Exit (Esc)')" @click.stop="stopPresenting"><Icon name="x" :size="16" /></button>
+      <!-- like Esc: with a tool on, the first press puts the tool away, so the tool buttons come back instead of the presentation ending -->
+      <button class="tb icon small" :title="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" :aria-label="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" @click.stop="tool ? (tool = null) : stopPresenting()"><Icon name="x" :size="16" /></button>
+    </div>
     </div>
     <div class="pv-progress" :style="{ width: ((ui.slide + 1) / deck.slides.length) * 100 + '%' }" />
   </div>

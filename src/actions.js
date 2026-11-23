@@ -1,12 +1,12 @@
 import { toggleList } from './lists.js'
 import { computed, nextTick, ref } from 'vue'
-import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides } from './store.js'
-import { ELEMENTS, SLIDE_PRESETS } from './presets.js'
+import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout } from './store.js'
+import { ELEMENTS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
 import { formatSize, parseRatio } from './format.js'
 import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
-import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath } from './toSlidev.js'
+import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf } from './toSlidev.js'
 import { withSolutions } from './quiz.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
 const loadZip = async () => (await import('jszip')).default
@@ -22,7 +22,9 @@ const flattenBackgrounds = async (...a) => (await import('./exportFormats.js')).
 // Everything the UI can do. Menus, keyboard shortcuts, the command palette and the inspector all
 // call these, so behaviour is the same wherever an action is triggered.
 
-export const slide = computed(() => deck.slides[ui.slide])
+// ui.master: the master ('master') or a layout (its id) is edited instead of the slide: the canvas, selection and
+// element tools then work on its elements
+export const slide = computed(() => (ui.master === 'master' ? { id: 'master', layout: 'default', elements: deck.master } : ui.master && deck.layouts.find(l => l.id === ui.master)) || deck.slides[ui.slide])
 export const selection = computed(() => slide.value?.elements.filter(e => ui.sel.includes(e.id)) || [])
 export const primary = computed(() => slide.value?.elements.find(e => e.id === ui.sel.at(-1)))
 
@@ -97,7 +99,7 @@ export async function startCrop(el) {
   ui.crop = el.id
 }
 export function endCrop() {
-  const el = deck.slides.flatMap(s => s.elements).find(e => e.id === ui.crop)
+  const el = [slide.value, ...deck.slides].flatMap(s => s?.elements || []).find(e => e.id === ui.crop)
   if (el) { const c = cleanCrop(el.crop); if (c) el.crop = c; else delete el.crop }
   ui.crop = null
   ui.cropRatio = null
@@ -230,8 +232,11 @@ export async function fitHeight(el) {
 }
 
 // --- slides ---
-export function addSlide(preset = SLIDE_PRESETS[1]) {
-  const s = newSlide(preset.layout, preset.make())
+// a new slide from a project layout (default: "Title & content"): its placeholders, copied
+export function addSlide(l = deck.layouts.find(x => x.id === 'content') || deck.layouts[0]) {
+  ui.master = null
+  const s = newSlide(l?.layout, l && regroup(l.elements.filter(e => e.placeholder).map(({ placeholder, ...e }) => ({ ...JSON.parse(JSON.stringify(e)), id: uid() }))))
+  if (l) s.type = l.id
   if (flowable(s.elements)) s.flow = flowHash(s) // exported as plain Markdown until it is rearranged or styled
   s.file = slide.value ? fileOf(slide.value) : deck.entry // stays in the current deck
   deck.slides.splice(ui.slide + 1, 0, s)
@@ -239,6 +244,7 @@ export function addSlide(preset = SLIDE_PRESETS[1]) {
   ui.sel = []
 }
 export function duplicateSlide(i = ui.slide) {
+  if (ui.master) return
   const copy = { ...JSON.parse(JSON.stringify(deck.slides[i])), id: uid() }
   copy.elements = copy.elements.map(e => ({ ...e, id: uid() }))
   deck.slides.splice(i + 1, 0, copy)
@@ -250,11 +256,38 @@ export function toggleHidden(i = ui.slide) {
   else s.hidden = true
 }
 export function deleteSlide(i = ui.slide) {
+  if (ui.master) return // the slide is not in view
   deck.slides.splice(i, 1)
   if (!deck.slides.length) deck.slides.push(newSlide())
   ui.slide = Math.min(i, deck.slides.length - 1)
   ui.sel = []
 }
+// --- master and layouts ---
+export function editMaster(target = 'master') {
+  if (ui.crop) endCrop()
+  Object.assign(ui, { master: target, sel: [], editing: null })
+}
+// another layout for a slide: its content stays, its Slidev layout follows
+export const setSlideLayout = (s, l) => Object.assign(s, { type: l.id, layout: l.layout })
+// a blank layout or a copy of one; the new one is edited
+export function addLayout(from) {
+  const l = from ? { ...JSON.parse(JSON.stringify(from)), id: uid(), name: t('{0} (copy)', from.name) } : { id: uid(), name: t('New layout'), layout: 'default', elements: [] }
+  l.elements = regroup(l.elements.map(e => ({ ...e, id: uid() })))
+  deck.layouts.push(l)
+  editMaster(l.id)
+}
+export function deleteLayout(id) {
+  removeLayout(id)
+  if (ui.master === id) editMaster('master')
+}
+// the layout's slides follow its new Slidev layout
+export function setLayoutBase(l, base) {
+  for (const s of deck.slides) if (layoutOf(s, deck.layouts) === l) s.layout = base
+  l.layout = base
+}
+// a text box with a field (slide number, count, project title), bottom right
+export const insertField = kind => addElement({ type: 'text', html: `<p><span data-field="${kind}">#</span></p>`, x: W - 216, y: H - 44, w: 160, h: 28, align: 'right', fontSize: 14 })
+
 // file: the deck the slide was dropped into (it becomes part of it)
 export function moveSlide(from, to, file) {
   if (to < 0 || to >= deck.slides.length) return

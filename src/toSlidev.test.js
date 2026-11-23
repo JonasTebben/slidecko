@@ -111,3 +111,43 @@ test('static exports get each quiz slide twice: as asked and with the solution',
   assert.equal(out[2].elements[1].solved, true)
   assert.equal(out[2].elements[0], t)
 })
+
+test('fields show the slide number, count and an escaped project title', async () => {
+  const { fillFields } = await import('./toSlidev.js')
+  assert.equal(fillFields('<p>Slide <span data-field="page">#</span> / <span data-field="total">9</span> · <span data-field="title"></span></p>', { page: 3, total: 12, title: 'A <b> & B' }),
+    '<p>Slide <span data-field="page">3</span> / <span data-field="total">12</span> · <span data-field="title">A &lt;b&gt; &amp; B</span></p>')
+  assert.equal(fillFields('<p>{{ x }}</p>', { page: 1 }), '<p>{{ x }}</p>')
+})
+
+test('Slidev export: the master is global-bottom.vue, a decorated layout layouts/<name>.vue; plain layouts and unchanged slides stay as they are', async () => {
+  const { readLayers } = await import('./toSlidev.js')
+  const field = { id: 'f', type: 'text', x: 800, y: 500, w: 120, h: 30, html: '<p>{{ <span data-field="page">#</span></p>' }
+  const layouts = [
+    { id: 'title', name: 'Title slide', layout: 'cover', elements: [{ id: 'p', type: 'text', placeholder: true, ...box, html: '<h1>T</h1>' }] },
+    { id: 'brand', name: 'Brand cover', layout: 'cover', elements: [{ id: 'b', type: 'shape', shape: 'rect', x: 0, y: 0, w: 980, h: 20, fill: '#123456', stroke: 'none', strokeWidth: 0, radius: 0 }, field] },
+    { id: 'cv', name: 'Cover', layout: 'default', elements: [{ id: 'x', type: 'shape', shape: 'rect', ...box, fill: '#000', stroke: 'none' }] }, // its name is a Slidev layout's
+  ]
+  const md = '# Hello\n'
+  const slides = [
+    { layout: 'cover', type: 'title', md, hash: 0, elements: [] },
+    { layout: 'cover', type: 'brand', md, elements: [], hideMaster: true },
+    { layout: 'default', type: 'cv', elements: [{ id: 'y', type: 'text', ...box, html: '<p>x</p>' }] },
+  ]
+  const { slideHash } = await import('./toSlidev.js')
+  for (const s of slides) s.hash = slideHash(s)
+  const { files } = toSlidev({ title: 'T', theme: 'hell', slides, master: [field], layouts }, { 'layouts/old.vue': '<!-- slidecko-layout {} -->', 'layouts/mine.vue': '<template />' })
+  const out = parseSlidev(files['slides.md'])
+  assert.deepEqual(out.map(s => s.layout), ['cover', 'brand-cover', 'cover-layout'])
+  assert.equal(out[0].md.trim(), md.trim()) // unchanged slide: its Markdown as imported
+  assert.match(files['slides.md'], /hideMaster: true/)
+  assert.ok(!files['layouts/old.vue'] && files['layouts/mine.vue']) // an earlier export's file goes, the project's own stays
+  const vue = files['layouts/brand-cover.vue']
+  assert.match(vue, /class="slidev-layout cover"[\s\S]*fill="#123456"[\s\S]*<slot \/>/)
+  assert.match(vue, /<span v-pre>\{\{<\/span> <span data-field="page">\{\{ \$nav\.currentPage \}\}<\/span>/)
+  assert.match(files['global-bottom.vue'], /hideMaster[\s\S]*\$nav\.currentPage/)
+  // read back: the editable master and layouts, and which file a slide names
+  const back = readLayers(files)
+  assert.equal(back.master[0].html, field.html)
+  const brand = back.layouts.find(l => l.slug === 'brand-cover')
+  assert.deepEqual([brand.id, brand.name, brand.layout, brand.elements.length], ['brand', 'Brand cover', 'cover', 2])
+})

@@ -3,7 +3,7 @@ import { gfm } from 'turndown-plugin-gfm'
 import { fmGet, fmHidden, TRANSITIONS } from './parseSlidev.js'
 import { parseRatio } from './format.js'
 import { clock } from './timer.js'
-import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss } from './themes.js'
+import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss, CENTERED } from './themes.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
 //
@@ -139,6 +139,67 @@ function elementMd(el, flat) {
   }
 }
 
+// --- master and layouts (slide types) ---
+// a field in master or layout text: <span data-field="page">#</span>, shown as the slide number, slide count or project title
+export const FIELDS = { page: 'Slide number', total: 'Slide count', title: 'Project title' }
+const FIELD = /(<span\b[^>]*\bdata-field="(page|total|title)"[^>]*>)[^<]*(<\/span>)/g
+const htmlText = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+export const fillFields = (html, v) => (html?.includes('data-field') ? html.replace(FIELD, (_, a, k, b) => a + htmlText(v[k]) + b) : html)
+// a slide's project layout: its own while that still has the slide's Slidev layout, else the first one with it
+export const layoutOf = (s, layouts = []) => layouts.find(l => l.id === s.type && l.layout === s.layout) || layouts.find(l => l.layout === s.layout)
+// drawn behind every slide of the layout (placeholders are copied into new slides instead)
+export const decorations = l => l?.elements.filter(e => !e.placeholder) || []
+const SLIDEV_LAYOUTS = ['cover', 'default', 'center', 'end', 'fact', 'full', 'iframe', 'iframe-left', 'iframe-right', 'image', 'image-left', 'image-right', 'intro', 'none', 'quote', 'section', 'statement', 'two-cols', 'two-cols-header']
+// file names for decorated layouts, from their names; never the name of a Slidev or theme layout
+function layoutSlugs(layouts, reserved) {
+  const used = new Set(reserved), out = {}
+  for (const l of layouts.filter(l => decorations(l).length)) {
+    let base = l.name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'layout'
+    if (used.has(base)) base += '-layout'
+    let k = base
+    for (let i = 2; used.has(k); i++) k = `${base}-${i}`
+    used.add(k)
+    out[l.id] = k
+  }
+  return out
+}
+// Slidev's global layers and layouts are Vue files: elements as HTML (no Markdown there), fields as Slidev's own values;
+// timers, pickers and quizzes need Markdown and are left out
+const FIELD_VUE = { page: '{{ $nav.currentPage }}', total: '{{ $nav.total }}', title: '{{ $slidev.configs.title }}' }
+function layerHtml(el) {
+  const html = el.type === 'text' ? `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">${el.html}</div>`
+    : el.type === 'code' ? `<pre style="${boxStyle(el)};margin:0;overflow:hidden"><code>${esc(el.code)}</code></pre>`
+      : el.type === 'table' ? `<div data-table="${el.preset || 'theme'}" style="${boxStyle(el)}">${tableMd({ ...el, fills: el.fills || [] })}</div>` // fills: always the HTML table
+        : ['image', 'shape', 'video'].includes(el.type) ? elementMd(el) : ''
+  return '    ' + escapeMustache(html).replace(FIELD, (_, a, k, b) => a + FIELD_VUE[k] + b)
+}
+// the data rides along in a comment, so a re-import gets the editable master and layouts back
+const layerComment = (kind, data) => `<!-- slidecko-${kind} ${JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')} -->\n`
+const strip = els => els.map(({ id, ...e }) => e)
+// the master as Slidev's global-bottom layer (behind every slide; a slide with hideMaster: true has none)
+const masterVue = master => layerComment('master', { elements: strip(master)}) + `<template>
+  <div v-if="!$nav.currentSlideRoute?.meta?.slide?.frontmatter?.hideMaster" style="position:absolute;inset:0;pointer-events:none">
+${master.map(layerHtml).filter(s => s.trim()).join('\n')}
+  </div>
+</template>
+`
+// a decorated layout: its Slidev layout as class (centred ones centre their content like Slidev's), the decorations behind the slide's content
+const layoutVue = l => layerComment('layout', { id: l.id, name: l.name, layout: l.layout, elements: strip(l.elements) }) + `<template>
+  <div class="slidev-layout ${l.layout}">
+${decorations(l).map(layerHtml).filter(s => s.trim()).join('\n')}
+    ${CENTERED.includes(l.layout) ? '<div class="my-auto w-full"><slot /></div>' : '<slot />'}
+  </div>
+</template>
+`
+// master and layouts from a Slidev export of Slidecko: { master, layouts: [{ ...layout, slug }] } (slug: the file name slides use)
+export function readLayers(files = {}) {
+  const read = p => { try { return JSON.parse(files[p].match(/^<!-- slidecko-\w+ (.*) -->/)[1]) } catch { return undefined } }
+  const paths = Object.keys(files)
+  const layouts = paths.filter(p => /(^|\/)layouts\/[\w-]+\.vue$/.test(p)).map(p => ({ ...read(p), slug: p.match(/([\w-]+)\.vue$/)[1] })).filter(l => Array.isArray(l.elements))
+  const master = read(paths.find(p => /(^|\/)global-bottom\.vue$/.test(p)))?.elements
+  return { master: Array.isArray(master) ? master : undefined, layouts }
+}
+
 export const COLORED = ':is(h1, h2, h3, h4, h5, h6, p, li, blockquote, strong, em)'
 // CSS a changed slide needs beyond the theme (scoped to the slide by Slidev)
 function slideStyle(slide) {
@@ -180,6 +241,7 @@ function withTransition(fm, v) {
 function slideFm(slide) {
   let fm = slide.fm || ''
   if (!!slide.hidden !== fmHidden(fm)) fm = [fm.replace(/^(hide|disabled):.*\n?/gm, '').trim(), slide.hidden && 'hide: true'].filter(Boolean).join('\n')
+  if (!!slide.hideMaster !== (fmGet(fm, 'hideMaster') === 'true')) fm = [fm.replace(/^hideMaster:.*\n?/gm, '').trim(), slide.hideMaster && 'hideMaster: true'].filter(Boolean).join('\n')
   fm = withTransition(fm, slide.transition)
   if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
   const rest = fm.replace(/^layout:.*\n?/m, '').trim()
@@ -194,7 +256,7 @@ export function slideToMarkdown(slide) {
 // returns { files: { path: text }, images: { path: assetId } }
 // projectFiles: the project's other files (theme, package.json …), written back unchanged
 // shapeFont: element id -> font size the editor shrank its shape text to
-export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition }, projectFiles = {}, { shapeFont = {} } = {}) {
+export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition, master = [], layouts = [] }, projectFiles = {}, { shapeFont = {} } = {}) {
   entry ||= 'slides.md'
   const dir = entry.split('/').slice(0, -1).join('/')
   // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
@@ -217,11 +279,20 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
       return [head, s.body].filter(Boolean).join('\n\n') + next
     }).join('')
   }
+  // master and decorated layouts: Slidev's global-bottom.vue and layouts/<name>.vue (files of an earlier export are replaced)
+  const root = dir ? dir + '/' : ''
+  for (const p of Object.keys(files)) if (/^(global-bottom|layouts\/[\w-]+)\.vue$/.test(p.slice(root.length)) && files[p].startsWith('<!-- slidecko-')) delete files[p]
+  if (master.length) files[root + 'global-bottom.vue'] = masterVue(master)
+  const theirs = Object.keys(files).map(p => p.slice(root.length).match(/^layouts\/([\w-]+)\.vue$/)?.[1]).filter(Boolean) // the project's own layouts stay
+  const slug = layoutSlugs(layouts, [...SLIDEV_LAYOUTS, ...(themeOf(theme).layouts || []).map(x => x[0]), ...theirs])
+  for (const l of layouts) if (slug[l.id]) files[`${root}layouts/${slug[l.id]}.vue`] = layoutVue(l)
+  // slides on a decorated layout name its file; the others keep their Slidev layout, so unchanged slides stay byte for byte
+  const onLayout = s => { const k = slug[layoutOf(s, layouts)?.id]; return k ? { ...s, layout: k } : s }
   const entrySlides = []
   const used = {}
   for (const part of parts) {
     // slide 1's frontmatter is usually the headmatter, whose transition is the project default
-    const list = part.slides.map(s => ({ fm: slideFm(s === slides[0] && !s.transition ? { ...s, transition: head } : s), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
+    const list = part.slides.map(s => ({ fm: slideFm(onLayout(s === slides[0] && !s.transition ? { ...s, transition: head } : s)), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
     if (part.file === entry) { entrySlides.push(...list); continue }
     // a file whose slides were split up by reordering continues in "name-2.md"
     const n = (used[part.file] = (used[part.file] || 0) + 1)
@@ -259,7 +330,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   }
 
   const images = {}
-  for (const s of slides) for (const el of s.elements) {
+  for (const s of [...slides, { elements: master }, ...layouts]) for (const el of s.elements) {
     if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
     for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
       const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]

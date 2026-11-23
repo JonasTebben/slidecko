@@ -172,3 +172,46 @@ test('quiz: plain one-line text with length limits, 2–6 answers, only true mar
   assert.equal(q.answers[2].text.length, 200)
   assert.deepEqual(S.cleanEl({ type: 'quiz', answers: 'x' }).answers, [{ text: '' }, { text: '' }])
 })
+
+test('layouts: a project without them gets the presets plus one per other Slidev layout its slides use, and every slide a type', async () => {
+  const { default: DOMPurify } = await import('dompurify')
+  const real = DOMPurify.sanitize
+  DOMPurify.sanitize = String
+  try {
+    const slides = S.cleanSlides([{ layout: 'cover' }, { layout: 'default' }, { layout: 'center' }, { layout: 'default', type: 'two' }])
+    const { layouts, master } = S.setupLayouts({}, slides)
+    assert.deepEqual(master, [])
+    assert.ok(layouts.some(l => l.id === 'content' && l.elements.length && l.elements.every(e => e.placeholder)))
+    assert.deepEqual(slides.map(s => s.type), ['title', 'content', 'center', 'two'])
+    assert.equal(layouts.find(l => l.id === 'center').layout, 'center')
+    // stored layouts are cleaned: bad id, base and name, a repeated id
+    const kept = S.setupLayouts({ layouts: [{ id: 'a', name: ' A ', layout: 'cover', elements: [{ type: 'shape' }, { type: 'nope' }] }, { id: 'a', layout: 'x y' }, 'junk'], master: [{ type: 'shape', placeholder: 'yes' }] }, [])
+    assert.equal(kept.layouts.length, 2)
+    assert.deepEqual([kept.layouts[0].name, kept.layouts[0].layout, kept.layouts[0].elements.length], ['A', 'cover', 1])
+    assert.notEqual(kept.layouts[1].id, 'a')
+    assert.equal(kept.layouts[1].layout, 'default')
+    assert.equal(kept.master[0].placeholder, undefined)
+  } finally { DOMPurify.sanitize = real }
+})
+
+test('layouts: the master and a layout’s decorations are drawn behind a slide, placeholders are not', () => {
+  const m = { id: 'm', type: 'shape' }, deco = { id: 'd', type: 'shape' }, ph = { id: 'p', type: 'text', placeholder: true }
+  const L = { id: 'L', name: 'L', layout: 'cover', elements: [deco, ph] }
+  const d = { master: [m], layouts: [{ id: 'c', layout: 'default', elements: [] }, L], slides: [] }
+  assert.deepEqual(S.underlay({ type: 'L', layout: 'cover', elements: [] }, d), [m, deco])
+  assert.deepEqual(S.underlay({ layout: 'cover', elements: [] }, d), [m, deco]) // no type: the first layout with its Slidev layout
+  assert.deepEqual(S.underlay({ type: 'L', layout: 'cover', hideMaster: true, elements: [] }, d), [deco])
+  assert.deepEqual(S.underlay({ type: 'L', layout: 'section', elements: [] }, d), [m]) // the slide's Slidev layout changed: no longer L
+  assert.deepEqual(S.underlay(L, d), [m]) // editing a layout shows the master behind it
+  assert.deepEqual(S.underlay({ id: 'master', elements: d.master }, d), [])
+})
+
+test('layouts: deleting one moves its slides to the default layout, keeping their content; the last one stays', () => {
+  const el = { id: 'e', type: 'shape' }
+  const d = { master: [], layouts: [{ id: 'c', layout: 'default', elements: [] }, { id: 'L', layout: 'cover', elements: [] }], slides: [{ type: 'L', layout: 'cover', elements: [el] }] }
+  S.removeLayout('L', d)
+  assert.deepEqual(d.layouts.map(l => l.id), ['c'])
+  assert.deepEqual(d.slides[0], { type: 'c', layout: 'default', elements: [el] })
+  S.removeLayout('c', d)
+  assert.equal(d.layouts.length, 1)
+})

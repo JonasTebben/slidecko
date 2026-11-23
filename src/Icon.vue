@@ -1,6 +1,7 @@
 <script setup>
 // Line icons (24×24, stroke), drawn in the style of Lucide
 defineProps({ name: String, size: { type: [Number, String], default: 18 } })
+const G = 'M4 4h.01M8 4h.01M12 4h.01M16 4h.01M20 4h.01M4 20h.01M8 20h.01M12 20h.01M16 20h.01M20 20h.01M4 8h.01M4 12h.01M4 16h.01M20 8h.01M20 12h.01M20 16h.01M12 8h.01M12 12h.01M12 16h.01M8 12h.01M16 12h.01' // dotted grid behind the border icons
 const P = {
   plus: 'M12 5v14M5 12h14',
   sun: 'M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z',
@@ -79,6 +80,53 @@ const P = {
   dice: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01',
   arrowDraw: 'M5 19 19 5M10 5h9v9',
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M7 14h10',
+  borderAll: G + 'M4 4h16v16H4zM4 12h16M12 4v16',
+  borderOuter: G + 'M4 4h16v16H4z',
+  borderInner: G + 'M4 12h16M12 4v16',
+  borderTop: G + 'M4 4h16',
+  borderBottom: G + 'M4 20h16',
+  borderLeft: G + 'M4 4v16',
+  borderRight: G + 'M20 4v16',
+  borderNone: G,
+  sortAsc: 'M3 16l4 4 4-4M7 20V4M14 4h3M14 9h5M14 14h7',
+  sortDesc: 'M3 16l4 4 4-4M7 20V4M14 4h7M14 9h5M14 14h3',
+  colsEqual: 'M3 4v16M12 4v16M21 4v16M5.5 12h4M14.5 12h4',
+  vTop: 'M4 4h16M12 20V8M8 12l4-4 4 4',
+  vMiddle: 'M4 12h16M12 2v6M9 5l3 3 3-3M12 22v-6M9 19l3-3 3 3',
+  vBottom: 'M4 20h16M12 4v12M8 12l4 4 4-4',
+  fontColor: 'M6 17 12 3l6 14M8.5 12h7',
+  fontSize: 'M3 7V5h10v2M8 5v14M6 19h4M14 13v-1h7v1M17.5 12v7M16 19h3',
+  fill: 'm19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0zM5 2l5 5M2 13h15M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z',
+  outline: 'M3 3h18v18H3zM7 7h10v10H7z',
+  lineWidth: 'M4 6h16M4 12h16M4 18h16',
+  opacity: 'M12 2.7s-6 6.3-6 11.3a6 6 0 0 0 12 0c0-5-6-11.3-6-11.3zM6 14h12',
+  radius: 'M4 20v-8a8 8 0 0 1 8-8h8',
+  shadow: 'M4 4h12v12H4zM20 8v12H8',
+  lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
+  unlock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 7.9-1',
+  pointer: 'M9 9l5 12 1.8-5.2L21 14zM7.2 2.2 8 5.1M5.1 8l-2.9-.8M14 4.1 12 6M6 12l-1.9 2',
+  move: 'M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3',
+  layers: 'M12 2 2 7l10 5 10-5zM2 12l10 5 10-5M2 17l10 5 10-5',
+  toFront: 'M8 8h8v8H8zM10 4V2H2v8h2M14 20v2h8v-8h-2',
+  forward: 'M8 8h8v8H8zM10 4V2H2v8h2',
+  backward: 'M2 2h8v8H2zM10 7h6v9H7v-6',
+  toBack: 'M2 2h8v8H2zM14 14h8v8h-8zM10 7h7v7M7 10v7h7',
+  group: 'M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4M7 7h6v6H7zM11 11h6v6h-6z',
+  ungroup: 'M3 3h8v8H3zM13 13h8v8h-8z',
+  crop: 'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',
+  pen: 'M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  clipboard: 'M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l4 2',
+  book: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5',
+  selectAll: 'M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M14 3h1M9 21h1M14 21h1M3 9v1M3 14v1M21 9v1M21 14v1M8 8h8v8H8z',
+  zoomIn: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.3-4.3M11 8v6M8 11h6',
+  zoomOut: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.3-4.3M8 11h6',
+  slidePlus: 'M3 4h18v13H3zM12 7.5v6M9 10.5h6M8 21h8',
+  insert: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17.5 14v7M14 17.5h7',
+  // A
+  // B
+  // C
 }
 </script>
 
