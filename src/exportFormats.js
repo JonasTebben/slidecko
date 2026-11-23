@@ -100,7 +100,16 @@ body[data-tool=laser], body[data-tool=laser] * { cursor: none !important; }
 body[data-tool=pen] .deck { touch-action: none; cursor: crosshair; }
 body[data-tool=pen] .deck * { pointer-events: none; }
 .laser { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: #ff2a2a; box-shadow: 0 0 6px 3px #ff2a2acc, 0 0 18px 8px #ff2a2a66; pointer-events: none; }
-.ink { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9999; pointer-events: none; fill: none; stroke: #e5202a; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.ink { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9999; pointer-events: none; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+body[data-tool=arrow] .deck { touch-action: none; cursor: crosshair; }
+body[data-tool=arrow] .deck * { pointer-events: none; }
+.inks { position: fixed; right: 12px; bottom: 58px; display: flex; gap: 4px; align-items: center; padding: 4px 6px; border-radius: 10px; background: #000a; }
+.inks[hidden] { display: none; }
+.inks button { width: 26px; height: 26px; border: 2px solid #fff6; border-radius: 50%; padding: 0; margin: 0; cursor: pointer; }
+.inks button[aria-pressed=true] { outline: 2px solid #fff; outline-offset: 1px; }
+.inks .w { border-radius: 6px; background: #fff1; display: grid; place-items: center; }
+.inks .w i { display: block; width: 14px; border-radius: 4px; background: #fff; }
+@media (hover: none) { .inks button { width: 40px; height: 40px; } .inks { bottom: 70px; } }
 @media print {
   html, body { height: auto; overflow: visible; background: none; }
   .deck { position: static; }
@@ -170,6 +179,7 @@ addEventListener('keydown', e => {
   else if (e.metaKey || e.ctrlKey || e.altKey) return
   else if (e.key === 'l') setTool('laser')
   else if (e.key === 'd') setTool('pen')
+  else if (e.key === 'a') setTool('arrow')
   else if (e.key === 'e' || e.key === 'c') clearInk()
   else if (e.key === 'f') full()
   else return
@@ -228,25 +238,47 @@ function full() { if (document.fullscreenElement) document.exitFullscreen?.()?.c
 const fullBtn = document.querySelector('[data-full]')
 if (document.fullscreenEnabled) fullBtn.onclick = full; else fullBtn.hidden = true
 // laser pointer (L) and pen (D) as in the editor: E or C clears, Esc leaves the tool, a slide change wipes the drawing
-const dot = document.querySelector('.laser'), btn = { laser: document.querySelector('[data-laser]'), pen: document.querySelector('[data-pen]') }
-let tool = null, ink = null, line = null
+// arrow (A) draws a straight arrow; pen and arrow take one of the editor's colours and widths
+const dot = document.querySelector('.laser'), btn = { laser: document.querySelector('[data-laser]'), pen: document.querySelector('[data-pen]'), arrow: document.querySelector('[data-arrow]') }
+const inks = document.querySelector('.inks'), pen = { color: '#e5202a', width: 6 }
+let tool = null, ink = null, line = null, start = null
 function setTool(t) {
   tool = tool === t ? null : t
   document.body.dataset.tool = tool || ''
   dot.hidden = true
+  inks.hidden = tool !== 'pen' && tool !== 'arrow'
   for (const k in btn) btn[k].setAttribute('aria-pressed', tool === k)
+}
+for (const b of inks.querySelectorAll('button')) b.onclick = e => {
+  e.stopPropagation()
+  if (b.dataset.color) pen.color = b.dataset.color; else pen.width = +b.dataset.width
+  for (const o of inks.querySelectorAll('button')) o.setAttribute('aria-pressed', o.dataset.color ? o.dataset.color === pen.color : +o.dataset.width === pen.width)
+}
+// the two barbs of an arrow from a to b, as in the editor (draw.js arrowHead)
+function head(a, b) {
+  const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), len = 10 + pen.width * 3
+  const barb = d => [b[0] - len * Math.cos(ang + d), b[1] - len * Math.sin(ang + d)]
+  return [barb(0.45), b, barb(-0.45)].map(p => p.join(',')).join(' ')
 }
 function clearInk() { if (ink) ink.remove(); ink = line = null }
 // the ink lives inside the slide in slide units (viewBox), so it scales with it
-function addPoint(e) {
+function at(e) {
   const r = slides[i].getBoundingClientRect()
-  line.setAttribute('points', (line.getAttribute('points') || '') + ' ' + ((e.clientX - r.left) / r.width * ${W}).toFixed(1) + ',' + ((e.clientY - r.top) / r.height * ${H}).toFixed(1))
+  return [+((e.clientX - r.left) / r.width * ${W}).toFixed(1), +((e.clientY - r.top) / r.height * ${H}).toFixed(1)]
 }
+function addPoint(e) {
+  const p = at(e)
+  if (tool === 'arrow') { line.firstChild.setAttribute('points', start + ' ' + p); line.lastChild.setAttribute('points', head(start, p)); return }
+  line.setAttribute('points', (line.getAttribute('points') || '') + ' ' + p)
+}
+const svg = (parent, tag) => parent.appendChild(document.createElementNS('http://www.w3.org/2000/svg', tag))
 addEventListener('pointerdown', e => {
-  if (tool !== 'pen' || !e.isPrimary || e.button > 0 || e.target.closest('.hud')) return
-  if (!ink) { ink = slides[i].appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg')); ink.setAttribute('class', 'ink'); ink.setAttribute('viewBox', '0 0 ${W} ${H}') }
-  line = ink.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polyline'))
-  addPoint(e); addPoint(e) // two points: a tap leaves a dot
+  if ((tool !== 'pen' && tool !== 'arrow') || !e.isPrimary || e.button > 0 || e.target.closest('.hud, .inks')) return
+  if (!ink) { ink = svg(slides[i], 'svg'); ink.setAttribute('class', 'ink'); ink.setAttribute('viewBox', '0 0 ${W} ${H}') }
+  line = svg(ink, tool === 'arrow' ? 'g' : 'polyline')
+  line.setAttribute('stroke', pen.color); line.setAttribute('stroke-width', pen.width)
+  if (tool === 'arrow') { start = at(e); svg(line, 'polyline'); svg(line, 'polyline') }
+  addPoint(e); if (tool === 'pen') addPoint(e) // two points: a tap leaves a dot
 })
 addEventListener('pointermove', e => {
   if (tool === 'laser') { dot.hidden = false; dot.style.translate = e.clientX + 'px ' + e.clientY + 'px' }
@@ -256,6 +288,7 @@ addEventListener('pointerup', () => { line = null })
 addEventListener('pointercancel', () => { line = null })
 btn.laser.onclick = () => setTool('laser')
 btn.pen.onclick = () => setTool('pen')
+btn.arrow.onclick = () => setTool('arrow')
 document.querySelector('[data-clear]').onclick = clearInk
 fit(); go(i)`
 
@@ -301,7 +334,8 @@ export async function htmlDeck(root, title, list, files) {
 <div class="deck">
 ${slides}
 </div>
-<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-laser aria-label="Laser pointer" title="Laser pointer (L)" aria-pressed="false">◉</button><button data-pen aria-label="Pen" title="Pen (D)" aria-pressed="false">✎</button><button data-clear aria-label="Clear drawing" title="Clear drawing (E)">⌫</button><button data-full aria-label="Full screen">⛶</button></div>
+<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-laser aria-label="Laser pointer" title="Laser pointer (L)" aria-pressed="false">◉</button><button data-pen aria-label="Pen" title="Pen (D)" aria-pressed="false">✎</button><button data-arrow aria-label="Arrow" title="Arrow (A)" aria-pressed="false">➚</button><button data-clear aria-label="Clear drawing" title="Clear drawing (E)">⌫</button><button data-full aria-label="Full screen">⛶</button></div>
+<div class="inks" hidden>${['#e5202a', '#facc15', '#16a34a', '#2563eb', '#ffffff'].map(c => `<button data-color="${c}" style="background:${c}" aria-label="Pen colour ${c}" aria-pressed="${c === '#e5202a'}"></button>`).join('')}${[3, 6, 12].map(w => `<button class="w" data-width="${w}" aria-label="Line width ${w}" aria-pressed="${w === 6}"><i style="height:${w / 2 + 1}px"></i></button>`).join('')}</div>
 <div class="laser" hidden></div>
 <script type="application/json" id="slides-builder-project">${project.replace(/</g, '\\u003c')}</script>
 <script>${viewerJs()}</script>
