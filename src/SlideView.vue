@@ -374,17 +374,17 @@ function codeKey(e, el) {
   void el
 }
 // text boxes grow with their content (bigger style or font, typing), so the frame and handles
-// always enclose the text; only in the editor, and never shrink what the user sized larger
+// always enclose the text; only in the editor (and in a notes box typed into while presenting), and never shrink what the user sized larger
 const boxes = new Map()
 const ro = new ResizeObserver(entries => {
   for (const { target } of entries) {
     const el = boxes.get(target)
     // only while the user types in it: a theme/typo change must never resize boxes for good
-    if (el && ui.editing === el.id && target.offsetHeight > el.h + 1) el.h = Math.ceil(target.offsetHeight)
+    if (el && (ui.editing === el.id || liveEdit.value === el.id) && target.offsetHeight > el.h + 1) el.h = Math.ceil(target.offsetHeight)
   }
 })
 function fit(node, el) {
-  if (!props.editable || !node || boxes.get(node) === el) return
+  if (!(props.editable || (props.live && el.board)) || !node || boxes.get(node) === el) return
   boxes.set(node, el)
   ro.observe(node)
 }
