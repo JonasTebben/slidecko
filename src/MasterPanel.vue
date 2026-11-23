@@ -18,9 +18,10 @@ const bases = computed(() => { const l = themeLayouts(deck.theme); return cur.va
 const sel = A.selection
 const isPlaceholder = computed(() => sel.value.length > 0 && sel.value.every(e => e.placeholder))
 const setPlaceholder = on => { for (const e of sel.value) if (on) e.placeholder = true; else delete e.placeholder }
+const emit = defineEmits(['ask']) // the app's own confirm dialog (App.vue ask), not the browser's
 function remove(l) {
   const n = used(l.id)
-  if (confirm(n ? t('Delete layout “{0}”? Its {1} slides keep their content and get the default layout.', l.name, n) : t('Delete layout “{0}”?', l.name))) A.deleteLayout(l.id)
+  emit('ask', n ? t('Delete layout “{0}”? Its {1} slides keep their content and get the default layout.', l.name, n) : t('Delete layout “{0}”?', l.name), () => A.deleteLayout(l.id), t('Delete'))
 }
 </script>
 

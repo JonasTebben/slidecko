@@ -1130,7 +1130,7 @@ function onClipboard(e) {
     </header>
 
     <main :class="{ 'no-slides': !panels.slides, 'no-props': !panels.props }">
-      <MasterPanel v-if="ui.master" />
+      <MasterPanel v-if="ui.master" @ask="ask" />
       <nav v-else class="slides-panel" data-tour="slides" :aria-label="t('Slides')">
         <div class="panel-head">
           <span>{{ groups.length > 1 ? t('Decks') : t('Slides') }}</span>
