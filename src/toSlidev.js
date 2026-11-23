@@ -176,9 +176,10 @@ function layerHtml(el) {
 // the data rides along in a comment, so a re-import gets the editable master and layouts back
 const layerComment = (kind, data) => `<!-- slidecko-${kind} ${JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')} -->\n`
 const strip = els => els.map(({ id, ...e }) => e)
-// the master as Slidev's global-bottom layer (behind every slide; a slide with hideMaster: true has none)
+// the master as Slidev's global-top layer: global-bottom sits behind the slide's opaque background and would never show.
+// So in Slidev it lies over the slide's content (a slide with hideMaster: true has none); the class brings the theme's colours and fonts
 const masterVue = master => layerComment('master', { elements: strip(master)}) + `<template>
-  <div v-if="!$nav.currentSlideRoute?.meta?.slide?.frontmatter?.hideMaster" style="position:absolute;inset:0;pointer-events:none">
+  <div v-if="!$nav.currentSlideRoute?.meta?.slide?.frontmatter?.hideMaster" class="slidev-layout" style="position:absolute;inset:0;padding:0;background:none;pointer-events:none">
 ${master.map(layerHtml).filter(s => s.trim()).join('\n')}
   </div>
 </template>
@@ -196,7 +197,7 @@ export function readLayers(files = {}) {
   const read = p => { try { return JSON.parse(files[p].match(/^<!-- slidecko-\w+ (.*) -->/)[1]) } catch { return undefined } }
   const paths = Object.keys(files)
   const layouts = paths.filter(p => /(^|\/)layouts\/[\w-]+\.vue$/.test(p)).map(p => ({ ...read(p), slug: p.match(/([\w-]+)\.vue$/)[1] })).filter(l => Array.isArray(l.elements))
-  const master = read(paths.find(p => /(^|\/)global-bottom\.vue$/.test(p)))?.elements
+  const master = read(paths.find(p => /(^|\/)global-(top|bottom)\.vue$/.test(p)))?.elements
   return { master: Array.isArray(master) ? master : undefined, layouts }
 }
 
@@ -279,10 +280,10 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
       return [head, s.body].filter(Boolean).join('\n\n') + next
     }).join('')
   }
-  // master and decorated layouts: Slidev's global-bottom.vue and layouts/<name>.vue (files of an earlier export are replaced)
+  // master and decorated layouts: Slidev's global-top.vue and layouts/<name>.vue (files of an earlier export are replaced)
   const root = dir ? dir + '/' : ''
-  for (const p of Object.keys(files)) if (/^(global-bottom|layouts\/[\w-]+)\.vue$/.test(p.slice(root.length)) && files[p].startsWith('<!-- slidecko-')) delete files[p]
-  if (master.length) files[root + 'global-bottom.vue'] = masterVue(master)
+  for (const p of Object.keys(files)) if (/^(global-(top|bottom)|layouts\/[\w-]+)\.vue$/.test(p.slice(root.length)) && files[p].startsWith('<!-- slidecko-')) delete files[p]
+  if (master.length) files[root + 'global-top.vue'] = masterVue(master)
   const theirs = Object.keys(files).map(p => p.slice(root.length).match(/^layouts\/([\w-]+)\.vue$/)?.[1]).filter(Boolean) // the project's own layouts stay
   const slug = layoutSlugs(layouts, [...SLIDEV_LAYOUTS, ...(themeOf(theme).layouts || []).map(x => x[0]), ...theirs])
   for (const l of layouts) if (slug[l.id]) files[`${root}layouts/${slug[l.id]}.vue`] = layoutVue(l)

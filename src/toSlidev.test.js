@@ -119,7 +119,7 @@ test('fields show the slide number, count and an escaped project title', async (
   assert.equal(fillFields('<p>{{ x }}</p>', { page: 1 }), '<p>{{ x }}</p>')
 })
 
-test('Slidev export: the master is global-bottom.vue, a decorated layout layouts/<name>.vue; plain layouts and unchanged slides stay as they are', async () => {
+test('Slidev export: the master is global-top.vue, a decorated layout layouts/<name>.vue; plain layouts and unchanged slides stay as they are', async () => {
   const { readLayers } = await import('./toSlidev.js')
   const field = { id: 'f', type: 'text', x: 800, y: 500, w: 120, h: 30, html: '<p>{{ <span data-field="page">#</span></p>' }
   const layouts = [
@@ -135,16 +135,16 @@ test('Slidev export: the master is global-bottom.vue, a decorated layout layouts
   ]
   const { slideHash } = await import('./toSlidev.js')
   for (const s of slides) s.hash = slideHash(s)
-  const { files } = toSlidev({ title: 'T', theme: 'hell', slides, master: [field], layouts }, { 'layouts/old.vue': '<!-- slidecko-layout {} -->', 'layouts/mine.vue': '<template />' })
+  const { files } = toSlidev({ title: 'T', theme: 'hell', slides, master: [field], layouts }, { 'global-bottom.vue': '<!-- slidecko-master {} -->', 'layouts/old.vue': '<!-- slidecko-layout {} -->', 'layouts/mine.vue': '<template />' })
   const out = parseSlidev(files['slides.md'])
   assert.deepEqual(out.map(s => s.layout), ['cover', 'brand-cover', 'cover-layout'])
   assert.equal(out[0].md.trim(), md.trim()) // unchanged slide: its Markdown as imported
   assert.match(files['slides.md'], /hideMaster: true/)
-  assert.ok(!files['layouts/old.vue'] && files['layouts/mine.vue']) // an earlier export's file goes, the project's own stays
+  assert.ok(!files['layouts/old.vue'] && !files['global-bottom.vue'] && files['layouts/mine.vue']) // an earlier export's file goes, the project's own stays
   const vue = files['layouts/brand-cover.vue']
   assert.match(vue, /class="slidev-layout cover"[\s\S]*fill="#123456"[\s\S]*<slot \/>/)
   assert.match(vue, /<span v-pre>\{\{<\/span> <span data-field="page">\{\{ \$nav\.currentPage \}\}<\/span>/)
-  assert.match(files['global-bottom.vue'], /hideMaster[\s\S]*\$nav\.currentPage/)
+  assert.match(files['global-top.vue'], /hideMaster[\s\S]*\$nav\.currentPage/)
   // read back: the editable master and layouts, and which file a slide names
   const back = readLayers(files)
   assert.equal(back.master[0].html, field.html)
