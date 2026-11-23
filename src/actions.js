@@ -6,7 +6,7 @@ import { importSlidev } from './importSlidev.js'
 import { formatSize, parseRatio } from './format.js'
 import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
-import { toSlidev, slideToMarkdown, slideHash, imagePath } from './toSlidev.js'
+import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath } from './toSlidev.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
 const loadZip = async () => (await import('jszip')).default
 const importPptx = async (...a) => (await import('./importOffice.js')).importPptx(...a)
@@ -231,6 +231,7 @@ export async function fitHeight(el) {
 // --- slides ---
 export function addSlide(preset = SLIDE_PRESETS[1]) {
   const s = newSlide(preset.layout, preset.make())
+  if (flowable(s.elements)) s.flow = flowHash(s) // exported as plain Markdown until it is rearranged or styled
   s.file = slide.value ? fileOf(slide.value) : deck.entry // stays in the current deck
   deck.slides.splice(ui.slide + 1, 0, s)
   ui.slide++

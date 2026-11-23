@@ -67,6 +67,14 @@ const rename = go(async e => {
   await renameProject(id, e.target.value)
 })
 const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', timeStyle: 'short' }).format(d)
+// claims checked against the code: no external scripts (CSP), system fonts, YouTube only after consent
+const WHY = [
+  ['Everything stays in your browser', 'Slides are created, stored and exported on your device. Nothing is uploaded: the server only delivers the app.'],
+  ['No tracking, no account', 'No cookies, no analytics, no ads, no sign-up. Nobody sees what you present or how you work.'],
+  ['Independent of US cloud services', 'No Google or Microsoft account, no fonts or scripts from other servers. YouTube videos load only when you allow it.'],
+  ['Open formats, no lock-in', 'Export to PowerPoint, OpenDocument, PDF, HTML or Slidev Markdown, or save the project as a file. Your work goes with you.'],
+  ['Open source', 'Apache 2.0 licensed: read the code, adapt it or host it on your own server.'],
+]
 </script>
 
 <template>
@@ -92,6 +100,13 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
           <input type="file" :accept="IMPORT_ACCEPT" multiple hidden @change="importPresentations([...$event.target.files]); $event.target.value = ''" /></label>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+    </section>
+
+    <section class="home-why">
+      <h2>{{ t('Why Slidecko') }}</h2>
+      <div class="why-grid">
+        <div v-for="[title, text] in WHY" :key="title" class="why-card"><b>{{ t(title) }}</b><p>{{ t(text) }}</p></div>
+      </div>
     </section>
 
     <section class="home-themes">

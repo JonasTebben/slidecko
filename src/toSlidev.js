@@ -32,11 +32,13 @@ turndown.addRule('img', {
 })
 
 // identity of a slide's content, ignoring element ids (they change on every load)
-export function slideHash(slide) {
-  let h = 0
-  for (const c of JSON.stringify([slide.layout, slide.elements.map(({ id, ...e }) => e)])) h = (h * 31 + c.charCodeAt(0)) | 0
-  return h
-}
+const hashOf = v => { let h = 0; for (const c of JSON.stringify(v)) h = (h * 31 + c.charCodeAt(0)) | 0; return h }
+export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, ...e }) => e)])
+// a new slide's arrangement without its text (and heights, which grow with the text): while it stays the same,
+// the slide follows the Slidev layout and is written as plain Markdown instead of positioned boxes
+export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, html, code, h, ...e }) => e)])
+// only one column of text and code flows in Markdown the way it sits in the editor
+export const flowable = els => els.every(e => e.type === 'text' || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
 // a malformed escape ("100%.png") stays as written instead of stopping the export
 export const imagePath = src => { try { src = decodeURI(src) } catch { /* keep src */ } return src.replace(/^\.?\//, '') }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
@@ -92,7 +94,7 @@ export function shapeSvg(el) {
 
 let curShapeFont = {} // toSlidev()'s shapeFont while it runs
 let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
-function elementMd(el) {
+function elementMd(el, flat) {
   switch (el.type) {
     case 'image': {
       const r = el.radius ? `;border-radius:${el.radius}px` : ''
@@ -111,7 +113,9 @@ function elementMd(el) {
       const own = el.fill || el.fillAlpha != null
       const bg = own ? `;--slidev-code-background:${el.fillAlpha != null ? `color-mix(in srgb, ${el.fill || 'var(--code-bg, #f5f5f5)'} ${el.fillAlpha}%, transparent)` : el.fill}` : ''
       const look = bg + (el.radius != null ? `;--slidev-code-radius:${el.radius}px` : '') + (el.fill ? `;color:${codeDark(el, curTheme) ? '#e6edf3' : '#1f2328'}` : '')
-      return `<div${el.fill ? ` class="${codeDark(el, curTheme) ? 'code-dark' : 'code-light'}"` : ''} style="${boxStyle(el, size + look)}">\n\n${fence}${info}\n${el.code}\n${fence}\n\n</div>`
+      const block = `${fence}${info}\n${el.code}\n${fence}`
+      if (flat) return block
+      return `<div${el.fill ? ` class="${codeDark(el, curTheme) ? 'code-dark' : 'code-light'}"` : ''} style="${boxStyle(el, size + look)}">\n\n${block}\n\n</div>`
     }
     case 'table': {
       const data = `data-table="${el.preset || 'theme'}"${el.firstCol ? ' data-firstcol' : ''}${el.compact ? ' data-compact' : ''}${el.borders ? ' data-borders' : ''}`
@@ -122,6 +126,7 @@ function elementMd(el) {
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: // text
+      if (flat) return turndown.turndown(el.html || '').trim()
       return `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">\n\n${turndown.turndown(el.html || '').trim()}\n\n</div>`
   }
 }
@@ -148,7 +153,9 @@ export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<sp
 
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
-  const body = escapeMustache(slide.elements.map(elementMd).join('\n\n') + slideStyle(slide))
+  const flow = slide.flow != null && slide.flow === flowHash(slide)
+  const els = flow ? [...slide.elements].sort((a, b) => a.y - b.y) : slide.elements
+  const body = escapeMustache(els.map(e => elementMd(e, flow)).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
   return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
 }

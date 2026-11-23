@@ -43,3 +43,18 @@ test('transitions: project default in the headmatter, own ones in the slide fron
   assert.deepEqual(parseSlidev(plain).map(s => s.transition), ['slide-right', undefined])
   assert.equal(headFormat(plain).transition, undefined)
 })
+
+test('a new slide in its preset arrangement is plain Markdown until it is moved', async () => {
+  const { flowHash, flowable } = await import('./toSlidev.js')
+  const s = { layout: 'default', elements: [
+    { id: 'b', type: 'text', x: 56, y: 110, w: 868, h: 108, html: '<ul><li>One</li><li>Two</li></ul>' },
+    { id: 'a', type: 'text', title: true, x: 56, y: 40, w: 868, h: 40, html: '<h1>Title</h1>' }] }
+  assert.ok(flowable(s.elements))
+  s.flow = flowHash(s)
+  s.elements[0].html = '<ul><li>One</li><li>Two</li><li>Three</li></ul>' // typing keeps it Markdown
+  s.elements[0].h = 140
+  assert.equal(slideToMarkdown(s), '# Title\n\n-   One\n-   Two\n-   Three\n')
+  s.elements[0].x = 80 // rearranged: positioned boxes again
+  assert.match(slideToMarkdown(s), /position:absolute/)
+  assert.ok(!flowable([{ type: 'text', x: 56, w: 410 }, { type: 'text', x: 514, w: 410 }])) // two columns
+})

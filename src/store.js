@@ -156,6 +156,7 @@ function cleanSlide(s) {
     // Slidev source of the slide: frontmatter, original markdown, file it belongs to, speaker notes
     fm: str(s.fm), md: str(s.md), file: safePath(s.file), notes: str(s.notes) || '',
     hash: Number.isInteger(s.hash) ? s.hash : undefined,
+    flow: Number.isInteger(s.flow) ? s.flow : undefined, // arrangement of a new slide, see flowHash
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
     ...(s.hidden === true && { hidden: true }), // skipped when presenting and exporting
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
