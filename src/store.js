@@ -6,6 +6,7 @@ import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, t
 import { SLIDE_PRESETS } from './presets.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
+import { clickSteps } from './clicks.js'
 
 // Logical slide size (Slidev's canvas). All element coordinates are in these units; editor,
 // thumbnails, print and PPTX only scale them. Live bindings: read them at call time; templates use format.
@@ -113,6 +114,7 @@ export function cleanEl(e) {
       ...base, html: clean(e.html), ...(e.title && { title: true }), ...(ALIGN.includes(e.align) && { align: e.align }), ...(['middle', 'bottom'].includes(e.valign) && { valign: e.valign }),
       ...(color(e.color) && { color: color(e.color) }), ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(fontStack(e.font) && { font: e.font }),
       ...(e.board === true && { board: true }), // notes box: the class's answers are typed into it while presenting
+      ...(e.clickItems === true && { clickItems: true }), // its list items appear one per click while presenting
       // border: colour, width in px, line style
       ...(color(e.stroke) && e.stroke !== 'none' && { stroke: color(e.stroke), strokeWidth: num(e.strokeWidth || 1, 0.5, 20), ...(['dashed', 'dotted'].includes(e.strokeStyle) && { strokeStyle: e.strokeStyle }) }),
     }
@@ -233,9 +235,7 @@ export function nextShown(slides, i, d) {
   for (let j = i + d; j >= 0 && j < slides.length; j += d) if (!slides[j].hidden) return j
   return i
 }
-// click steps of a slide: its distinct click order numbers, ascending (step k shows the elements up to the k-th)
-export const clickSteps = slide => [...new Set((slide?.elements || []).map(e => e.click).filter(Boolean))].sort((a, b) => a - b)
-export const revealed = (el, steps, k) => !el.click || (k > 0 && el.click <= steps[k - 1])
+export { clickSteps, revealed, stepOf, markItems } from './clicks.js'
 // next (d = 1) or back (-1) while presenting: reveal or hide a step first, then change the slide;
 // arriving backwards shows all of the slide's steps (as in Slidev)
 export function stepMove(slides, i, k, d) {

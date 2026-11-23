@@ -6,6 +6,7 @@ import { parseRatio, formatSize } from './format.js'
 import { CENTERED, themeStyle, fontKey, SHADOWS } from './themes.js'
 import { applyUno } from './uno.js'
 import { t } from './i18n.js'
+import { listItems } from './clicks.js'
 
 // Slidev markdown -> slides of absolutely positioned elements.
 //
@@ -25,6 +26,8 @@ const hasText = el => [...el.childNodes].some(n => n.nodeType === 3 && n.data.tr
 // a box written by toSlidev.js: <div style="position:absolute;left:…px;…">
 const savedBox = el => el.tagName === 'DIV' && el.style.position === 'absolute' && el.style.width.endsWith('px')
 const isImageOnly = el => el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG' && !hasText(el)
+// <v-clicks> around lists only (written by toSlidev): the text box's "list items one by one"
+const itemClicks = el => el?.tagName === 'V-CLICKS' && [...el.attributes].every(a => a.name === 'at') && [...el.children].every(c => /^[OU]L$/.test(c.tagName))
 const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.table || el.dataset.callout
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
@@ -157,6 +160,8 @@ function measure(slide, parsed) {
     for (const img of [c, ...c.querySelectorAll('img')]) if (img.tagName === 'IMG' && img.dataset.src) img.setAttribute('src', img.dataset.src)
     return c.outerHTML
   }).join('\n'))
+  // in a saved box such a <v-clicks> does not split the box's text
+  const up = m => (itemClicks(m.parentElement) && savedBox(m.parentElement.parentElement) ? m.parentElement.parentElement : m.parentElement)
   const textual = m => !special(m) && m.tagName !== 'IMG' && !isImageOnly(m) && m.tagName !== 'PRE' && m.tagName !== 'TABLE' && !styled(m)
 
   const elements = []
@@ -216,11 +221,12 @@ function measure(slide, parsed) {
       // text: this leaf plus the following text leaves of the same parent
       const group = [n]
       const isTitle = !titled && n.tagName === 'H1' && !box
-      while (!isTitle && textual(n) && leaves[i + 1]?.parentElement === n.parentElement && textual(leaves[i + 1])) group.push(leaves[++i])
+      while (!isTitle && textual(n) && leaves[i + 1] && up(leaves[i + 1]) === up(n) && textual(leaves[i + 1])) group.push(leaves[++i])
       let content = html(group)
-      const parent = n.parentElement
+      const parent = n.parentElement, items = group.map(m => m.parentElement).find(itemClicks)
+      if (items) Object.assign(el, { clickItems: true, ...(!box && { click: clickOf(items.getAttribute('at') ?? '', clicks) }) })
       // dissolved wrappers that still matter: click animations and inherited alignment
-      if (/^V-/.test(parent.tagName)) {
+      if (/^V-/.test(parent.tagName) && !items) {
         const tag = parent.tagName.toLowerCase()
         content = `<${tag}${[...parent.attributes].map(a => ` ${a.name}="${a.value}"`).join('')}>${content}</${tag}>`
       }
@@ -231,6 +237,7 @@ function measure(slide, parsed) {
     }
     const vc = (box || img || n).getAttribute('v-click') // Slidev's appear on click, written by toSlidev on the box
     if (vc != null) clicks = Math.max(clicks, (el.click = clickOf(vc, clicks)))
+    if (el.clickItems) clicks = Math.max(clicks, (el.click || clicks + 1) + listItems(el.html) - 1)
     if (box) fromBox(box, el)
     else if (el.w == null) sized(el, [r])
     elements.push(el)

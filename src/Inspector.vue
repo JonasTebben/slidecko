@@ -548,6 +548,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button class="ib wide" :class="{ on: el.click }" :aria-pressed="!!el.click" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')" @click="el.click = el.click ? undefined : nextClick()"><Icon name="pointer" /> {{ t('Appear on click') }}</button>
           <input v-if="el.click" type="number" class="click-num" min="1" max="99" :aria-label="t('Click order')" :title="t('Click order')" :value="el.click" @change="el.click = clickNum($event.target.value)" />
         </div>
+        <label v-if="el.type === 'text' && /<(ul|ol)\b/.test(el.html)" class="check" :title="t('While presenting, the list items appear one per click, from the box’s click step on')"><input type="checkbox" :checked="!!el.clickItems" @change="el.clickItems = $event.target.checked || undefined" /> {{ t('List items one by one') }}</label>
       </Sec>
       <section class="actions">
         <button v-if="['text', 'shape', 'code', 'image'].includes(el.type)" class="ib" :class="{ on: ui.painting }" :aria-pressed="!!ui.painting" :aria-label="t('Copy formatting')" :title="t('Copy formatting: then click an element (⌘⌥C / ⌘⌥V)')" @click="paint"><Icon name="brush" /></button>

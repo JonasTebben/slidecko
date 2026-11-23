@@ -3,6 +3,7 @@ import { gfm } from 'turndown-plugin-gfm'
 import { fmGet, fmHidden, TRANSITIONS } from './parseSlidev.js'
 import { parseRatio } from './format.js'
 import { clock } from './timer.js'
+import { clickSteps, stepOf } from './clicks.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss, CENTERED } from './themes.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
@@ -23,6 +24,17 @@ turndown.escape = s => mdEscape(s).replace(/&(?=#?\w+;)/g, '&amp;').replace(/</g
 turndown.keep(node => ['V-CLICKS', 'V-CLICK', 'V-AFTER', 'MARK', 'U', 'SUB', 'SUP', 'KBD'].includes(node.nodeName) ||
   (node.nodeName === 'SPAN' && node.getAttribute('style')) || (node.nodeName === 'DIV' && node.getAttribute('data-callout')) ||
   (/^(P|H\d|LI)$/.test(node.nodeName) && /text-align/.test(node.getAttribute('style') || '')))
+// list items one by one: each top-level list in Slidev's <v-clicks>, from the step of its first item (set by elementMd)
+let listAt = 0
+const inItem = n => { for (let p = n.parentNode; p; p = p.parentNode) if (p.nodeName === 'LI') return true }
+turndown.addRule('clickItems', {
+  filter: n => listAt > 0 && /^[OU]L$/.test(n.nodeName) && !inItem(n),
+  replacement: (content, n) => {
+    const at = listAt
+    listAt += [...n.childNodes].filter(c => c.nodeName === 'LI').length
+    return `\n\n<v-clicks at="${at}">\n\n${content.replace(/^\n+|\n+$/g, '')}\n\n</v-clicks>\n\n`
+  },
+})
 turndown.addRule('img', {
   filter: 'img',
   replacement: (_, n) => {
@@ -96,7 +108,7 @@ export function shapeSvg(el) {
 
 let curShapeFont = {} // toSlidev()'s shapeFont while it runs
 let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
-function elementMd(el, flat) {
+function elementMd(el, flat, at = 0) { // at: step of the first list item (list items one by one)
   switch (el.type) {
     case 'image': {
       const r = el.radius ? `;border-radius:${el.radius}px` : ''
@@ -133,9 +145,13 @@ function elementMd(el, flat) {
       return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
-    default: // text
-      if (flat) return turndown.turndown(el.html || '').trim()
-      return `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">\n\n${turndown.turndown(el.html || '').trim()}\n\n</div>`
+    default: { // text
+      listAt = el.clickItems ? at : 0
+      const md = turndown.turndown(el.html || '').trim()
+      listAt = 0
+      if (flat) return md
+      return `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">\n\n${md}\n\n</div>`
+    }
   }
 }
 
@@ -221,13 +237,14 @@ function slideStyle(slide) {
 const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)[\s\S]*?[^`]\2(?!`)|<\/?[a-zA-Z][^>]*>|\{\{/gm
 export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
 
-// appear on click: Slidev's v-click attribute with the step number on the element's box
-const withClick = (el, md) => (el.click ? md.replace(/^<(div|img)\b/, `<$1 v-click="${el.click}"`) : md)
+// appear on click: Slidev's v-click attribute on the element's box, with its step (list items shown one by one take a step each)
+const withClick = (el, md, steps) => (el.click ? md.replace(/^<(div|img)\b/, `<$1 v-click="${steps.indexOf(el.click) + 1}"`) : md)
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
   const flow = slide.flow != null && slide.flow === flowHash(slide)
   const els = flow ? [...slide.elements].sort((a, b) => a.y - b.y) : slide.elements
-  const body = escapeMustache(els.map(e => withClick(e, elementMd(e, flow))).join('\n\n') + slideStyle(slide))
+  const steps = clickSteps(slide)
+  const body = escapeMustache(els.map(e => withClick(e, elementMd(e, flow, stepOf(slide, e, steps)), steps)).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
   return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { parseSlidev, headFormat } from './parseSlidev.js'
-import { toSlidev, slideToMarkdown, imagePath } from './toSlidev.js'
+import { toSlidev, slideToMarkdown, imagePath, flowHash } from './toSlidev.js'
 
 const box = { x: 0, y: 0, w: 400, h: 100 }
 
@@ -100,6 +100,22 @@ test('appear on click: the box gets Slidev’s v-click with its step, which the 
   assert.deepEqual([...md.matchAll(/v-click="(\d+)"/g)].map(m => clickOf(m[1], 0)), [2, 1])
   // Slidev's relative forms: an empty v-click (and "+1") is the step after the last one
   assert.deepEqual([clickOf('', 0), clickOf('', 3), clickOf('+2', 1), clickOf('4', 9)], [1, 4, 3, 4])
+})
+
+test('list items one by one: each list in Slidev’s <v-clicks> at its step, later v-clicks moved back, read back by the parser', () => {
+  const html = '<h2>T</h2><ul><li>a<ul><li>n</li></ul></li><li>b</li></ul><p>mid</p><ol><li>c</li></ol>'
+  const els = [{ id: 'a', type: 'text', ...box, html, clickItems: true, click: 1 }, { id: 'b', type: 'text', ...box, html: '<p>z</p>', click: 2 }]
+  const md = slideToMarkdown({ layout: 'default', elements: els })
+  assert.match(md, /<div v-click="1" style="[^"]*">\n\n## T\n\n<v-clicks at="1">\n\n- +a\n +- +n\n- +b\n\n<\/v-clicks>\n\nmid\n\n<v-clicks at="3">\n\n1\. +c\n\n<\/v-clicks>\n\n<\/div>/)
+  assert.match(md, /<div v-click="4"/) // after the three items
+  // valid Markdown inside the box: the parser gets the lists as HTML inside <v-clicks>, which the import turns back into the option
+  const block = parseSlidev(md)[0].blocks[0]
+  assert.match(block.html, /^<h2>T<\/h2>\n<v-clicks at="1"><ul>[\s\S]*<\/ul>\n<\/v-clicks><p>mid<\/p>\n<v-clicks at="3"><ol>\n<li>c<\/li>\n<\/ol>\n<\/v-clicks>$/)
+  assert.deepEqual(block.box, box)
+  // flowed: the same <v-clicks> in plain Markdown; without the option no <v-clicks>
+  const flowed = { layout: 'default', elements: [{ ...els[0], click: undefined }] }
+  assert.match(slideToMarkdown({ ...flowed, flow: flowHash(flowed) }), /^## T\n\n<v-clicks at="1">\n\n- +a/)
+  assert.ok(!/v-clicks/.test(slideToMarkdown({ layout: 'default', elements: [{ ...els[0], clickItems: undefined }] })))
 })
 
 test('static exports get each quiz slide twice: as asked and with the solution', async () => {

@@ -146,6 +146,18 @@ test('click steps: next reveals a step before the slide changes, back hides it, 
   assert.deepEqual(stepMove(s, 3, 1, 1), { slide: 3, step: 1 }) // end: stays
   assert.deepEqual(stepMove(s, 0, 5, 1), { slide: 2, step: 0 }) // a step past the end (elements removed) counts as all shown
 })
+test('list items one by one: every top-level item is a click step, later steps move back', async () => {
+  const { stepMove, clickSteps, stepOf, markItems } = await import('./store.js')
+  const html = '<p>x</p><ul><li>a<ul><li>nested</li></ul></li><li>b</li></ul><ol><li>c</li></ol>'
+  const list = { clickItems: true, html, click: 2 }, after = { click: 3 }, bare = { clickItems: true, html: '<ul><li>d</li><li>e</li></ul>' }
+  const s = { elements: [{ click: 2 }, after, list, bare, { clickItems: true, html: '<p>no list</p>' }] }
+  assert.deepEqual(clickSteps(s), [2, 2, 2, 3, 100, 100]) // a, b, c; then the next number; the box without a number last
+  assert.deepEqual([list, after, bare].map(e => stepOf(s, e)), [1, 4, 5])
+  assert.deepEqual(stepMove([s], 0, 5, 1), { slide: 0, step: 6 })
+  assert.deepEqual(stepMove([s], 0, 6, 1), { slide: 0, step: 6 }) // all shown, last slide: stays
+  const marked = markItems(html, 1, 2)
+  assert.deepEqual([...marked.matchAll(/<li( data-click="\d")?( data-unshown)?>/g)].map(m => m.slice(1).join('')), [' data-click="1"', '', ' data-click="2"', ' data-click="3" data-unshown'])
+})
 test('click order is kept as a whole number from 1 to 99', () => {
   assert.equal(S.cleanEl({ type: 'shape', click: '2.4' }).click, 2)
   assert.equal(S.cleanEl({ type: 'shape', click: 500 }).click, 99)

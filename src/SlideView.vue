@@ -1,7 +1,7 @@
 <script setup>
 import { gapSnaps, nearestGap } from './spacing.js'
 import { computed, nextTick, ref, watch, onBeforeUnmount } from 'vue'
-import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, underlay } from './store.js'
+import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, markItems, underlay } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
@@ -19,6 +19,11 @@ import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 // scale converts pointer movement back into slide units.
 const props = defineProps({ slide: Object, index: Number, editable: Boolean, scale: { type: Number, default: 1 }, live: Boolean, theme: String, step: Number }) // theme: preview in another theme than the deck's; step: click steps revealed (unset: all)
 const steps = computed(() => clickSteps(props.slide))
+// list items one by one: marked with their steps outside the editor (an edit would save the marks)
+const items = (el, html) => {
+  const from = el.clickItems && !props.editable && !el.board && stepOf(props.slide, el, steps.value)
+  return from ? markItems(html, from, props.step == null ? Infinity : props.step - from + 1) : html
+}
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 // a short or narrow box drops its middle handles, which would cover the corners (big touch handles on a phone)
 const HSIZE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 18 : 10
@@ -425,7 +430,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
   <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown">
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
-      :data-click="el.click || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
+      :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
       class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
@@ -435,7 +440,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
-        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="fields(resolveImgs(el.html))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
+        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="items(el, fields(resolveImgs(el.html)))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event)" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"

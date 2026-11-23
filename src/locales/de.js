@@ -307,6 +307,8 @@ export default {
   "Lock position": "Position sperren",
   "Appear on click": "Per Klick einblenden",
   "Click order": "Klick-Reihenfolge",
+  "List items one by one": "Listenpunkte einzeln einblenden",
+  "While presenting, the list items appear one per click, from the box’s click step on": "Beim Präsentieren erscheinen die Listenpunkte einzeln per Klick, ab dem Klick-Schritt des Felds",
   "Appears on click {0}": "Erscheint bei Klick {0}",
   "Click steps shown": "Gezeigte Klick-Schritte",
   "Hidden while presenting until a click or → reveals it; elements with the same number appear together": "Beim Präsentieren unsichtbar, bis ein Klick oder → es einblendet; Elemente mit derselben Nummer erscheinen zusammen",

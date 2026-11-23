@@ -96,7 +96,7 @@
 /* locked (editor only): a dashed selection frame instead of handles */
 .slide .el.locked.selected { outline-style: dashed !important; cursor: default; }
 /* appears on click: not revealed yet while presenting, but keeps its place */
-.slide .el[data-unshown] { visibility: hidden; }
+.slide .el[data-unshown], .slide .el li[data-unshown] { visibility: hidden; }
 .slide .el.code pre.code, .slide .el.code textarea.code { margin: 0; width: 100%; height: 100%; }
 .slide .el.code textarea.code { display: block; border: 0; background: #fff; resize: none; outline: none; font: inherit; font-family: var(--mono); font-size: var(--code-size); line-height: var(--code-line); }
 /* image classes from Slidev keep their look (rounded, border, shadow), the box decides the size */
