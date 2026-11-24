@@ -1233,4 +1233,12 @@ export default {
   "Grays": "Grautöne",
   "Color-blind safe": "Farbenblind-sicher",
   "Everyone drawn · click to start over": "Alle gezogen · Klick beginnt von vorn",
+  "What you can style": "Was du gestalten kannst",
+  "The fields above set these variables. Use them with var(--accent) or set them in & { … }.": "Die Felder oben setzen diese Variablen. Verwende sie mit var(--accent) oder setze sie in & { … }.",
+  "Variables": "Variablen",
+  "Layouts": "Layouts",
+  "Elements": "Elemente",
+  "Lists": "Listen",
+  "Table cells": "Tabellenzellen",
+  "Callouts": "Hinweiskästen",
 }

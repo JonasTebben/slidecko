@@ -1212,4 +1212,12 @@ export default {
   "Grays": "Gris",
   "Color-blind safe": "Sûres pour le daltonisme",
   "Everyone drawn · click to start over": "Tout le monde est passé · cliquez pour recommencer",
+  "What you can style": "Ce que tu peux styliser",
+  "The fields above set these variables. Use them with var(--accent) or set them in & { … }.": "Les champs ci-dessus définissent ces variables. Utilise-les avec var(--accent) ou définis-les dans & { … }.",
+  "Variables": "Variables",
+  "Layouts": "Mises en page",
+  "Elements": "Éléments",
+  "Lists": "Listes",
+  "Table cells": "Cellules du tableau",
+  "Callouts": "Encadrés",
 }

@@ -3,7 +3,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import SlideView from './SlideView.vue'
 import { t } from './i18n.js'
-import { THEMES, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf, containedCss } from './themes.js'
+import { THEMES, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf, containedCss, LAYOUTS } from './themes.js'
 import { download } from './actions.js'
 import CodeEditor from './CodeEditor.vue'
 import FontOptions from './FontOptions.vue'
@@ -19,6 +19,12 @@ const COLORS = [
   ['bg', 'Background'], ['fg', 'Text'], ['title', 'Headings'], ['accent', 'Accent (links, table header)'], ['accent-fg', 'Text on accent'],
   ['code-bg', 'Code background'], ['code-fg', 'Code text'], ['rule', 'Line below the title'], ['bar', 'Title bar'], ['bar-fg', 'Text in the title bar'],
   ['cover-bg', 'Title slide: background'], ['cover-fg', 'Title slide: text'],
+]
+// what own CSS can address: selectors that exist in the editor and in every export
+const VARS = [...COLORS, ['font', 'Font'], ['heading-font', 'Heading font'], ['heading-weight', 'Heading weight']]
+const PARTS = [
+  ['h1', 'Title'], ['h2', 'Subtitle'], ['p', 'Paragraph'], ['ul, ol, li', 'Lists'], ['a', 'Links'], [':not(pre) > code', 'Inline code'],
+  ['pre', 'Code block'], ['blockquote', 'Quote'], ['th', 'Table header'], ['td', 'Table cells'], ['[data-callout]', 'Callouts'], ['.pageno', 'Slide number'],
 ]
 const WEIGHTS = ['300', '400', '500', '600', '700', '800']
 const hex = v => /^#[\da-f]{6}$/i.test(v || '') ? v : /^#[\da-f]{3}$/i.test(v || '') ? '#' + [...v.slice(1)].map(c => c + c).join('') : '#000000'
@@ -95,6 +101,18 @@ const PREVIEWS = computed(() => [
           <details class="te-css" :open="!!draft.css">
             <summary>{{ t('Custom CSS') }}</summary>
             <p>{{ t('Applies to this theme only; & stands for the slide, e.g. & h1 { … } or &.layout-cover { … }.') }}</p>
+            <details class="te-ref">
+              <summary>{{ t('What you can style') }}</summary>
+              <p>{{ t('The fields above set these variables. Use them with var(--accent) or set them in & { … }.') }}</p>
+              <dl>
+                <dt>{{ t('Variables') }}</dt>
+                <dd v-for="[k, n] in VARS" :key="k"><code>--{{ k }}</code> {{ t(n) }}</dd>
+                <dt>{{ t('Layouts') }}</dt>
+                <dd v-for="[k, n] in [...LAYOUTS, ...(keep.layouts || [])]" :key="k"><code>&amp;.layout-{{ k }}</code> {{ t(n) }}</dd>
+                <dt>{{ t('Elements') }}</dt>
+                <dd v-for="[k, n] in PARTS" :key="k"><code>&amp; {{ k }}</code> {{ t(n) }}</dd>
+              </dl>
+            </details>
             <CodeEditor v-model="draft.css" :label="t('Custom CSS')" />
             <label class="check"><input v-model="draft.base" type="checkbox" /> {{ t('Apply the common theme rules (title bar, title slide …)') }}</label>
           </details>

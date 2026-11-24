@@ -1233,4 +1233,12 @@ export default {
   "Grays": "Grijstinten",
   "Color-blind safe": "Kleurenblindveilig",
   "Everyone drawn · click to start over": "Iedereen getrokken · klik om opnieuw te beginnen",
+  "What you can style": "Wat je kunt opmaken",
+  "The fields above set these variables. Use them with var(--accent) or set them in & { … }.": "De velden hierboven stellen deze variabelen in. Gebruik ze met var(--accent) of stel ze in & { … } in.",
+  "Variables": "Variabelen",
+  "Layouts": "Lay-outs",
+  "Elements": "Elementen",
+  "Lists": "Lijsten",
+  "Table cells": "Tabelcellen",
+  "Callouts": "Kaders",
 }

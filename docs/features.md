@@ -94,7 +94,7 @@ From the Export menu or the export dialog (⌘E), for the whole project or one d
 
 ## Theme editor
 
-Colours, fonts and your own CSS (`&` is the slide) with a live preview. CSS that would reach outside the theme (an unbalanced `{` or `}`) is not applied or saved. Built-in themes stay unchanged; changes to them are saved as a new theme. Your themes live in the browser, travel inside the project file and can be exported and imported as `.theme.json` (Theme menu → Import …). Importing a theme again replaces the stored copy; projects keep their theme. The CSS field is a code editor (CodeMirror) with line numbers and highlighting.
+Colours, fonts and your own CSS (`&` is the slide) with a live preview. CSS that would reach outside the theme (an unbalanced `{` or `}`) is not applied or saved. Built-in themes stay unchanged; changes to them are saved as a new theme. Your themes live in the browser, travel inside the project file and can be exported and imported as `.theme.json` (Theme menu → Import …). Importing a theme again replaces the stored copy; projects keep their theme. The CSS field is a code editor (CodeMirror) with line numbers and highlighting. Above it, “What you can style” lists what your CSS can address: the theme variables (`--accent`, `--bar`, …), the layouts (`&.layout-cover`, …) and the slide's elements (`& h1`, `& th`, `& .pageno`, …).
 
 ## Presenting
 
