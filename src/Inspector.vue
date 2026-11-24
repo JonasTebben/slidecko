@@ -182,8 +182,11 @@ function chooseFont(e, els) {
 }
 const uploadFont = file => file && run(async () => setAll(fontFor, 'font', await storeFont(file)))
 // appear on click: switched on, an element gets a step after the slide's last one
-const nextClick = () => Math.min(99, Math.max(0, ...slide.value.elements.map(e => e.click || 0)) + 1)
+const nextClick = (min = 0) => Math.min(99, Math.max(min, ...slide.value.elements.flatMap(e => [e.click || 0, e.clickUntil || 0])) + 1)
 const clickNum = v => Math.min(99, Math.max(1, Math.round(+v) || 1))
+// disappear on click (Slidev v-click.hide, with "appear" a range): always after the element appeared
+const setClick = (el, v) => { el.click = v; if (v && el.clickUntil <= v) el.clickUntil = undefined }
+const setUntil = (el, v) => { el.clickUntil = v && Math.min(99, Math.max(v, (el.click || 0) + 1)) }
 // planned time of a slide or the whole talk; empty or 0 clears it (the deck keeps 0, a slide drops the key)
 function setTime(obj, e) {
   const v = parseClock(e.target.value || 0)
@@ -407,7 +410,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="field">{{ t('Font size') }}
           <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
         </label>
-        <label v-if="!isRun(el.meta)" class="field">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
+        <label v-if="!isRun(el.meta)" class="field" :title="t('Line numbers in braces, e.g. {2,4-5}; steps separated by | advance one per click while presenting, e.g. {1|3-4|all}')">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5} or {1|3|all}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
         <label class="check"><input type="checkbox" :checked="codeOpts(el.meta).lines" @change="el.meta = setLines(el.meta, $event.target.checked)" /> {{ t('Line numbers') }}</label>
         <!-- Slidev's {monaco-run}: runs in a sandbox, while presenting and here; the last run is kept for the exports -->
         <label v-if="RUN_LANGS.includes(el.lang) || isRun(el.meta)" class="check"><input type="checkbox" :checked="isRun(el.meta)" @change="el.meta = withRun(el.meta, $event.target.checked)" /> {{ t('Runnable (JavaScript)') }}</label>
@@ -688,8 +691,12 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <select :aria-label="t('Shadow')" :value="el.shadow || ''" @change="el.shadow = $event.target.value || undefined"><option value="">{{ t('none') }}</option><option value="soft">{{ t('soft') }}</option><option value="strong">{{ t('strong') }}</option></select>
         </label>
         <div class="btn-row">
-          <button class="ib wide" :class="{ on: el.click }" :aria-pressed="!!el.click" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')" @click="el.click = el.click ? undefined : nextClick()"><Icon name="pointer" /> {{ t('Appear on click') }}</button>
-          <input v-if="el.click" type="number" class="click-num" min="1" max="99" :aria-label="t('Click order')" :title="t('Click order')" :value="el.click" @change="el.click = clickNum($event.target.value)" />
+          <button class="ib wide" :class="{ on: el.click }" :aria-pressed="!!el.click" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')" @click="setClick(el, el.click ? undefined : nextClick())"><Icon name="pointer" /> {{ t('Appear on click') }}</button>
+          <input v-if="el.click" type="number" class="click-num" min="1" max="99" :aria-label="t('Click order')" :title="t('Click order')" :value="el.click" @change="setClick(el, clickNum($event.target.value))" />
+        </div>
+        <div class="btn-row">
+          <button class="ib wide" :class="{ on: el.clickUntil }" :aria-pressed="!!el.clickUntil" :title="t('Hidden from this click on while presenting; with “Appear on click” the element is visible only in between')" @click="setUntil(el, el.clickUntil ? undefined : nextClick(el.click))"><Icon name="pointer" /> {{ t('Disappear on click') }}</button>
+          <input v-if="el.clickUntil" type="number" class="click-num" :min="(el.click || 0) + 1" max="99" :aria-label="t('Disappear at click')" :title="t('Disappear at click')" :value="el.clickUntil" @change="setUntil(el, clickNum($event.target.value))" />
         </div>
         <label v-if="el.type === 'text' && /<(ul|ol)\b/.test(el.html)" class="check" :title="t('While presenting, the list items appear one per click, from the box’s click step on')"><input type="checkbox" :checked="!!el.clickItems" @change="el.clickItems = $event.target.checked || undefined" /> {{ t('List items one by one') }}</label>
         <!-- empty: Magic move pairs it automatically (same text, picture or shape) -->

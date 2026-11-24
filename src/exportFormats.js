@@ -139,16 +139,20 @@ const BACK = { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }
 const morphPairs = ${morphPairs}, playMorph = ${playMorph}
 const settle = s => s.classList.remove('moving', ...[...s.classList].filter(c => c.startsWith('tr-')))
 for (const s of slides) s.addEventListener('animationend', e => { if (e.target === s) settle(s) })
-// click steps (Slidev v-click): elements and list items with data-click (their step) appear one step at a time, as when presenting in the editor
-const stepsOf = s => [...new Set([...s.querySelectorAll('[data-click]')].map(e => +e.dataset.click))].sort((a, b) => a - b)
+// click steps (Slidev v-click): the slide's data-steps counts them; elements and list items appear at data-click and go at
+// data-until (their steps), code lines are highlighted for the stage reached (data-stages: its start steps), as in the editor
+const stepsOf = s => +s.dataset.steps || 0
 let k = 0
 function reveal() {
-  const st = stepsOf(slides[i])
-  for (const e of slides[i].querySelectorAll('[data-click]')) e.classList.toggle('unshown', !(k && +e.dataset.click <= st[k - 1]))
+  for (const e of slides[i].querySelectorAll('[data-click], [data-until]')) e.classList.toggle('unshown', k < +(e.dataset.click || 0) || (+e.dataset.until > 0 && k >= +e.dataset.until))
+  for (const pre of slides[i].querySelectorAll('pre[data-stages]')) {
+    const stage = String(pre.dataset.stages.split(' ').filter(n => +n <= k).length)
+    for (const l of pre.querySelectorAll('.line[data-on]')) l.classList.toggle('dim', !l.dataset.on.split(' ').includes(stage))
+  }
 }
 // next/back: a step first, then the slide; arriving backwards shows all steps
 function step(d) {
-  if (d > 0 ? k < stepsOf(slides[i]).length : k > 0) { k += d; reveal() } else if (slides[i + d]) go(i + d, d < 0)
+  if (d > 0 ? k < stepsOf(slides[i]) : k > 0) { k += d; reveal() } else if (slides[i + d]) go(i + d, d < 0)
 }
 function go(n, back) {
   n = Math.max(0, Math.min(slides.length - 1, n))
@@ -162,7 +166,7 @@ function go(n, back) {
     slides[n].classList.add('moving', tr + '-enter-active')
   }
   i = n
-  k = back ? stepsOf(slides[i]).length : 0
+  k = back ? stepsOf(slides[i]) : 0
   reveal()
   if (from) playMorph(from, slides[i], pairs)
   slides.forEach((s, j) => s.classList.toggle('on', j === i))

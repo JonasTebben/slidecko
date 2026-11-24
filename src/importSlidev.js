@@ -1,12 +1,12 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent, clickOf, fmGet, codeEl } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, clickOf, clickAttrs, fmGet, codeEl } from './parseSlidev.js'
 import { imagePath, readLayers } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
 import { CENTERED, themeStyle, fontKey, SHADOWS } from './themes.js'
 import { applyUno } from './uno.js'
 import { t } from './i18n.js'
-import { listItems } from './clicks.js'
+import { listItems, codeStages } from './clicks.js'
 import { iconTags, readIconStyle, getIcon } from './icons.js'
 import { loadMath, formulaHtml } from './math.js'
 import { isRun } from './run.js'
@@ -31,6 +31,12 @@ const savedBox = el => el.tagName === 'DIV' && el.style.position === 'absolute' 
 const isImageOnly = el => el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG' && !hasText(el)
 // <v-clicks> around lists only (written by toSlidev): the text box's "list items one by one"
 const itemClicks = el => el?.tagName === 'V-CLICKS' && [...el.attributes].every(a => a.name === 'at') && [...el.children].every(c => /^[OU]L$/.test(c.tagName))
+// a leaf with its own click attribute is an element of its own
+const clicky = el => ['v-click', 'v-click.hide', 'v-after'].some(a => el.hasAttribute(a))
+// Slidev's <v-click at="2" hide> / <v-after> around exactly an element's leaves: its click, as the attribute forms
+const soleIn = (p, n) => /^V-(CLICK|AFTER)$/.test(p?.tagName) && p.children.length === n
+const compAttr = c => k => (c.tagName === 'V-AFTER' ? (k === 'v-after' ? '' : null)
+  : k === (c.hasAttribute('hide') ? 'v-click.hide' : 'v-click') ? c.getAttribute('at') ?? '' : null)
 const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
@@ -180,6 +186,7 @@ function measure(slide, parsed) {
     const n = leaves[i], box = boxOf(n), r = rect(n)
     if (r.r - r.x < 1 && r.b - r.y < 1) continue
     const el = { id: uid() }
+    let span = 1 // leaves the element is made of
     const img = n.tagName === 'IMG' ? n : isImageOnly(n) ? n.firstElementChild : null
 
     if (n.dataset.shape) {
@@ -246,12 +253,13 @@ function measure(slide, parsed) {
       // text: this leaf plus the following text leaves of the same parent
       const group = [n]
       const isTitle = !titled && n.tagName === 'H1' && !box
-      while (!isTitle && textual(n) && leaves[i + 1] && up(leaves[i + 1]) === up(n) && textual(leaves[i + 1])) group.push(leaves[++i])
+      while (!isTitle && textual(n) && !clicky(n) && leaves[i + 1] && up(leaves[i + 1]) === up(n) && textual(leaves[i + 1]) && !clicky(leaves[i + 1])) group.push(leaves[++i])
       let content = html(group)
       const parent = n.parentElement, items = group.map(m => m.parentElement).find(itemClicks)
       if (items) Object.assign(el, { clickItems: true, ...(!box && { click: clickOf(items.getAttribute('at') ?? '', clicks) }) })
       // dissolved wrappers that still matter: click animations and inherited alignment
-      if (/^V-/.test(parent.tagName) && !items) {
+      span = group.length
+      if (/^V-/.test(parent.tagName) && !items && !soleIn(parent, span)) {
         const tag = parent.tagName.toLowerCase()
         content = `<${tag}${[...parent.attributes].map(a => ` ${a.name}="${a.value}"`).join('')}>${content}</${tag}>`
       }
@@ -260,9 +268,16 @@ function measure(slide, parsed) {
       if (isTitle) titled = true
       if (!box) sized(el, group.map(rect))
     }
-    const vc = (box || img || n).getAttribute('v-click') // Slidev's appear on click, written by toSlidev on the box
-    if (vc != null) clicks = Math.max(clicks, (el.click = clickOf(vc, clicks)))
+    // Slidev's appear/disappear on click: toSlidev writes it on the box; a <v-click>/<v-after> around just this element counts too
+    const comp = !box && soleIn(n.parentElement, span) && n.parentElement, src = box || img || n
+    const c = clickAttrs(comp ? compAttr(comp) : k => src.getAttribute(k), clicks)
+    clicks = c.last
+    if (c.click) el.click = c.click
+    if (c.clickUntil) el.clickUntil = c.clickUntil
+    // now the element's own: kept in its text it would count twice in a Slidev export
+    if (src === n && el.html && (c.click || c.clickUntil)) el.html = el.html.replace(/^<[^>]+>/, tag => tag.replace(/\s(v-click(\.hide)?|v-after)(="[^"]*")?/g, ''))
     if (el.clickItems) clicks = Math.max(clicks, (el.click || clicks + 1) + listItems(el.html) - 1)
+    if (codeStages(el) > 1) clicks += codeStages(el) - 1 // code line steps are relative clicks in Slidev
     if (box) fromBox(box, el)
     else if (el.w == null) sized(el, [r])
     if (!box && el.type === 'code' && isRun(el.meta)) el.h += 84 // runnable: room for its output panel (80px) below the code

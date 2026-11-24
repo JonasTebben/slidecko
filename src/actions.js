@@ -8,6 +8,7 @@ import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
 import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf } from './toSlidev.js'
 import { withSolutions } from './quiz.js'
+import { perClick } from './clicks.js'
 import { diagramsReady } from './diagram.js'
 import { mathReady } from './math.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
@@ -584,8 +585,9 @@ export function download(blob, name) {
 // all: hidden slides too (the Slidev export keeps them, with hide: true)
 const scopeSlides = (file, all) => (all ? s => s : shownSlides)(file ? slidesOf(file) : deck.slides)
 const scopeName = file => safe(file ? deckName(file) : deck.title)
-async function renderOutput(file, all, solutions) {
-  const slides = solutions ? withSolutions(scopeSlides(file, all)) : scopeSlides(file, all)
+async function renderOutput(file, all, solutions, clicks) {
+  const scoped = solutions ? withSolutions(scopeSlides(file, all)) : scopeSlides(file, all)
+  const slides = clicks ? perClick(scoped) : scoped
   if (!slides.length) throw new Error(t('All slides are hidden'))
   exportSlides.value = slides
   await nextTick()
@@ -598,8 +600,9 @@ async function renderOutput(file, all, solutions) {
   return out
 }
 // print CSS: one page per slide at the project format -> vector PDF with selectable text
-export const pdf = file => run(async () => {
-  await flattenBackgrounds(await renderOutput(file, false, true))
+// clicks: one page per click step (Slidev's --with-clicks)
+export const pdf = (file, clicks) => run(async () => {
+  await flattenBackgrounds(await renderOutput(file, false, true, clicks))
   const title = document.title
   document.title = scopeName(file) // browsers use it as the PDF file name
   addEventListener('afterprint', () => { exportSlides.value = null; document.title = title }, { once: true })
@@ -623,14 +626,14 @@ export const FORMATS = {
     return zip.generateAsync({ type: 'blob' })
   }],
 }
-export const exportAs = (format, file) => {
-  if (format === 'pdf') return pdf(file)
+export const exportAs = (format, file, clicks) => {
+  if (format === 'pdf') return pdf(file, clicks)
   if (format === 'slidev') return slidev()
   const [label, ext, build] = FORMATS[format]
   return run(async () => {
     toast(t('Creating {0} …', t(label)), 0)
     try {
-      const out = await renderOutput(file, false, !format.startsWith('html')) // the HTML presentation reveals quizzes itself
+      const out = await renderOutput(file, false, !format.startsWith('html'), clicks && format === 'png') // the HTML presentation reveals quizzes itself
       download(await build(out, scopeName(file), exportSlides.value), `${scopeName(file)}${format === 'png' ? '-images' : format === 'html-zip' ? '-html' : format === 'pptx-google' ? '-google' : ''}.${ext}`)
     } finally { exportSlides.value = null }
     toast(t('{0} exported.', t(label)))

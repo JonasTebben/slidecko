@@ -2,7 +2,7 @@ import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
 import { toJpeg, toPng, getFontEmbedCSS } from 'html-to-image'
 import { OdpDoc } from './exportOdp.js'
-import { onePPr, numberFont, decorative, DECORATIVE } from './pptxFix.js'
+import { onePPr, numberFont, decorative, DECORATIVE, clickTiming } from './pptxFix.js'
 import { W, H, deck } from './store.js'
 import { SHADOWS } from './themes.js'
 import { t } from './i18n.js'
@@ -436,6 +436,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
   const masters = {} // background key -> master name
   // the master's and layouts' elements are rendered on the slides too (behind their own), and exported like them
   const model = new Map([...slides, { elements: deck.master }, ...deck.layouts].flatMap(s => s.elements.map(e => [e.id, e])))
+  const timing = [] // per slide: the objects of each element that appears or disappears on click, with its steps
 
   for (const [index, node] of [...root.querySelectorAll('.slide')].entries()) {
     // decorated backgrounds (title bar, cover photo with gradient overlay, frame) are rendered by the
@@ -459,7 +460,10 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       continue
     }
     if (!masterName) slide.background = { color }
+    // appear / disappear on click (data-click, data-until: the steps SlideView wrote): every object the element becomes
+    const count = () => (slide._slideObjects || slide.items).length, marks = []
     for (const el of node.querySelectorAll('.el')) {
+      marks.push({ at: count(), click: +el.dataset.click || 0, until: +el.dataset.until || 0 })
       const m = model.get(el.dataset.el) || {}
       const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points
@@ -579,12 +583,14 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       }
       markShapes(slide, el)
     }
+    timing[index] = marks.map((m, j) => ({ ...m, objs: Array.from({ length: (marks[j + 1]?.at ?? count()) - m.at }, (_, k) => m.at + k) })).filter(m => (m.click || m.until) && m.objs.length)
+    slide.clicks = timing[index] // the ODP writer's animations
     const no = node.querySelector('.pageno')
     if (no && getComputedStyle(no).display !== 'none') {
       slide.addText(no.textContent, { x: (W - 60) * IN, y: (H - 28) * IN, w: 52 * IN, h: 20 * IN, align: 'right', fontSize: 9, color: hex(getComputedStyle(no).color) || '000000', margin: 0 })
     }
   }
-  return format === 'odp' ? pptx.write() : insets(await pptx.write({ outputType: 'arraybuffer' }), slides)
+  return format === 'odp' ? pptx.write() : insets(await pptx.write({ outputType: 'arraybuffer' }), slides, timing)
 }
 
 // the invisible bullets of runs() become a plain left margin: marL kept, no hanging indent, no bullet
@@ -594,14 +600,14 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
 const PPT_TRANSITION = { fade: '<p:fade/>', 'slide-left': '<p:push dir="l"/>', 'slide-up': '<p:push dir="u"/>' }
 // Magic move is PowerPoint's Morph (2016 and later pair the shapes themselves), older versions fade, as PowerPoint writes it
 const MORPH = '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" Requires="p159"><p:transition spd="slow"><p159:morph option="byObject"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="slow"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>'
-async function insets(buf, slides) {
+async function insets(buf, slides, timing) {
   const zip = await JSZip.loadAsync(buf)
   for (const path of Object.keys(zip.files).filter(p => p.endsWith('.xml'))) {
     const xml = (await zip.file(path).async('string')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
     if (!/^ppt\/slides\/slide\d+\.xml$/.test(path)) { zip.file(path, xml); continue }
     const before = slides[+path.match(/\d+/)[0] - 2], name = before && (before.transition || deck.transition), tr = name === 'morph' ? MORPH : PPT_TRANSITION[name] && `<p:transition spd="med">${PPT_TRANSITION[name]}</p:transition>`
     zip.file(path, decorative(numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>')))
-      .replace('</p:clrMapOvr>', m => m + (tr || ''))))
+      .replace('</p:clrMapOvr>', m => m + (tr || '') + clickTiming(xml, timing[+path.match(/\d+/)[0] - 1]))))
   }
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
 }

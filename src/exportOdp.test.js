@@ -93,3 +93,20 @@ test('control characters are dropped (invalid XML)', async () => {
   for (const f of ['content.xml', 'meta.xml']) assert.ok(!/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(await zip.file(f).async('string')), f)
   assert.match(await zip.file('content.xml').async('string'), /\[31mred\[0m<text:tab\/>x/)
 })
+
+test('click animations: the objects get ids, each step is one click of Impress', async () => {
+  const d = new OdpDoc()
+  const s = d.addSlide()
+  s.addText('a', { x: 0, y: 0, w: 1, h: 1 })
+  s.addShape('rect', { x: 0, y: 0, w: 1, h: 1 })
+  s.clicks = [{ objs: [0], click: 1, until: 2 }, { objs: [1], click: 2, until: 0 }]
+  const zip = await JSZip.loadAsync(await (await d.write()).arrayBuffer())
+  const xml = await zip.file('content.xml').async('string')
+  assert.match(xml, /<draw:frame xml:id="s1o0" draw:id="s1o0"/)
+  assert.match(xml, /<draw:rect xml:id="s1o1"/)
+  const clicks = xml.split('smil:begin="next"').slice(1)
+  assert.equal(clicks.length, 2)
+  assert.match(clicks[0], /entrance-appear[^]*targetElement="s1o0"/)
+  assert.match(clicks[1], /on-click" presentation:preset-class="exit"[^]*targetElement="s1o0"[^]*with-previous" presentation:preset-class="entrance"[^]*targetElement="s1o1"/)
+  assert.match(xml, /xmlns:anim=/)
+})

@@ -58,7 +58,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 let markLast = 0
 DOMPurify.addHook?.('beforeSanitizeAttributes', n => { if (n.attributes?.length) markLast = vmarkToData(n, markLast) })
 DOMPurify.addHook?.('afterSanitizeAttributes', n => { if (n.hasAttribute?.('data-mark') || n.hasAttribute?.('data-mark-at') || n.hasAttribute?.('data-mark-color')) checkMark(n) })
-export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'v-click'], FORBID_TAGS: ['style'] }))
+export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'hide', 'v-click', 'v-click.hide', 'v-after'], FORBID_TAGS: ['style'] }))
 // a rendered diagram (Mermaid SVG, labels may be HTML in foreignObject) -> sanitized <body> holding it
 export const cleanSvg = svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true, html: true }, ADD_TAGS: ['foreignObject'], RETURN_DOM: true })
 
@@ -130,6 +130,8 @@ export function cleanEl(e) {
   if (/^[\w-]{1,40}$/.test(e.morph ?? '')) base.morph = e.morph // Magic move name: pairs it with the element of that name on the next slide
   if (/^[\w-]{1,20}$/.test(e.mid ?? '')) base.mid = e.mid // kept by a duplicated slide's copy, so Magic move pairs the two
   if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
+  // Slidev v-click.hide or the end of a range v-click="[2, 4]": gone from this step on (after it appeared)
+  if (e.clickUntil >= 1 && Math.round(e.clickUntil) > (base.click || 0)) base.clickUntil = Math.min(99, Math.round(e.clickUntil))
   switch (e.type) {
     case 'text': return {
       ...base, html: clean(e.html), ...(e.title && { title: true }), ...(ALIGN.includes(e.align) && { align: e.align }), ...(['middle', 'bottom'].includes(e.valign) && { valign: e.valign }),
@@ -286,7 +288,7 @@ export function nextShown(slides, i, d) {
   for (let j = i + d; j >= 0 && j < slides.length; j += d) if (!slides[j].hidden) return j
   return i
 }
-export { clickSteps, revealed, stepOf, markItems } from './clicks.js'
+export { clickSteps, revealed, stepOf, untilOf, markItems, codeStage, codeStages, notesParts } from './clicks.js'
 // next (d = 1) or back (-1) while presenting: reveal or hide a step first, then change the slide;
 // arriving backwards shows all of the slide's steps (as in Slidev)
 export function stepMove(slides, i, k, d) {

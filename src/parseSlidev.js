@@ -21,7 +21,22 @@ export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up', 'morph']
 // Magic move (Slidecko's own) is written as `transition: fade` plus this key, which Slidev ignores
 export const trOf = fm => (fmGet(fm, 'slidecko-transition') === 'morph' ? 'morph' : fmGet(fm, 'transition'))
 // Slidev's v-click value -> click step: "2" is that step, an empty one (or "+1") the step after the last one
-export const clickOf = (v, last) => (/^\d+$/.test(v) ? +v : last + (+v || 1))
+export const clickOf = (v, last) => (v = String(v).trim().replace(/^['"]|['"]$/g, ''), /^\d+$/.test(v) ? +v : last + (+v || 1))
+// an element's Slidev click attributes (attr(name): value or null) -> { click, clickUntil, last: the new last step }:
+// v-click="2" or "'+1'", v-click="[2, 4]" (visible from 2, gone at 4; a relative end counts from the start),
+// v-click.hide="3" (gone at 3), v-after (with the previous click)
+export function clickAttrs(attr, last) {
+  const out = {}, vc = attr('v-click'), hide = attr('v-click.hide')
+  const range = vc?.trim().match(/^\[(.*),(.*)\]$/)
+  if (range) {
+    out.click = clickOf(range[1], last)
+    out.clickUntil = /^\s*['"]?[+-]/.test(range[2]) ? clickOf(range[2], out.click) : clickOf(range[2], 0)
+  } else if (vc != null) out.click = clickOf(vc, last)
+  else if (attr('v-after') != null && last) out.click = last
+  if (hide != null) out.clickUntil = clickOf(hide, last)
+  if (!(out.clickUntil > (out.click || 0))) delete out.clickUntil
+  return { ...out, last: Math.max(last, out.click || 0, range ? 0 : out.clickUntil || 0) }
+}
 export const fmHidden =fm => fmGet(fm, 'hide') === 'true' || fmGet(fm, 'disabled') === 'true'
 
 // the slide format of a Slidev headmatter: { aspectRatio: '4/3', canvasWidth: 980 } (keys only when set);

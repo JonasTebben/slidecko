@@ -166,7 +166,6 @@ export default {
   "Duplicate": "Duplizieren",
   "Duplicate slide": "Folie duplizieren",
   "e.g. Databases": "z. B. Datenbanken",
-  "e.g. {2,4-5}": "z. B. {2,4-5}",
   "Each selected file becomes – sorted by name – a deck of its own at the end of the project and is included in the export of": "Jede gewählte Datei wird – sortiert nach Namen – ein eigener Foliensatz am Ende des Projekts und im Export von",
   "Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.": "Jede Folie als hochaufgelöstes Bild – sieht überall exakt so aus wie hier. Notizen bleiben erhalten.",
   "edit": "bearbeiten",
@@ -1139,4 +1138,13 @@ export default {
   "right of the code": "rechts vom Code",
   "Output size": "Größe der Ausgabe",
   "Clear output": "Ausgabe löschen",
+  // clicks
+  "Visible from click {0} to {1}": "Sichtbar von Klick {0} bis {1}",
+  "Disappears on click {0}": "Verschwindet bei Klick {0}",
+  "Disappear on click": "Per Klick ausblenden",
+  "Disappear at click": "Ausblenden bei Klick",
+  "Hidden from this click on while presenting; with “Appear on click” the element is visible only in between": "Beim Präsentieren ab diesem Klick ausgeblendet; zusammen mit „Per Klick einblenden“ ist das Element nur dazwischen sichtbar",
+  "Line numbers in braces, e.g. {2,4-5}; steps separated by | advance one per click while presenting, e.g. {1|3-4|all}": "Zeilennummern in geschweiften Klammern, z. B. {2,4-5}; mit | getrennte Schritte wechseln beim Präsentieren mit jedem Klick, z. B. {1|3-4|all}",
+  "e.g. {2,4-5} or {1|3|all}": "z. B. {2,4-5} oder {1|3|all}",
+  "One page per click step": "Eine Seite pro Klickschritt",
 }

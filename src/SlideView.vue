@@ -1,7 +1,7 @@
 <script setup>
 import { gapSnaps, nearestGap } from './spacing.js'
 import { computed, nextTick, ref, watch, onBeforeUnmount, onMounted, onUpdated } from 'vue'
-import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, markItems, underlay } from './store.js'
+import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, untilOf, markItems, codeStage, codeStages, underlay } from './store.js'
 import { themeStyle, fontStack, codeDark, shadowCss, themeOf } from './themes.js'
 import { chartSvg } from './chart.js'
 import { hlLines, codeOpts } from './hl.js'
@@ -30,6 +30,16 @@ const items = (el, html) => {
   const from = el.clickItems && !props.editable && !el.board && stepOf(props.slide, el, steps.value)
   return from ? markItems(html, from, props.step == null ? Infinity : props.step - from + 1) : html
 }
+// code line steps: the stage shown (editor: the first, which line selection edits; static exports: the last);
+// outside the editor each line lists its stages and the block the steps they start at, for the HTML presentation
+const stageOf = el => (props.editable ? 0 : codeStage(props.slide, el, props.step ?? Infinity, steps.value))
+const stageStarts = el => {
+  const n = codeStages(el), f = stepOf(props.slide, el, steps.value)
+  return !props.editable && n > 1 ? Array.from({ length: n - 1 }, (_, s) => f + s + (el.click ? 1 : 0)).join(' ') : null
+}
+const lineStages = (el, i) => (props.editable || codeStages(el) < 2 ? null : Array.from({ length: codeStages(el) }, (_, s) => s).filter(s => { const m = codeOpts(el.meta, s).marked; return !m || m.has(i + 1) }).join(' '))
+const badge = el => (el.click && el.clickUntil ? `${el.click}–${el.clickUntil}` : el.click || `–${el.clickUntil}`)
+const badgeTitle = el => (el.click && el.clickUntil ? t('Visible from click {0} to {1}', el.click, el.clickUntil) : el.click ? t('Appears on click {0}', el.click) : t('Disappears on click {0}', el.clickUntil))
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 // a short or narrow box drops its middle handles, which would cover the corners (big touch handles on a phone)
 const HSIZE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 18 : 10
@@ -476,10 +486,10 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
 </script>
 
 <template>
-  <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown" @marks="layoutMarks">
+  <div ref="root" class="slide" :data-steps="steps.length || null" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown" @marks="layoutMarks">
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
-      :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
+      :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-until="untilOf(el, steps) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
       class="el" :class="[el.type, { run: el.type === 'code' && isRun(el.meta), 'out-right': el.outPos === 'right', cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
@@ -498,7 +508,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
         <textarea v-else-if="live && runEdit === el.id" v-model="runOf(el).code" class="code" spellcheck="false" :aria-label="t('Code')" @blur="endRunEdit" @keydown.stop="runKey($event, el)" @click.stop />
-        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" :data-stages="stageStarts(el)" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta, stageOf(el))]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }" :data-on="lineStages(el, i)"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
         <!-- runnable: the output panel (the last kept run in the editor and exports, the live one while presenting) -->
         <template v-if="isRun(el.meta)">
           <pre class="code run-out" :class="{ dark: codeDarkOf(el) }" :aria-live="live ? 'polite' : null" :aria-label="t('Output')"><span v-for="(l, i) in runShown(el).out" :key="i" :class="'out-' + l.k">{{ outLine(l) }}{{ '\n' }}</span></pre>
@@ -561,7 +571,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         </g>
       </svg>
       <template v-if="editable && marks[el.id] && !decor(el)"><span v-for="(m, i) in marks[el.id].filter(m => m.at)" :key="'m' + i" class="click-badge mark-badge" :style="{ left: m.x + 'px', top: m.y + 'px' }" :title="t('Drawn on click {0}', m.at)">{{ m.at }}</span></template>
-      <span v-if="editable && el.click && !decor(el)" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
+      <span v-if="editable && (el.click || el.clickUntil) && !decor(el)" class="click-badge" :title="badgeTitle(el)">{{ badge(el) }}</span>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
         <template v-if="ui.crop === el.id"><i v-for="h in handlesOf(el)" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>
         <template v-else><i v-for="h in handlesOf(el)" :key="h" class="handle" :class="h" @pointerdown.stop="drag($event, el, h)" /></template>

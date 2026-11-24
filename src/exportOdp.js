@@ -5,7 +5,7 @@ import JSZip from 'jszip'
 // defineLayout, defineSlideMaster, addSlide → addText / addImage / addShape / addTable / addNotes.
 // Units as in pptxgenjs: positions in inches, font sizes, spacing and line widths in points.
 
-const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"'
+const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.3"'
 // control characters (terminal escapes pasted into code, notes) are not allowed in XML: Impress would refuse the file
 const esc = s => String(s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const inch = v => `${(+v || 0).toFixed(4)}in`
@@ -92,6 +92,16 @@ export class OdpDoc {
 
 function frameImage(doc, { data, x, y, w, h }) {
   return `<draw:frame draw:style-name="${doc.style('graphic', '<style:graphic-properties draw:stroke="none" draw:fill="none"/>', 'Mgr')}" svg:x="${inch(x)}" svg:y="${inch(y)}" svg:width="${inch(w)}" svg:height="${inch(h)}"><draw:image xlink:href="${doc.image(data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`
+}
+
+// Impress's click animations: one click per step, an element's objects appear ("Appear") or vanish ("Disappear") together
+export function clickAnimations(clicks, id) {
+  const steps = [...new Set(clicks.flatMap(c => [c.click, c.until]).filter(Boolean))].sort((a, b) => a - b)
+  if (!steps.length) return ''
+  const set = (o, show, first) => `<anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="${first ? 'on-click' : 'with-previous'}" presentation:preset-class="${show ? 'entrance' : 'exit'}" presentation:preset-id="ooo-${show ? 'entrance-appear' : 'exit-disappear'}"><anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:attributeName="visibility" smil:to="${show ? 'visible' : 'hidden'}"/></anim:par>`
+  const step = k => `<anim:par smil:begin="next"><anim:par smil:begin="0s">${clicks.flatMap(c => [c.click === k && [c, true], c.until === k && [c, false]].filter(Boolean))
+    .flatMap(([c, show]) => c.objs.map(o => [o, show])).map(([o, show], j) => set(o, show, !j)).join('')}</anim:par></anim:par>`
+  return `<anim:par presentation:node-type="timing-root"><anim:seq presentation:node-type="main-sequence">${steps.map(step).join('')}</anim:seq></anim:par>`
 }
 
 class OdpSlide {
@@ -213,6 +223,9 @@ class OdpSlide {
     const dp = bg ? ` draw:style-name="${d.style('drawing-page', `<style:drawing-page-properties draw:fill="solid" draw:fill-color="${color(bg)}" draw:background-size="full" presentation:background-visible="true" presentation:background-objects-visible="true"/>`, 'dp')}"` : ''
     const r = d.size.height / d.size.width, th = Math.min(3.9, 6.5 * r) // thumbnail in the slide's ratio, above the notes at 4.8in
     const notes = this.notes ? `<presentation:notes><draw:page-thumbnail svg:x="1in" svg:y="0.8in" svg:width="${inch(th / r)}" svg:height="${inch(th)}" draw:page-number="${i + 1}" presentation:class="page"/><draw:frame presentation:class="notes" svg:x="0.8in" svg:y="4.8in" svg:width="6.9in" svg:height="4.4in"><draw:text-box>${this.notes.split('\n').map(l => `<text:p>${textXml(l)}</text:p>`).join('')}</draw:text-box></draw:frame></presentation:notes>` : ''
-    return `<draw:page draw:name="Slide ${i + 1}" draw:master-page-name="${esc(this.master || 'Standard')}"${dp}>${this.items.join('')}${notes}</draw:page>`
+    // appear / disappear on click (clicks: set by exportPptx.js): the objects get ids the animations point to
+    const id = k => `s${i + 1}o${k}`, clicks = this.clicks || []
+    const items = this.items.map((x, k) => (clicks.some(c => c.objs.includes(k)) ? x.replace(/^<draw:\w+/, m => `${m} xml:id="${id(k)}" draw:id="${id(k)}"`) : x))
+    return `<draw:page draw:name="Slide ${i + 1}" draw:master-page-name="${esc(this.master || 'Standard')}"${dp}>${items.join('')}${clickAnimations(clicks, id)}${notes}</draw:page>`
   }
 }

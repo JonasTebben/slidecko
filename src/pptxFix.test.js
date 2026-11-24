@@ -21,3 +21,16 @@ test('pictures: no media path as description, decorative ones marked as decorati
   assert.equal(decorative(pic('Image 1', 'A red bus')), pic('Image 1', 'A red bus'))
   assert.match(decorative(pic(DECORATIVE, '../media/image-1-2.png')), /descr=""><a:extLst><a:ext uri="\{C183D7F6-B498-43B3-948B-1728B52AA6E4\}"><adec:decorative [^>]*val="1"\/><\/a:ext><\/a:extLst><\/p:cNvPr>/)
 })
+
+test('click animations: one PowerPoint click per step, appear and disappear on the shapes of each element', async () => {
+  const { clickTiming } = await import('./pptxFix.js')
+  const xml = '<p:cNvPr id="1" name=""/><p:cNvPr id="2" name="a"/><p:cNvPr id="3" name="b"/><p:cNvPr id="4" name="c"/>'
+  assert.equal(clickTiming(xml, []), '')
+  const t = clickTiming(xml, [{ objs: [0, 1], click: 1, until: 0 }, { objs: [2], click: 0, until: 3 }])
+  const clicks = t.split('delay="indefinite"').slice(1)
+  assert.equal(clicks.length, 2)
+  assert.deepEqual([...clicks[0].matchAll(/presetClass="(\w+)"[^]*?nodeType="(\w+)"[^]*?spid="(\d+)"/g)].map(m => m.slice(1).join(' ')), ['entr clickEffect 2', 'entr withEffect 3'])
+  assert.match(clicks[1], /presetClass="exit"[^]*spid="4"[^]*val="hidden"/)
+  const ids = [...t.matchAll(/cTn id="(\d+)"/g)].map(m => m[1])
+  assert.equal(new Set(ids).size, ids.length)
+})

@@ -21,7 +21,7 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./A11yPanel.vue'))
 import { checkDeck } from './a11yCheck.js'
 import { t, lang } from './i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay } from './store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts } from './store.js'
 import { parseRatio } from './format.js'
 import { slidePoint, arrowHead } from './draw.js'
 import { toggleSolution, resetQuiz } from './quiz.js'
@@ -224,6 +224,7 @@ const EXPORTS = [
   { id: 'slidev', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
 ]
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
+const exportClicks = ref(false) // PDF and images: one page per click step
 function openExport(scope = '', format) {
   exportScope.value = scope
   if (format) exportFormat.value = format
@@ -232,7 +233,7 @@ function openExport(scope = '', format) {
 function doExport() {
   if (exportDialog.value.returnValue !== 'ok') return
   try { localStorage.setItem('slides-builder:export', exportFormat.value) } catch { /* private mode */ }
-  A.exportAs(exportFormat.value, exportScope.value || undefined)
+  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value)
 }
 const THUMB = computed(() => 176 / format.w)
 // one style object for all thumbnails: a new object per render would re-render every thumbnail
@@ -662,6 +663,10 @@ const presentGo = (i, k = 0) => { blank.value = null; jump.value = ''; A.go(i); 
 // next/back: click steps first, then the slide (hidden slides are skipped)
 const presentStep = d => { const m = stepMove(deck.slides, ui.slide, clickStep.value, d); presentGo(m.slide, m.step) }
 const upNext = computed(() => stepMove(deck.slides, ui.slide, clickStep.value, 1))
+// Slidev's [click] markers in the notes: the part for the current step stands out and scrolls into view
+const notes = computed(() => notesParts(slide.value?.notes))
+const notesNow = computed(() => (notes.value.length > 1 ? notes.value.findLastIndex(p => p.step <= clickStep.value) : -1))
+watch(notesNow, () => nextTick(() => document.querySelector('.pv-notes .note-now')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })))
 // Slidev: the earlier slide's transition plays between two slides, reversed when going back
 const transition = ref('none')
 watch(() => ui.slide, (n, o) => {
@@ -1611,6 +1616,7 @@ function onClipboard(e) {
             <span class="badges"><em v-if="f.editable" class="b-edit">{{ t('editable') }}</em><em v-if="f.exact" class="b-exact">{{ t('pixel-perfect') }}</em><em v-if="f.project">{{ t('whole project only') }}</em></span>
           </label>
         </div>
+        <label v-if="['pdf', 'png'].includes(exportFormat)" class="check"><input v-model="exportClicks" type="checkbox" /> {{ t('One page per click step') }}</label>
         <p class="export-hint">{{ t('Keynote opens') }} <code>.pptx</code> {{ t('directly. For Google Slides pick its own variant and open it there via “File → Import”. For an exact look there, choose “exact copy”.') }}</p>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok" :disabled="EXPORTS.find(f => f.id === exportFormat)?.project && !!exportScope">{{ t('Export') }}</button></menu>
       </form>
@@ -1704,7 +1710,7 @@ function onClipboard(e) {
         <div v-if="upNext.slide !== ui.slide || upNext.step !== clickStep" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[upNext.slide]" :index="upNext.slide" :step="upNext.step" :style="{ transform: 'scale(0.3)' }" /></div>
         <p v-else>{{ t('End') }}</p>
       </div>
-      <div class="pv-notes">{{ slide.notes || t('No notes') }}</div>
+      <div class="pv-notes"><template v-if="slide.notes"><span v-for="(p, j) in notes" :key="j" :class="notesNow >= 0 && (j === notesNow ? 'note-now' : 'note-off')">{{ p.text }}</span></template><template v-else>{{ t('No notes') }}</template></div>
     </aside>
     <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
     <div v-if="tool === 'laser' && laser" class="pv-laser" :style="{ translate: `${laser[0]}px ${laser[1]}px` }" aria-hidden="true" />
@@ -1741,6 +1747,6 @@ function onClipboard(e) {
   </div>
 
   <div v-if="A.exportSlides.value" class="output">
-    <SlideView v-for="(s, i) in A.exportSlides.value" :key="s.id" :slide="s" :index="i" />
+    <SlideView v-for="(s, i) in A.exportSlides.value" :key="s.id" :slide="s" :index="s.no ?? i" :step="s.step" />
   </div>
 </template>

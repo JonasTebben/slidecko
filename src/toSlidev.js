@@ -274,7 +274,12 @@ const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)
 export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
 
 // appear on click: Slidev's v-click attribute on the element's box, with its step (list items shown one by one take a step each)
-const withClick = (el, md, steps) => (el.click ? md.replace(/^<(div|img)\b/, `<$1 v-click="${steps.indexOf(el.click) + 1}"`) : md)
+// disappear on click as v-click.hide="n", both as the range v-click="[from, to]" (visible from, gone at)
+function withClick(el, md, steps) {
+  const at = k => steps.indexOf(k) + 1
+  const attr = el.click && el.clickUntil ? `v-click="[${at(el.click)}, ${at(el.clickUntil)}]"` : el.click ? `v-click="${at(el.click)}"` : el.clickUntil ? `v-click.hide="${at(el.clickUntil)}"` : ''
+  return attr ? md.replace(/^<(div|img)\b/, `<$1 ${attr}`) : md
+}
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
   const flow = slide.flow != null && slide.flow === flowHash(slide)

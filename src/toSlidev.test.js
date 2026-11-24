@@ -198,6 +198,20 @@ test('planned times: per slide in the frontmatter, the talk length as Slidev dur
   assert.ok(again.startsWith(`---\n${fm}\n---`))
 })
 
+test('click variants: disappear as v-click.hide, ranges as v-click="[a, b]" with their steps; code steps and note markers stay', async () => {
+  const { slideHash } = await import('./toSlidev.js')
+  const els = [{ id: 'a', type: 'text', ...box, html: '<p>a</p>', clickUntil: 5 }, { id: 'b', type: 'text', ...box, html: '<p>b</p>', click: 2, clickUntil: 5 }, { id: 'c', type: 'code', ...box, code: 'x\ny', lang: 'js', meta: '{1|2}' }]
+  const md = slideToMarkdown({ layout: 'default', elements: els, notes: 'Start [click] then [click:2] end' })
+  assert.match(md, /<div v-click\.hide="2" style=/) // steps 2 and 5 are the first and second
+  assert.match(md, /<div v-click="\[1, 2\]" style=/)
+  assert.match(md, /```js \{1\|2\}\n/)
+  assert.match(md, /Start \[click\] then \[click:2\] end/)
+  // an imported slide not changed since: written back byte for byte, whatever Slidev syntax it uses
+  const orig = '<div v-click.hide>gone</div>\n\n<v-after>with it</v-after>\n\n```ts {1|3-4|all}\ncode\n```\n\n<!--\nIntro [click] next\n-->'
+  const s = { layout: 'default', elements: els, md: orig }
+  s.hash = slideHash(s)
+  assert.equal(slideToMarkdown(s), orig + '\n')
+})
 test('an icon is written as Slidev’s Iconify component in its box, and its set lands in package.json once', () => {
   const icon = { id: 'i', type: 'icon', x: 10, y: 20, w: 64, h: 64, icon: 'mdi:home', body: '<path d="M0 0"/>', view: '0 0 24 24', color: '#dc2626' }
   assert.match(slideToMarkdown({ layout: 'default', elements: [icon] }), /<div style="position:absolute;left:10px;top:20px;width:64px;height:64px">\n\n<mdi-home style="width:100%;height:100%;color:#dc2626" aria-hidden="true" \/>\n\n<\/div>/)

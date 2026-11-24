@@ -34,12 +34,13 @@ function splitLines(code, lang) {
   }
   return [...out, cur]
 }
-// Slidev's code block options in the fence info: "{2,4-5}" highlights lines (the first click step of "{1|3}"),
-// "{lines:true,startLine:5}" numbers them. marked: Set of line numbers or null (all lines)
-export function codeOpts(meta = '') {
+// Slidev's code block options in the fence info: "{2,4-5}" highlights lines (stage: which click step of "{1|3}",
+// past the last one the last), "{lines:true,startLine:5}" numbers them. marked: Set of line numbers or null (all lines)
+export function codeOpts(meta = '', stage = 0) {
   const groups = [...meta.matchAll(/\{([^}]*)\}/g)].map(m => m[1])
   const opts = groups.find(g => g.includes(':')) || ''
-  const first = groups.find(g => !g.includes(':') && !g.startsWith('monaco'))?.split('|')[0].trim() // {monaco-run} is no line range
+  const steps = groups.find(g => !g.includes(':') && !g.startsWith('monaco'))?.split('|') || [] // {monaco-run} is no line range
+  const first = steps[Math.min(stage, steps.length - 1)]?.trim()
   let marked = null
   if (first && !/^(all|\*)$/.test(first)) {
     marked = new Set()
@@ -58,7 +59,7 @@ export function toggleMarked(meta = '', a, b) {
   const nums = [...marked].sort((x, y) => x - y), parts = []
   for (const n of nums) { const last = parts.at(-1); last && last[1] === n - 1 ? (last[1] = n) : parts.push([n, n]) }
   const first = parts.map(([x, y]) => (x === y ? x : `${x}-${y}`)).join(',')
-  const groups = [...meta.matchAll(/\{([^}]*)\}/g)], g = groups.find(m => !m[1].includes(':'))
+  const groups = [...meta.matchAll(/\{([^}]*)\}/g)], g = groups.find(m => !m[1].includes(':') && !m[1].startsWith('monaco'))
   const steps = g ? g[1].split('|').slice(1) : []
   const group = first || steps.length ? `{${[first || 'all', ...steps].join('|')}}` : ''
   const out = g ? meta.replace(g[0], group) : group + meta
