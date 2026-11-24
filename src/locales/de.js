@@ -47,7 +47,7 @@ export default {
   "Are you sure?": "Bist du sicher?",
   "Arrow": "Pfeil",
   "Aspect ratio": "Seitenverhältnis",
-  "Back": "Hinten",
+  "Back": "Zurück",
   "Back to “{0}”": "Zurück zu „{0}“",
   "Background": "Hintergrund",
   "Before": "Vorher",

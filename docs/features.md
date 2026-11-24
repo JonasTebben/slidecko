@@ -179,7 +179,7 @@ The interface follows the system or is fixed to light or dark (sun/moon switch i
 
 ## Languages
 
-English and German. Without a stored choice the browser language decides: German for German browsers, English otherwise. A link with `?lang=de` or `?lang=en` picks the language and stores it like the switch does (under `slides-builder:lang`, so pages on the same site can share it). Switching in the footer works at once, without reloading.
+German, English, French, Dutch and Spanish, each with its flag in the switch. Without a stored choice the browser language decides: the first browser language Slidecko has, English otherwise. A link with `?lang=de`, `?lang=en`, `?lang=fr`, `?lang=nl` or `?lang=es` picks the language and stores it like the switch does (under `slides-builder:lang`, so pages on the same site can share it). Switching in the footer works at once, without reloading.
 
 ## View in the URL
 

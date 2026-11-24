@@ -2,8 +2,18 @@
 // Add a language: create locales/<code>.js (English → translation) and list it in LOCALES.
 import { ref, watch, watchEffect } from 'vue'
 import de from './locales/de.js'
+import fr from './locales/fr.js'
+import nl from './locales/nl.js'
+import es from './locales/es.js'
 
-export const LOCALES = { en: { name: 'English', dict: {} }, de: { name: 'Deutsch', dict: de } }
+// flag emoji: Windows shows the two letters instead, which still reads fine
+export const LOCALES = {
+  de: { name: '🇩🇪 Deutsch', dict: de },
+  en: { name: '🇬🇧 English', dict: {} },
+  fr: { name: '🇫🇷 Français', dict: fr },
+  nl: { name: '🇳🇱 Nederlands', dict: nl },
+  es: { name: '🇪🇸 Español', dict: es },
+}
 const KEY = 'slides-builder:lang'
 
 const pick = () => {

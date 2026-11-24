@@ -25,7 +25,7 @@ Run `bun test` and `bun run build` before you call a change done.
 
 ## Required updates
 
-- **Interface text**: English is the key. Wrap every new string in `t()` and add the German entry to `src/locales/de.js`. Tests assert the English text.
+- **Interface text**: English is the key. Wrap every new string in `t()` and add its entry to every file in `src/locales/` (German, French, Dutch, Spanish); `src/i18n.test.js` fails when one is missing. Tests assert the English text.
 - **Storage**: if you change what is kept in IndexedDB, localStorage or sessionStorage, update the "What the app stores" table in the README. The `slides-builder` key prefix stays (existing user data).
 - **Themes**: built-in themes must stay WCAG AA; see "Theme readability" in the README.
 - **Features**: user-visible changes go into `docs/features.md` (and the README feature list if they are major).

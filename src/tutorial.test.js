@@ -1,13 +1,16 @@
 import { LESSONS, typed, tutorial, openTutorial, closeTutorial } from './tutorial.js'
-import de from './locales/de.js'
+import { LOCALES } from './i18n.js'
 
-test('every lesson: the start text fails its check, the solution passes, in English and German', () => {
+test('every lesson: the start text fails its check, the solution passes, in every language', () => {
   for (const l of LESSONS) {
     expect([l.title, l.check(l.start)]).toEqual([l.title, false])
     expect([l.title, l.check(l.solution)]).toEqual([l.title, true])
-    for (const k of ['title', 'text', 'task', 'hint', 'solution', ...(l.start ? ['start'] : [])]) expect([l.title, k, l[k] in de]).toEqual([l.title, k, true])
-    expect([l.title, l.check(de[l.start] ?? '')]).toEqual([l.title, false])
-    expect([l.title, l.check(de[l.solution])]).toEqual([l.title, true])
+    for (const [code, { dict }] of Object.entries(LOCALES)) {
+      if (code === 'en') continue
+      for (const k of ['title', 'text', 'task', 'hint', 'solution', ...(l.start ? ['start'] : [])]) expect([code, l.title, k, l[k] in dict]).toEqual([code, l.title, k, true])
+      expect([code, l.title, l.check(dict[l.start] ?? '')]).toEqual([code, l.title, false])
+      expect([code, l.title, l.check(dict[l.solution])]).toEqual([code, l.title, true])
+    }
   }
 })
 

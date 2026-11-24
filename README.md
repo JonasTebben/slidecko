@@ -28,7 +28,7 @@ bun test         # parser, export and server tests
 - **Markdown**: edit the whole project as Slidev Markdown in a VS Code-like source editor (highlighting, markdownlint, Prettier, live preview), insert slides from Markdown (e.g. written by an AI) or edit one slide as Markdown; a hands-on Markdown tutorial teaches the syntax in a few minutes.
 - **Present** in full screen or with a presenter view (notes, next slide, timer, slide overview with O), and **rehearse** the talk against planned times per slide; elements can appear and disappear step by step on click (Slidev's `v-click`, `v-click.hide`, ranges), code highlights step through lines, notes follow `[click]` markers, and words get hand-drawn marks (`v-mark`: circle, underline, highlight …) drawn on a click; Magic move slides elements that two slides share from one place, size and colour to the next; record the talk as a video with microphone and a camera bubble (stays on the device).
 - **Accessibility check** for the presentation: alt text, contrast (WCAG AA), font size, slide titles, reading order, table headers, link texts, with one-click fixes.
-- **Phone and tablet** layout, long press for context menus, light/dark mode, English and German interface, accessible controls (4.5:1 contrast, named controls, reduced motion).
+- **Phone and tablet** layout, long press for context menus, light/dark mode, interface in German, English, French, Dutch and Spanish, accessible controls (4.5:1 contrast, named controls, reduced motion).
 
 The full behaviour is described in [docs/features.md](docs/features.md).
 
@@ -65,7 +65,7 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 
 ## Translations
 
-English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` maps it to German. A missing entry shows the English text.
+English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
 
 - Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
 - Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/i18n.js`.
