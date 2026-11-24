@@ -15,11 +15,11 @@ export const STEPS = [
   { id: 'theme', target: 'theme', title: 'Theme', text: 'One click changes colours and fonts of the whole presentation.' },
   { id: 'present', target: 'present', only: 'short', title: 'Present', text: 'Starts the full-screen presentation. Arrow keys move on, Esc ends it.' },
   { id: 'export', target: 'export', only: 'short', title: 'Export', text: 'PDF, PowerPoint, OpenDocument, HTML or Slidev Markdown – made on your device.' },
-  { id: 'palette', target: 'palette', title: 'Every command', text: 'Search all commands and their shortcuts. {0}K opens it from anywhere.' },
+  { id: 'palette', target: 'palette', title: 'Every command', text: 'Search all commands and their shortcuts. {0} opens it from anywhere.' },
   { id: 'md', only: 'full', tutorial: true, title: 'Next: slides from Markdown', text: 'Now you write a few slides yourself in Markdown, step by step. At the end you open them as a new presentation.' },
   { id: 'present2', target: 'present', only: 'full', after: true, title: 'Your new presentation', text: 'This is what you wrote. Present it right away …' },
   { id: 'export2', target: 'export', only: 'full', after: true, title: 'Take it with you', text: '… or export it as PDF, PowerPoint or Slidev Markdown.' },
-  { id: 'markdown', target: 'markdown', only: 'full', after: true, title: 'Edit as Markdown later', text: 'M (or this button) opens the Markdown of the current slide. {0}K finds everything else. Have fun!' },
+  { id: 'markdown', target: 'markdown', only: 'full', after: true, title: 'Edit as Markdown later', text: '{1} (or this button) opens the Markdown of the current slide. {0} finds everything else. Have fun!' },
 ]
 export const stepsFor = full => STEPS.filter(s => !s.only || s.only === (full ? 'full' : 'short'))
 

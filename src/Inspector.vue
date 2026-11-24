@@ -16,6 +16,7 @@ import * as table from './tableOps.js'
 import { clock, parseClock } from './timer.js'
 import { LETTERS } from './quiz.js'
 import { t } from './i18n.js'
+import { kbd } from './keys.js'
 import { morphSlides } from './morph.js'
 import { PALETTE, FILLS, SHAPE_NAMES, DIAGRAMS, FORMULAS } from './presets.js'
 import { picker as iconPicker } from './icons.js'
@@ -157,10 +158,10 @@ function setTypo(k, v) {
   deck.typo = t
 }
 const ALIGNS = [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]
-const ORDERS = [['front', 'toFront', 'Bring to front (⌘⇧↑)'], ['forward', 'forward', 'Bring forward (⌘↑)'], ['backward', 'backward', 'Send backward (⌘↓)'], ['back', 'toBack', 'Send to back (⌘⇧↓)']]
+const ORDERS = [['front', 'toFront', 'Bring to front'], ['forward', 'forward', 'Bring forward'], ['backward', 'backward', 'Send backward'], ['back', 'toBack', 'Send to back']] // the command id is the first entry
 const TEXT_ALIGNS = [['left', 'textL', 'Align left'], ['center', 'textC', 'Centered'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']]
-// the label without the shortcut in brackets, for screen readers
-const bare = s => t(s).replace(/ \(.*\)$/, '')
+// a tooltip with the user's current shortcut of that command (keys.js)
+const keyTip = (lbl, ...ids) => { const k = ids.map(kbd).filter(Boolean).join(' / '); return k ? `${t(lbl)} (${k})` : t(lbl) }
 const alignTo = ref('sel')
 // several elements: the text boxes among them, formatted together
 const texts = computed(() => selection.value.filter(e => e.type === 'text'))
@@ -244,10 +245,10 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       <Sec id="arrange" icon="layers" :title="t('Arrange')">
         <div class="seg-row">
           <span class="seg" role="group" :aria-label="t('Arrange')">
-            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
+            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="t(lbl)" :title="keyTip(lbl, o)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
           </span>
-          <button v-if="selection.some(e => e.group)" class="ib" :aria-label="bare('Ungroup (⌘⇧G)')" :title="t('Ungroup (⌘⇧G)')" @click="ungroup"><Icon name="ungroup" /></button>
-          <button v-else class="ib" :aria-label="bare('Group (⌘G)')" :title="t('Group (⌘G)')" @click="group"><Icon name="group" /></button>
+          <button v-if="selection.some(e => e.group)" class="ib" :aria-label="t('Ungroup')" :title="keyTip('Ungroup', 'ungroup')" @click="ungroup"><Icon name="ungroup" /></button>
+          <button v-else class="ib" :aria-label="t('Group')" :title="keyTip('Group', 'group')" @click="group"><Icon name="group" /></button>
         </div>
       </Sec>
       <Sec v-if="texts.length" id="text" icon="text" :title="`${t('Text')} (${texts.length} ${texts.length === 1 ? t('Text box') : t('Text boxes')})`">
@@ -285,8 +286,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </div>
       </Sec>
       <section class="actions">
-        <button v-if="ui.look" class="ib" :aria-label="t('Paste formatting')" :title="t('Apply copied formatting to all (⌘⌥V)')" @click="pasteLook()"><Icon name="brush" /></button>
-        <button class="ib" :aria-label="t('Duplicate')" :title="t('Duplicate (⌘D)')" @click="duplicate"><Icon name="copy" /></button>
+        <button v-if="ui.look" class="ib" :aria-label="t('Paste formatting')" :title="keyTip('Apply copied formatting to all', 'pasteLook')" @click="pasteLook()"><Icon name="brush" /></button>
+        <button class="ib" :aria-label="t('Duplicate')" :title="keyTip('Duplicate', 'duplicate')" @click="duplicate"><Icon name="copy" /></button>
         <button class="ib danger" :aria-label="t('Delete')" :title="t('Delete (⌫)')" @click="remove"><Icon name="trash" /></button>
       </section>
     </template>
@@ -689,7 +690,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       <Sec id="arrange" icon="layers" :title="t('Arrange')">
         <div class="seg-row">
           <span class="seg" role="group" :aria-label="t('Arrange')">
-            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
+            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="t(lbl)" :title="keyTip(lbl, o)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
           </span>
         </div>
         <div class="seg-row">
@@ -720,8 +721,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </label>
       </Sec>
       <section class="actions">
-        <button v-if="['text', 'shape', 'code', 'image'].includes(el.type)" class="ib" :class="{ on: ui.painting }" :aria-pressed="!!ui.painting" :aria-label="t('Copy formatting')" :title="t('Copy formatting: then click an element (⌘⌥C / ⌘⌥V)')" @click="paint"><Icon name="brush" /></button>
-        <button class="ib" :aria-label="t('Duplicate')" :title="t('Duplicate (⌘D)')" @click="duplicate"><Icon name="copy" /></button>
+        <button v-if="['text', 'shape', 'code', 'image'].includes(el.type)" class="ib" :class="{ on: ui.painting }" :aria-pressed="!!ui.painting" :aria-label="t('Copy formatting')" :title="keyTip('Copy formatting: then click an element', 'copyLook', 'pasteLook')" @click="paint"><Icon name="brush" /></button>
+        <button class="ib" :aria-label="t('Duplicate')" :title="keyTip('Duplicate', 'duplicate')" @click="duplicate"><Icon name="copy" /></button>
         <button class="ib danger" :aria-label="t('Delete')" :title="t('Delete (⌫)')" @click="remove"><Icon name="trash" /></button>
       </section>
       <Sec v-if="tip" id="tips" icon="info" :title="t('Tips')"><p class="hint">{{ t(tip) }}</p></Sec>
@@ -764,8 +765,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="field">{{ t('Whole talk (minutes or m:ss)') }}
           <input :value="deck.duration ? clock(deck.duration) : ''" inputmode="numeric" :placeholder="t('e.g. 20')" @change="setTime(deck, $event)" /></label>
         <div class="btn-row">
-          <button class="ib" :aria-label="t('Duplicate slide')" :title="t('Duplicate slide (⌘⇧D)')" @click="duplicateSlide()"><Icon name="copy" /></button>
-          <button class="ib danger" :aria-label="t('Delete slide')" :title="t('Delete slide (⌘⇧⌫)')" @click="deleteSlide()"><Icon name="trash" /></button>
+          <button class="ib" :aria-label="t('Duplicate slide')" :title="keyTip('Duplicate slide', 'duplicateSlide')" @click="duplicateSlide()"><Icon name="copy" /></button>
+          <button class="ib danger" :aria-label="t('Delete slide')" :title="keyTip('Delete slide', 'deleteSlide')" @click="deleteSlide()"><Icon name="trash" /></button>
           <button class="ib wide" data-tour="markdown" :title="t('View and edit this slide’s Markdown – e.g. generated by an AI')" @click="emit('markdown')"><Icon name="markdown" /> {{ t('Edit Markdown') }}</button>
         </div>
         <button v-if="canRevert(slide)" class="ib wide" :title="t('Show the slide as it was imported – changes to this slide are lost (can be undone)')" @click="revertSlides([slide])"><Icon name="undo" /> {{ t('Revert to imported version') }}</button>

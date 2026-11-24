@@ -40,6 +40,8 @@ import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells 
 import { toggleMarked, codeOpts, highlight } from './hl.js'
 import { find, replace, ranges, pattern } from './search.js'
 import * as R from './rehearse.js'
+import { keyOf, kbd, comboOf, GLOBAL, PRESENT_LABELS, format as fmtKey } from './keys.js'
+import KeysDialog from './KeysDialog.vue'
 import { clock } from './timer.js'
 import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, parseViewHash } from './session.js'
 
@@ -688,13 +690,22 @@ watch(() => ui.slide, (n, o) => {
   if (from) nextTick(() => morphSlides(from, presenter.value?.querySelector('.pv-slide .slide'), deck.slides[o], deck.slides[n]))
 })
 const resetTimer = () => { started.value = Date.now(); now.value = started.value }
-// every presenting key, shown with ? or H and the keyboard button (one list, so help and handler stay in step)
+// every presenting key, shown with ? or H and the keyboard button; 'present-…' ids show the user's current key (keys.js)
 const PRESENT_KEYS = [
-  ['→  Space  Enter', 'Next step or slide'], ['←  Backspace', 'Previous step or slide'], ['Home  End', 'First / last slide'],
-  ['12 Enter', 'Jump to slide 12'], ['P', 'Presenter view'], ['B  W', 'Black / white screen'], ['R', 'Reset the talk timer'],
-  ['Q', 'Show the quiz solution'], ['L', 'Laser pointer'], ['D', 'Draw'], ['A', 'Draw an arrow'], ['E', 'Erase the drawing'],
-  ['O  G', 'Slide overview'], ['?  H', 'This list'], ['Esc', 'Put the tool away, then end presenting'],
+  [['→', 'Space', 'Enter'], 'Next step or slide'], [['←', 'Backspace'], 'Previous step or slide'], [['Home', 'End'], 'First / last slide'],
+  [['12 Enter'], 'Jump to slide 12'], ...Object.entries(PRESENT_LABELS).map(([id, what]) => [[id, ...{ 'present-overview': ['G'], 'present-help': ['?'] }[id] || []], what]),
+  [['Esc'], 'Put the tool away, then end presenting'],
 ]
+const presentKbd = x => (x.startsWith('present-') ? kbd(x) : x)
+// the remappable presenting keys; the fixed ones (arrows, digits, Esc, the aliases . , C G ?) stay below
+const PRESENT_ACTS = {
+  'present-view': () => { presenterView.value = !presenterView.value; fitPresenter() },
+  'present-black': () => { blank.value = blank.value === 'black' ? null : 'black' }, 'present-white': () => { blank.value = blank.value === 'white' ? null : 'white' },
+  'present-timer': () => (rehearsal.value ? rhRestart() : resetTimer()),
+  'present-quiz': () => { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id) },
+  'present-laser': () => setTool('laser'), 'present-draw': () => setTool('pen'), 'present-arrow': () => setTool('arrow'),
+  'present-erase': () => { strokes.value = [] }, 'present-overview': () => { overview.value = true }, 'present-help': () => { keysHelp.value = !keysHelp.value },
+}
 const keysHelp = ref(false)
 const overview = ref(false), recorder = ref()
 const closeOverview = async () => { overview.value = false; await nextTick(); presenter.value?.focus() } // after the modal is gone: until then the presenter is inert
@@ -710,18 +721,11 @@ function presentKey(e) {
     return e.preventDefault()
   }
   if (e.key === 'Enter' && jump.value) { clearTimeout(jumpTimer); presentGo(+jump.value - 1); return e.preventDefault() }
-  const k = e.key.toLowerCase()
-  if (plain && (k === 'b' || k === '.' || k === 'w' || k === ',')) {
-    const want = k === 'b' || k === '.' ? 'black' : 'white'
-    blank.value = blank.value === want ? null : want
-    return e.preventDefault()
-  }
-  if (plain && k === 'r') { rehearsal.value ? rhRestart() : resetTimer(); return e.preventDefault() }
-  if (plain && k === 'q') { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id); return e.preventDefault() }
-  if (plain && (k === 'l' || k === 'd' || k === 'a')) { setTool({ l: 'laser', d: 'pen', a: 'arrow' }[k]); return e.preventDefault() }
-  if (plain && (k === 'e' || k === 'c')) { strokes.value = []; return e.preventDefault() }
-  if (plain && (k === 'o' || k === 'g')) { overview.value = true; return e.preventDefault() } // g: Slidev's go-to, the overview takes a typed number too
-  if (e.key === '?' || (plain && k === 'h')) { keysHelp.value = !keysHelp.value; return e.preventDefault() }
+  const k = e.key.toLowerCase(), combo = comboOf(e)
+  const act = combo && Object.keys(PRESENT_ACTS).find(id => keyOf(id) === combo)
+  if (act) { PRESENT_ACTS[act](); return e.preventDefault() }
+  const alias = plain && { '.': 'present-black', ',': 'present-white', c: 'present-erase', g: 'present-overview' }[k] // g: Slidev's go-to, the overview takes a typed number too
+  if (alias || e.key === '?') { PRESENT_ACTS[alias || 'present-help'](); return e.preventDefault() }
   if (e.key === 'Escape' && keysHelp.value) { keysHelp.value = false; return e.preventDefault() }
   if (e.key === 'Escape' && tool.value) { tool.value = null; return e.preventDefault() }
   const d = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1, Enter: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1, Backspace: -1 }[e.key]
@@ -729,7 +733,6 @@ function presentKey(e) {
   else if (e.key === 'Home') presentGo(nextShown(deck.slides, -1, 1))
   else if (e.key === 'End') presentGo(nextShown(deck.slides, deck.slides.length, -1))
   else if (e.key === 'Escape') stopPresenting()
-  else if (plain && k === 'p') { presenterView.value = !presenterView.value; fitPresenter() }
   else return
   e.preventDefault()
 }
@@ -817,54 +820,54 @@ const THEME_PREVIEW = computed(() => ({ layout: 'default', elements: [
   { id: 'l', type: 'text', x: 56, y: 130, w: 520, h: 300, html: `<ul><li>${t('Item one')}</li><li>${t('Item')} <a href="#">${t('two')}</a></li><li><code>code</code></li></ul>`, fontSize: 40 },
   { id: 'c', type: 'code', x: 620, y: 140, w: 300, h: 220, lang: 'js', code: 'const a = 1\nlog(a)', fontSize: 30 },
 ] }))
-const SHAPE_NAMES = { rect: ['Rectangle', 'r'], rounded: ['Rounded'], ellipse: ['Ellipse', 'o'], triangle: ['Triangle'], arrow: ['Arrow', 'a'], line: ['Line'] }
+const SHAPE_NAMES = { rect: ['Rectangle'], rounded: ['Rounded'], ellipse: ['Ellipse'], triangle: ['Triangle'], arrow: ['Arrow'], line: ['Line'] }
 const pickImage = () => document.querySelector('.topbar input[type=file][accept^="image"]')?.click()
 const commands = computed(() => [
-  [t('New slide'), () => A.addSlide(), 'n'], [t('Duplicate slide'), () => A.duplicateSlide(), 'mod+shift+d'], [t('Delete slide'), () => A.deleteSlide(), 'mod+shift+backspace'],
-  [t('Move slide up'), () => A.moveSlide(ui.slide, ui.slide - 1), 'alt+arrowup'], [t('Move slide down'), () => A.moveSlide(ui.slide, ui.slide + 1), 'alt+arrowdown'],
-  ...deck.layouts.map(l => [t('New slide: {0}', l.name), () => A.addSlide(l)]), [t('Edit master and layouts'), () => A.editMaster()],
-  [t('Insert text'), () => A.insert('text'), 't'], [t('Insert heading'), () => A.insert('heading'), 'h'], [t('Insert bullet list'), () => A.insert('list'), 'l'],
-  [t('Insert numbered list'), () => A.insert('olist'), 'shift+l'], [t('Insert quote'), () => A.insert('quote'), 'q'], [t('Insert code'), () => A.insert('code'), 'c'],
-  [t('Insert image'), pickImage, 'i'],
-  ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
+  [t('New slide'), () => A.addSlide(), 'newSlide'], [t('Duplicate slide'), () => A.duplicateSlide(), 'duplicateSlide'], [t('Delete slide'), () => A.deleteSlide(), 'deleteSlide'],
+  [t('Move slide up'), () => A.moveSlide(ui.slide, ui.slide - 1), 'moveSlideUp'], [t('Move slide down'), () => A.moveSlide(ui.slide, ui.slide + 1), 'moveSlideDown'],
+  ...deck.layouts.map(l => [t('New slide: {0}', l.name), () => A.addSlide(l)]), [t('Edit master and layouts'), () => A.editMaster(), 'editMaster'],
+  [t('Insert text'), () => A.insert('text'), 'insertText'], [t('Insert heading'), () => A.insert('heading'), 'insertHeading'], [t('Insert bullet list'), () => A.insert('list'), 'insertList'],
+  [t('Insert numbered list'), () => A.insert('olist'), 'insertOlist'], [t('Insert quote'), () => A.insert('quote'), 'insertQuote'], [t('Insert code'), () => A.insert('code'), 'insertCode'],
+  [t('Insert image'), pickImage, 'insertImage'],
+  ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'insertTable']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
-  ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert table of contents'), () => A.insert('toc')], [t('Insert formula'), () => A.insert('math')], [t('Insert icon'), openIcons], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
-  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()], [t('Edit all Markdown (source editor)'), () => (source.open = true), 'alt+m'],
-  [t('New deck'), newDeck, 'shift+n'],
-  [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
-  [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
-  [t('Rehearse the talk (time each slide)'), () => rehearse()], [t('Record presentation …'), recordTalk],
-  [t('Show/hide slide list'), () => (panels.slides = !panels.slides), 'alt+b'], [t('Show/hide properties'), () => (panels.props = !panels.props), 'alt+e'],
-  [t('Undo'), () => undo(), 'mod+z'], [t('Redo'), redo, 'mod+shift+z'],
-  [t('Zoom in'), () => zoomBy(1.25), 'mod+='], [t('Zoom out'), () => zoomBy(1 / 1.25), 'mod+-'], [t('Zoom to 100 %'), () => setZoom(1), 'shift+0'],
-  [t('Fit slide to window'), () => setZoom(null), 'mod+0'], [t('Zoom to fit'), () => setZoom(null), 'shift+1'],
-  [t('Find'), () => openFind(), 'mod+f'], [t('Replace'), () => openFind(true), 'mod+alt+f'], [t('Check accessibility …'), () => { a11yOpen.value = true }],
-  [t('Select all'), A.selectAll, 'mod+a'], [t('Copy formatting'), A.copyLook, 'mod+alt+c'], [t('Paste formatting'), () => A.pasteLook(), 'mod+alt+v'], [t('Duplicate'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'mod+d'],
-  [t('Bring forward'), () => A.order('forward'), 'mod+arrowup'], [t('Send backward'), () => A.order('backward'), 'mod+arrowdown'],
-  [t('Bring to front'), () => A.order('front'), 'mod+shift+arrowup'], [t('Send to back'), () => A.order('back'), 'mod+shift+arrowdown'],
-  [t('Group'), A.group, 'mod+g'], [t('Ungroup'), A.ungroup, 'mod+shift+g'],
-  [t('Export …'), () => openExport(), 'mod+e'],
-  [t('Export: PDF (all)'), () => A.pdf(), 'mod+p'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'mod+shift+e'], [t('Export: Slidev project (ZIP)'), A.slidev, 'mod+alt+s'],
-  [t('Export: PowerPoint as images (all)'), () => A.exportAs('pptx-image')], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp')], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google')],
-  [t('Export: HTML presentation (all)'), () => A.exportAs('html')], [t('Export: PNG images (all)'), () => A.exportAs('png')],
+  ...Object.entries(SHAPE_NAMES).map(([s, [n]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), 'shape-' + s]),
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'insertVideo'], [t('Insert chart'), () => A.insert('chart'), 'insertChart'], [t('Insert diagram (Mermaid)'), () => A.insert('diagram'), 'insertDiagram'], [t('Insert table of contents'), () => A.insert('toc'), 'insertToc'], [t('Insert formula'), () => A.insert('math'), 'insertMath'], [t('Insert icon'), openIcons, 'insertIcon'], [t('Insert timer'), () => A.insert('timer'), 'insertTimer'], [t('Insert quiz'), () => A.insert('quiz'), 'insertQuiz'], [t('Insert random picker'), () => A.insert('picker'), 'insertPicker'], [t('Notes box for the class'), () => A.insert('board'), 'insertBoard'],
+  [t('Hide/show slide'), () => A.toggleHidden(), 'toggleHidden'], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'editMarkdown'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'markdownSlides'], [t('Markdown tutorial'), () => openTutorial(), 'markdownTutorial'], [t('Edit all Markdown (source editor)'), () => (source.open = true), 'sourceEditor'],
+  [t('New deck'), newDeck, 'newDeck'],
+  [t('Present from current slide'), () => present(), 'present'], [t('Present from beginning'), () => present(0), 'presentStart'],
+  [t('Presenter view'), () => { presenterView.value = true; present() }, 'presenterView'],
+  [t('Rehearse the talk (time each slide)'), () => rehearse(), 'rehearse'], [t('Record presentation …'), recordTalk, 'record'],
+  [t('Show/hide slide list'), () => (panels.slides = !panels.slides), 'toggleSlides'], [t('Show/hide properties'), () => (panels.props = !panels.props), 'toggleProps'],
+  [t('Undo'), () => undo(), 'undo'], [t('Redo'), redo, 'redo'],
+  [t('Zoom in'), () => zoomBy(1.25), 'zoomIn'], [t('Zoom out'), () => zoomBy(1 / 1.25), 'zoomOut'], [t('Zoom to 100 %'), () => setZoom(1), 'zoom100'],
+  [t('Fit slide to window'), () => setZoom(null), 'fitWindow'], [t('Zoom to fit'), () => setZoom(null), 'zoomFit'],
+  [t('Find'), () => openFind(), 'find'], [t('Replace'), () => openFind(true), 'replace'], [t('Check accessibility …'), () => { a11yOpen.value = true }, 'a11y'],
+  [t('Select all'), A.selectAll, 'selectAll'], [t('Copy formatting'), A.copyLook, 'copyLook'], [t('Paste formatting'), () => A.pasteLook(), 'pasteLook'], [t('Duplicate'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'duplicate'],
+  [t('Bring forward'), () => A.order('forward'), 'forward'], [t('Send backward'), () => A.order('backward'), 'backward'],
+  [t('Bring to front'), () => A.order('front'), 'front'], [t('Send to back'), () => A.order('back'), 'back'],
+  [t('Group'), A.group, 'group'], [t('Ungroup'), A.ungroup, 'ungroup'],
+  [t('Export …'), () => openExport(), 'export'],
+  [t('Export: PDF (all)'), () => A.pdf(), 'exportPdf'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'exportPptx'], [t('Export: Slidev project (ZIP)'), A.slidev, 'exportSlidev'],
+  [t('Export: PowerPoint as images (all)'), () => A.exportAs('pptx-image'), 'exportPptxImage'], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp'), 'exportOdp'], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google'), 'exportGoogle'],
+  [t('Export: HTML presentation (all)'), () => A.exportAs('html'), 'exportHtml'], [t('Export: PNG images (all)'), () => A.exportAs('png'), 'exportPng'],
   ...decks.value.filter(d => d.file !== deck.entry).map(d => [t('Export: deck “{0}” …', d.name), () => openExport(d.file)]),
-  [t('Save project as file'), A.saveFile, 'mod+s'], [t('Go to project overview'), () => { ui.home = true }],
-  [t('Save snapshot'), snapNow], [t('Version history …'), openSnaps],
-  [t('All commands and shortcuts'), openPalette, 'mod+k'],
-  [t('Take the tour'), () => begin(false)], [t('Full tour incl. Markdown (~5 min)'), () => begin(true)],
-  [t('Revert this slide to imported version'), () => A.revertSlides([slide.value])],
-  [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert'))],
+  [t('Save project as file'), A.saveFile, 'saveFile'], [t('Go to project overview'), () => { ui.home = true }, 'home'],
+  [t('Save snapshot'), snapNow, 'snapshot'], [t('Version history …'), openSnaps, 'versions'],
+  [t('All commands and shortcuts'), openPalette, 'palette'], [t('Keyboard shortcuts …'), openKeys, 'shortcuts'],
+  [t('Take the tour'), () => begin(false), 'tour'], [t('Full tour incl. Markdown (~5 min)'), () => begin(true), 'tourFull'],
+  [t('Revert this slide to imported version'), () => A.revertSlides([slide.value]), 'revertSlide'],
+  [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert')), 'revertAll'],
   ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),
-  [t('Edit theme …'), () => themeEditor.value.open(deck.theme)], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click()],
+  [t('Edit theme …'), () => themeEditor.value.open(deck.theme), 'editTheme'], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click(), 'importTheme'],
 ])
-const KEY_NAMES = { arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→', backspace: '⌫', enter: '↵' }
-const keyLabel = spec => spec && spec.split('+').map(k => ({ mod: isMac ? '⌘' : t('Ctrl+'), shift: '⇧', alt: isMac ? '⌥' : 'Alt+' }[k] || KEY_NAMES[k] || k.toUpperCase())).join('')
+const keyLabel = spec => fmtKey(spec) // fixed keys (find options); commands show kbd(id), the user's current key
+const keysDialog = ref(), openKeys = () => keysDialog.value?.open()
 const filtered = computed(() => {
   const q = paletteQuery.value.toLowerCase().split(/\s+/).filter(Boolean)
   // without a query: everything that has a shortcut first, as a cheat sheet
-  if (!q.length) return [...commands.value].sort((a, b) => !a[2] - !b[2])
-  return commands.value.filter(([n, , k]) => q.every(w => n.toLowerCase().includes(w) || keyLabel(k)?.toLowerCase() === w)).slice(0, 30)
+  if (!q.length) return [...commands.value].sort((a, b) => !keyOf(a[2]) - !keyOf(b[2]))
+  return commands.value.filter(([n, , k]) => q.every(w => n.toLowerCase().includes(w) || (keyOf(k) && kbd(k).toLowerCase() === w))).slice(0, 30)
 })
 function openPalette() { paletteQuery.value = ''; paletteIndex.value = 0; openDlg(paletteDialog.value) }
 function paletteKey(e) {
@@ -884,22 +887,16 @@ function runCommand(c) {
 function onKey(e) {
   // handled already (menu arrows, palette Enter, ⌘↵ in the Markdown editor): not a second time as a shortcut
   if (presenting.value || ui.home || e.defaultPrevented) return
-  const k = e.key.toLowerCase(), cmd = e.metaKey || e.ctrlKey
-  // letters by position: Alt/Option changes e.key (⌥P = π)
-  // digits by position too (Shift+0 is ")" or "="), and "+" as "=" (⌘+ on German keyboards)
-  const name = /^Key[A-Z]$/.test(e.code) ? e.code[3].toLowerCase() : /^Digit\d$/.test(e.code) ? e.code[5] : k === '+' ? '=' : k
+  const k = e.key.toLowerCase(), cmd = e.metaKey || e.ctrlKey, combo = comboOf(e)
   if (cmd && k === 'k' && ui.editing) { e.preventDefault(); return openLink() }
   // crop mode: Enter or Esc finishes it (before anything else uses those keys)
   if (ui.crop && (k === 'escape' || k === 'enter') && !inField(e)) { e.preventDefault(); return A.endCrop() }
   if (e.key === 'F5' || (cmd && e.key === 'Enter')) { e.preventDefault(); return present(e.shiftKey ? 0 : ui.slide) }
-  // shortcuts that also work while typing
-  const global = ['mod+s', 'mod+f', 'mod+alt+f', 'mod+k', 'mod+p', 'mod+shift+e', 'mod+alt+s']
   const typing = inField(e)
   if (e.key === '?' && !typing) { e.preventDefault(); return openPalette() }
   for (const c of commands.value) {
-    const parts = c[2]?.split('+')
-    if (!parts || parts.at(-1) !== name || parts.includes('mod') !== cmd || parts.includes('shift') !== e.shiftKey || parts.includes('alt') !== e.altKey) continue
-    if (typing && !global.includes(c[2])) return
+    if (!combo || !c[2] || keyOf(c[2]) !== combo) continue
+    if (typing && !GLOBAL.includes(c[2])) return // GLOBAL: the shortcuts that also work while typing
     e.preventDefault()
     return A.run(c[1])
   }
@@ -1057,45 +1054,45 @@ function onClipboard(e) {
             <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
-            <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ keyLabel('alt+m') }}</kbd></button>
+            <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ kbd('sourceEditor') }}</kbd></button>
             <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
             <hr />
-            <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ mod }}S</kbd></button>
+            <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ kbd('saveFile') }}</kbd></button>
             <button class="mi" @click="openSnaps"><Icon name="history" />{{ t('Version history …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
-            <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ mod }}Z</kbd></button>
-            <button class="mi" :disabled="!canRedo()" @click="redo"><Icon name="redo" />{{ t('Redo') }}<kbd>{{ mod }}⇧Z</kbd></button>
+            <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ kbd('undo') }}</kbd></button>
+            <button class="mi" :disabled="!canRedo()" @click="redo"><Icon name="redo" />{{ t('Redo') }}<kbd>{{ kbd('redo') }}</kbd></button>
             <hr />
-            <button class="mi" @click="openFind()"><Icon name="search" />{{ t('Find …') }}<kbd>{{ mod }}F</kbd></button>
-            <button class="mi" @click="openFind(true)"><Icon name="search" />{{ t('Replace …') }}<kbd>{{ keyLabel('mod+alt+f') }}</kbd></button>
+            <button class="mi" @click="openFind()"><Icon name="search" />{{ t('Find …') }}<kbd>{{ kbd('find') }}</kbd></button>
+            <button class="mi" @click="openFind(true)"><Icon name="search" />{{ t('Replace …') }}<kbd>{{ kbd('replace') }}</kbd></button>
             <hr />
-            <button class="mi" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
-            <button class="mi" :disabled="!selection.length" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ mod }}D</kbd></button>
+            <button class="mi" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ kbd('selectAll') }}</kbd></button>
+            <button class="mi" :disabled="!selection.length" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ kbd('duplicate') }}</kbd></button>
             <button class="mi" :disabled="!selection.length" @click="A.remove"><Icon name="trash" />{{ t('Delete') }}<kbd>⌫</kbd></button>
             <hr />
-            <button class="mi" @click="openPalette"><Icon name="keyboard" />{{ t('All commands & shortcuts …') }}<kbd>{{ mod }}K</kbd></button>
+            <button class="mi" @click="openPalette"><Icon name="keyboard" />{{ t('All commands & shortcuts …') }}<kbd>{{ kbd('palette') }}</kbd></button>
             <button class="mi" @click="begin(false)"><Icon name="info" />{{ t('Take the tour') }}</button>
           </Menu>
           <Menu :label="t('Insert')">
-            <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Text') }}<kbd>{{ keyLabel('t') }}</kbd></button>
-            <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ keyLabel('h') }}</kbd></button>
-            <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ keyLabel('l') }}</kbd></button>
-            <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ keyLabel('shift+l') }}</kbd></button>
-            <button class="mi" @click="A.insert('quote')"><Icon name="quote" />{{ t('Quote') }}<kbd>{{ keyLabel('q') }}</kbd></button>
-            <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ keyLabel('c') }}</kbd></button>
-            <button class="mi" @click="pickImage"><Icon name="image" />{{ t('Image …') }}<kbd>{{ keyLabel('i') }}</kbd></button>
+            <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Text') }}<kbd>{{ kbd('insertText') }}</kbd></button>
+            <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ kbd('insertHeading') }}</kbd></button>
+            <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ kbd('insertList') }}</kbd></button>
+            <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ kbd('insertOlist') }}</kbd></button>
+            <button class="mi" @click="A.insert('quote')"><Icon name="quote" />{{ t('Quote') }}<kbd>{{ kbd('insertQuote') }}</kbd></button>
+            <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ kbd('insertCode') }}</kbd></button>
+            <button class="mi" @click="pickImage"><Icon name="image" />{{ t('Image …') }}<kbd>{{ kbd('insertImage') }}</kbd></button>
             <hr />
-            <button class="mi" @click="A.insert('table', TABLE_PRESETS[0][0])"><Icon name="table" />{{ t('Table') }}<kbd>{{ keyLabel('b') }}</kbd></button>
+            <button class="mi" @click="A.insert('table', TABLE_PRESETS[0][0])"><Icon name="table" />{{ t('Table') }}<kbd>{{ kbd('insertTable') }}</kbd></button>
             <div class="shape-row">
-              <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="SHAPE_NAMES[s][1] ? `${t(SHAPE_NAMES[s][0])} (${keyLabel(SHAPE_NAMES[s][1])})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
+              <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="kbd('shape-' + s) ? `${t(SHAPE_NAMES[s][0])} (${kbd('shape-' + s)})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
                 <svg viewBox="0 0 40 28"><rect v-if="s === 'rect'" x="4" y="4" width="32" height="20" /><rect v-if="s === 'rounded'" x="4" y="4" width="32" height="20" rx="6" /><ellipse v-if="s === 'ellipse'" cx="20" cy="14" rx="16" ry="10" /><polygon v-if="s === 'triangle'" points="20,3 36,25 4,25" /><polygon v-if="s === 'arrow'" points="3,9 24,9 24,3 37,14 24,25 24,19 3,19" /><line v-if="s === 'line'" x1="4" y1="14" x2="36" y2="14" /></svg>
               </button>
             </div>
             <hr />
             <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
             <hr />
-            <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ keyLabel('y') }}</kbd></button>
+            <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ kbd('insertVideo') }}</kbd></button>
             <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
             <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
             <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
@@ -1105,16 +1102,16 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
             <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
             <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
-            <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ keyLabel('shift+m') }}</kbd></button>
+            <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ kbd('markdownSlides') }}</kbd></button>
           </Menu>
           <Menu :label="t('Arrange')">
-            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ kbd('front') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ kbd('forward') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ kbd('backward') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ kbd('back') }}</kbd></button>
             <hr />
-            <button class="mi" :disabled="selection.length < 2" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
-            <button class="mi" :disabled="!selection.some(e => e.group)" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
+            <button class="mi" :disabled="selection.length < 2" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ kbd('group') }}</kbd></button>
+            <button class="mi" :disabled="!selection.some(e => e.group)" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ kbd('ungroup') }}</kbd></button>
             <hr />
             <div class="mi-row" role="group" :aria-label="selection.length > 1 ? t('Align to each other') : t('Align on slide')">
               <button v-for="[a, i, tip] in [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]" :key="a"
@@ -1126,17 +1123,18 @@ function onClipboard(e) {
           <Menu :label="t('View')">
             <button class="mi" @click="present()"><Icon name="play" />{{ t('Present') }}<kbd>P</kbd></button>
             <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Present from beginning') }}<kbd>⇧P</kbd></button>
-            <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Presenter view') }}<kbd>{{ keyLabel('alt+p') }}</kbd></button>
+            <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Presenter view') }}<kbd>{{ kbd('presenterView') }}</kbd></button>
             <button class="mi" @click="rehearse()"><Icon name="timer" />{{ t('Rehearse the talk') }}</button>
             <button class="mi" @click="recordTalk"><Icon name="record" />{{ t('Record presentation …') }}</button>
             <hr />
-            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
-            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
-            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ keyLabel('mod+0') }}</kbd></button>
-            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />{{ t('Zoom to 100 %') }}<kbd>{{ keyLabel('shift+0') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ kbd('zoomIn') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ kbd('zoomOut') }}</kbd></button>
+            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ kbd('fitWindow') }}</kbd></button>
+            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />{{ t('Zoom to 100 %') }}<kbd>{{ kbd('zoom100') }}</kbd></button>
             <hr />
-            <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ keyLabel('alt+b') }}</kbd></button>
-            <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ keyLabel('alt+e') }}</kbd></button>
+            <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ kbd('toggleSlides') }}</kbd></button>
+            <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ kbd('toggleProps') }}</kbd></button>
+            <button class="mi" @click="openKeys"><Icon name="keyboard" />{{ t('Keyboard shortcuts …') }}<kbd>{{ kbd('shortcuts') }}</kbd></button>
             <hr />
             <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
             <button class="mi" :aria-pressed="a11yOpen" @click="a11yOpen = !a11yOpen"><Icon name="eye" />{{ t('Check accessibility …') }}</button>
@@ -1164,17 +1162,17 @@ function onClipboard(e) {
         </Menu>
         <Menu icon="shapes" :label="t('Shape')" :title="t('Shape')">
           <div class="shape-row shape-grid">
-            <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="SHAPE_NAMES[s][1] ? `${t(SHAPE_NAMES[s][0])} (${keyLabel(SHAPE_NAMES[s][1])})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
+            <button v-for="s in ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']" :key="s" class="shape-btn" :aria-label="t(SHAPE_NAMES[s][0])" :title="kbd('shape-' + s) ? `${t(SHAPE_NAMES[s][0])} (${kbd('shape-' + s)})` : t(SHAPE_NAMES[s][0])" @click="A.insert('shape', s)">
               <svg viewBox="0 0 40 28"><rect v-if="s === 'rect'" x="4" y="4" width="32" height="20" /><rect v-if="s === 'rounded'" x="4" y="4" width="32" height="20" rx="6" /><ellipse v-if="s === 'ellipse'" cx="20" cy="14" rx="16" ry="10" /><polygon v-if="s === 'triangle'" points="20,3 36,25 4,25" /><polygon v-if="s === 'arrow'" points="3,9 24,9 24,3 37,14 24,25 24,19 3,19" /><line v-if="s === 'line'" x1="4" y1="14" x2="36" y2="14" /></svg>
             </button>
           </div>
         </Menu>
         <span data-tour="insert" class="tour-anchor"><Menu icon="insert" :label="t('Insert')" :title="t('Insert')">
-          <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ keyLabel('h') }}</kbd></button>
-          <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ keyLabel('l') }}</kbd></button>
-          <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ keyLabel('shift+l') }}</kbd></button>
-          <button class="mi" @click="A.insert('quote')"><Icon name="quote" />{{ t('Quote') }}<kbd>{{ keyLabel('q') }}</kbd></button>
-          <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ keyLabel('c') }}</kbd></button>
+          <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Heading') }}<kbd>{{ kbd('insertHeading') }}</kbd></button>
+          <button class="mi" @click="A.insert('list')"><Icon name="list" />{{ t('Bullet list') }}<kbd>{{ kbd('insertList') }}</kbd></button>
+          <button class="mi" @click="A.insert('olist')"><Icon name="olist" />{{ t('Numbered list') }}<kbd>{{ kbd('insertOlist') }}</kbd></button>
+          <button class="mi" @click="A.insert('quote')"><Icon name="quote" />{{ t('Quote') }}<kbd>{{ kbd('insertQuote') }}</kbd></button>
+          <button class="mi" @click="A.insert('code')"><Icon name="code" />{{ t('Code') }}<kbd>{{ kbd('insertCode') }}</kbd></button>
           <hr />
           <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
           <hr />
@@ -1198,16 +1196,16 @@ function onClipboard(e) {
       <div class="right">
         <button class="tb icon" data-tour="palette" :title="`${t('Search commands')} (${mod}K)`" @click="openPalette"><Icon name="search" /></button>
         <div class="zoom-ctl" role="group" :aria-label="t('Zoom')">
-          <button class="tb icon small" :aria-label="t('Zoom out')" :title="`${t('Zoom out')} (${keyLabel('mod+-')})`" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" :size="16" /></button>
+          <button class="tb icon small" :aria-label="t('Zoom out')" :title="`${t('Zoom out')} (${kbd('zoomOut')})`" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" :size="16" /></button>
           <Menu :label="`${Math.round(scale * 100)} %`" :title="t('Zoom')">
-            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
-            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ kbd('zoomIn') }}</kbd></button>
+            <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ kbd('zoomOut') }}</kbd></button>
             <hr />
-            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ keyLabel('mod+0') }}</kbd></button>
-            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />100 %<kbd>{{ keyLabel('shift+0') }}</kbd></button>
+            <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ kbd('fitWindow') }}</kbd></button>
+            <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />100 %<kbd>{{ kbd('zoom100') }}</kbd></button>
             <button class="mi" @click="setZoom(2)"><Icon name="check" :style="{ visibility: zoom === 2 ? null : 'hidden' }" />200 %</button>
           </Menu>
-          <button class="tb icon small" :aria-label="t('Zoom in')" :title="`${t('Zoom in')} (${keyLabel('mod+=')})`" @click="zoomBy(1.25)"><Icon name="zoomIn" :size="16" /></button>
+          <button class="tb icon small" :aria-label="t('Zoom in')" :title="`${t('Zoom in')} (${kbd('zoomIn')})`" @click="zoomBy(1.25)"><Icon name="zoomIn" :size="16" /></button>
         </div>
         <span data-tour="theme" class="tour-anchor"><Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
           <template v-for="own in [false, true]" :key="own">
@@ -1241,7 +1239,7 @@ function onClipboard(e) {
           <h4 class="mh">{{ t('Everything · {0} slides', deck.slides.length) }}</h4>
           <button v-for="f in EXPORTS" :key="f.id" class="mi" @click="A.exportAs(f.id)"><Icon :name="f.id === 'slidev' ? 'markdown' : 'file'" />{{ t(f.name) }} <small class="mi-ext">{{ f.ext }}</small></button>
           <hr />
-          <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}<kbd>{{ keyLabel('mod+e') }}</kbd></button>
+          <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}<kbd>{{ kbd('export') }}</kbd></button>
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Export single deck …') }}</button>
         </Menu></span>
         <button class="tb primary" data-tour="present" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
@@ -1256,7 +1254,7 @@ function onClipboard(e) {
           <span>{{ groups.length > 1 ? t('Decks') : t('Slides') }}</span>
           <span class="panel-actions">
             <button class="tb icon small" :aria-label="t('New slide')" :title="`${t('New slide')} (N)`" @click="A.addSlide()"><Icon name="slidePlus" :size="16" /></button>
-            <button class="tb icon small" :aria-label="t('New deck')" :title="`${t('New deck')} (${keyLabel('shift+n')})`" @click="newDeck"><Icon name="folder" :size="16" /></button>
+            <button class="tb icon small" :aria-label="t('New deck')" :title="`${t('New deck')} (${kbd('newDeck')})`" @click="newDeck"><Icon name="folder" :size="16" /></button>
           </span>
         </div>
         <div class="slide-list">
@@ -1297,7 +1295,7 @@ function onClipboard(e) {
                 </button>
                 <div class="thumb-actions" role="group" :aria-label="t('Slide {0}', g.start + j + 1)">
                   <button class="tb icon small" :aria-label="s.hidden ? t('Show slide') : t('Hide slide')" :title="s.hidden ? t('Show slide') : t('Hide slide')" :aria-pressed="!!s.hidden" @click="A.toggleHidden(g.start + j)"><Icon :name="s.hidden ? 'eye' : 'eyeOff'" :size="14" /></button>
-                  <button class="tb icon small" :aria-label="t('Duplicate slide')" :title="`${t('Duplicate slide')} (${keyLabel('mod+shift+d')})`" @click="A.duplicateSlide(g.start + j)"><Icon name="copy" :size="14" /></button>
+                  <button class="tb icon small" :aria-label="t('Duplicate slide')" :title="`${t('Duplicate slide')} (${kbd('duplicateSlide')})`" @click="A.duplicateSlide(g.start + j)"><Icon name="copy" :size="14" /></button>
                   <button class="tb icon small" :aria-label="t('More actions')" :title="t('More actions')" @click="openThumbMenu($event, g.start + j)"><Icon name="more" :size="14" /></button>
                 </div>
               </div>
@@ -1321,8 +1319,8 @@ function onClipboard(e) {
       <section ref="stage" class="stage" data-tour="canvas" :aria-label="t('Slide {0}', ui.slide + 1)" @dragover.prevent @drop.prevent="dropFiles([...$event.dataTransfer.files])" @wheel="stageWheel"
         @pointerdown.capture="fingerDown" @pointermove="fingerMove" @pointerup="fingerUp" @pointercancel="fingerUp"
         @touchmove="$event.touches.length > 1 && $event.preventDefault()">
-        <button class="tb icon small panel-toggle left" :aria-expanded="panels.slides" :aria-label="t('Show/hide slide list')" :title="`${t('Show/hide slide list')} (${keyLabel('alt+b')})`" @click="panels.slides = !panels.slides"><Icon :name="panels.slides ? 'chevronL' : 'chevronR'" :size="16" /></button>
-        <button class="tb icon small panel-toggle right" :aria-expanded="panels.props" :aria-label="t('Show/hide properties')" :title="`${t('Show/hide properties')} (${keyLabel('alt+e')})`" @click="panels.props = !panels.props"><Icon :name="panels.props ? 'chevronR' : 'chevronL'" :size="16" /></button>
+        <button class="tb icon small panel-toggle left" :aria-expanded="panels.slides" :aria-label="t('Show/hide slide list')" :title="`${t('Show/hide slide list')} (${kbd('toggleSlides')})`" @click="panels.slides = !panels.slides"><Icon :name="panels.slides ? 'chevronL' : 'chevronR'" :size="16" /></button>
+        <button class="tb icon small panel-toggle right" :aria-expanded="panels.props" :aria-label="t('Show/hide properties')" :title="`${t('Show/hide properties')} (${kbd('toggleProps')})`" @click="panels.props = !panels.props"><Icon :name="panels.props ? 'chevronR' : 'chevronL'" :size="16" /></button>
         <Teleport defer :to="mdOpen ? '.md-wrap' : '.stage'">
         <dialog ref="findDialog" class="find" :class="{ replacing }" :aria-label="t('Find and replace')" @keydown.esc.stop.prevent="closeFind" @keydown="findKey" @close="findOpen = false">
           <button type="button" class="tb icon small find-fold" :title="replacing ? t('Hide replace') : t('Show replace')" :aria-expanded="replacing" @click="replacing = !replacing"><Icon :name="replacing ? 'chevron' : 'chevronR'" :size="14" /></button>
@@ -1375,7 +1373,7 @@ function onClipboard(e) {
                 <button class="mi" :disabled="!canMoveDeck(g, -1)" @click="A.moveDeck(g.file, -1)"><Icon name="up" />{{ t('Move up') }}</button>
                 <button class="mi" :disabled="!canMoveDeck(g, 1)" @click="A.moveDeck(g.file, 1)"><Icon name="down" />{{ t('Move down') }}</button>
               </template>
-              <button class="mi" @click="newDeck"><Icon name="folder" />{{ t('New deck') }}<kbd>{{ keyLabel('shift+n') }}</kbd></button>
+              <button class="mi" @click="newDeck"><Icon name="folder" />{{ t('New deck') }}<kbd>{{ kbd('newDeck') }}</kbd></button>
               <hr />
               <button class="mi" :disabled="!g.count" @click="A.pdf(g.file)"><Icon name="file" />{{ t('Export as PDF') }}</button>
               <button class="mi" :disabled="!g.count" @click="A.pptx(g.file)"><Icon name="file" />{{ t('Export as PPTX') }}</button>
@@ -1391,14 +1389,14 @@ function onClipboard(e) {
             <button class="mi" :aria-pressed="!!slide.hidden" @click="A.toggleHidden()"><Icon :name="slide.hidden ? 'eye' : 'eyeOff'" />{{ slide.hidden ? t('Show slide') : t('Hide slide') }}</button>
             <hr />
             <button class="mi" @click="A.addSlide()"><Icon name="slidePlus" />{{ t('New slide after') }}<kbd>N</kbd></button>
-            <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ keyLabel('mod+shift+d') }}</kbd></button>
+            <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ kbd('duplicateSlide') }}</kbd></button>
             <button class="mi" @click="openMarkdown('slide')"><Icon name="markdown" />{{ t('Edit this slide’s Markdown') }}<kbd>M</kbd></button>
             <button v-if="A.canRevert(slide)" class="mi" @click="A.revertSlides([slide])"><Icon name="undo" />{{ t('Revert to imported version') }}</button>
             <hr />
-            <button class="mi" :disabled="ui.slide === 0" @click="A.moveSlide(ui.slide, ui.slide - 1)"><Icon name="up" />{{ t('Move up') }}<kbd>{{ keyLabel('alt+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="ui.slide === deck.slides.length - 1" @click="A.moveSlide(ui.slide, ui.slide + 1)"><Icon name="down" />{{ t('Move down') }}<kbd>{{ keyLabel('alt+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="ui.slide === 0" @click="A.moveSlide(ui.slide, ui.slide - 1)"><Icon name="up" />{{ t('Move up') }}<kbd>{{ kbd('moveSlideUp') }}</kbd></button>
+            <button class="mi" :disabled="ui.slide === deck.slides.length - 1" @click="A.moveSlide(ui.slide, ui.slide + 1)"><Icon name="down" />{{ t('Move down') }}<kbd>{{ kbd('moveSlideDown') }}</kbd></button>
             <hr />
-            <button class="mi danger" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}<kbd>{{ keyLabel('mod+shift+backspace') }}</kbd></button>
+            <button class="mi danger" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}<kbd>{{ kbd('deleteSlide') }}</kbd></button>
           </template>
           <template v-else-if="ctxAt?.cropEl">
             <div class="mh">{{ t('Aspect ratio') }}</div>
@@ -1504,15 +1502,15 @@ function onClipboard(e) {
             <hr v-if="selection.length === 1 && ctxAt.el.type !== 'shape' && ctxAt.el.type !== 'video'" />
             <button class="mi" @click="clip('cut')"><Icon name="cut" />{{ t('Cut') }}<kbd>{{ mod }}X</kbd></button>
             <button class="mi" @click="clip('copy')"><Icon name="copy" />{{ t('Copy') }}<kbd>{{ mod }}C</kbd></button>
-            <button class="mi" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ mod }}D</kbd></button>
+            <button class="mi" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ kbd('duplicate') }}</kbd></button>
             <button class="mi" @click="A.remove"><Icon name="trash" />{{ selection.length > 1 ? t('Delete {0} elements', selection.length) : t('Delete') }}<kbd>⌫</kbd></button>
-            <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
-            <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
+            <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ kbd('ungroup') }}</kbd></button>
+            <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ kbd('group') }}</kbd></button>
             <hr />
-            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
-            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ kbd('front') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ kbd('forward') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ kbd('backward') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ kbd('back') }}</kbd></button>
             <hr />
             <div class="mi-row" role="group" :aria-label="selection.length > 1 ? t('Align to each other') : t('Align on slide')">
               <button v-for="[a, i, tip] in [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]" :key="a"
@@ -1527,10 +1525,10 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Insert text') }}<kbd>T</kbd></button>
             <button class="mi" @click="A.insert('heading')"><Icon name="heading" />{{ t('Insert heading') }}<kbd>H</kbd></button>
             <button class="mi" @click="pickImage"><Icon name="image" />{{ t('Insert image …') }}<kbd>I</kbd></button>
-            <button class="mi" :disabled="!slide.elements.length" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ mod }}A</kbd></button>
+            <button class="mi" :disabled="!slide.elements.length" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ kbd('selectAll') }}</kbd></button>
             <hr />
             <button class="mi" @click="A.addSlide()"><Icon name="slidePlus" />{{ t('New slide') }}<kbd>N</kbd></button>
-            <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ keyLabel('mod+shift+d') }}</kbd></button>
+            <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ kbd('duplicateSlide') }}</kbd></button>
             <button class="mi" @click="openMarkdown('slide')"><Icon name="markdown" />{{ t('Edit this slide’s Markdown') }}<kbd>M</kbd></button>
             <button class="mi" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}</button>
           </template>
@@ -1695,11 +1693,13 @@ function onClipboard(e) {
       <input v-model="paletteQuery" class="palette-input" :placeholder="t('Search commands … (e.g. “table”, “pdf”, “theme”)')" :aria-label="t('Search commands')" autofocus role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="palette-list" :aria-activedescendant="filtered.length ? 'cmd-' + paletteIndex : null" @input="paletteIndex = 0" />
       <ul id="palette-list" role="listbox" :aria-label="t('Commands')">
         <li v-for="(c, i) in filtered" :id="'cmd-' + i" :key="c[0]" role="option" :aria-selected="i === paletteIndex" @click="runCommand(c)" @mousemove="paletteIndex = i">
-          {{ c[0] }}<kbd v-if="c[2]">{{ keyLabel(c[2]) }}</kbd>
+          {{ c[0] }}<kbd v-if="keyOf(c[2])">{{ kbd(c[2]) }}</kbd>
         </li>
         <li v-if="!filtered.length" class="empty">{{ t('No command found') }}</li>
       </ul>
+      <button type="button" class="palette-keys" @click="paletteDialog.close(); openKeys()"><Icon name="keyboard" :size="14" />{{ t('Change keyboard shortcuts …') }}</button>
     </dialog>
+    <KeysDialog ref="keysDialog" :commands="commands" />
   </template>
 
   <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
@@ -1722,7 +1722,7 @@ function onClipboard(e) {
         <p class="rh-pace" :class="rehearsal.since == null ? '' : rhPace > 0 ? 'over' : rhPace != null && 'ok'"><span role="status">{{ rehearsal.since == null ? t('Paused') : rhPace == null ? t('No planned times') : rhPace > 0 ? t('Behind plan') : t('On track') }}</span> <span v-if="rehearsal.since != null && rhPace > 0">{{ signed(rhPace) }}</span></p>
         <div class="rh-btns">
           <button class="tb small" :aria-pressed="rehearsal.since == null" @click="rhPause"><Icon :name="rehearsal.since == null ? 'play' : 'pause'" :size="16" />{{ rehearsal.since == null ? t('Resume') : t('Pause') }}</button>
-          <button class="tb small" :title="t('Restart') + ' (R)'" @click="rhRestart"><Icon name="undo" :size="16" />{{ t('Restart') }}</button>
+          <button class="tb small" :title="`${t('Restart')} (${kbd('present-timer')})`" @click="rhRestart"><Icon name="undo" :size="16" />{{ t('Restart') }}</button>
           <button class="tb small" :title="t('End rehearsal') + ' (Esc)'" @click="stopPresenting"><Icon name="x" :size="16" />{{ t('End rehearsal') }}</button>
         </div>
       </section>
@@ -1739,7 +1739,8 @@ function onClipboard(e) {
     <Overview v-if="overview" @go="i => { presentGo(i); closeOverview() }" @close="closeOverview" />
     <div v-if="keysHelp" class="pv-keys" role="dialog" :aria-label="t('Keys while presenting')" @click.stop="keysHelp = false">
       <h2>{{ t('Keys while presenting') }}</h2>
-      <dl><template v-for="[k, what] in PRESENT_KEYS" :key="k"><dt><kbd v-for="x in k.split('  ')" :key="x">{{ x }}</kbd></dt><dd>{{ t(what) }}</dd></template></dl>
+      <dl><template v-for="[k, what] in PRESENT_KEYS" :key="what"><dt><kbd v-for="x in k.filter(presentKbd)" :key="x">{{ x === 'Space' ? t('Space') : presentKbd(x) }}</kbd></dt><dd>{{ t(what) }}</dd></template></dl>
+      <button class="tb small" @click.stop="keysHelp = false; stopPresenting(); nextTick(openKeys)">{{ t('Change keys …') }}</button>
     </div>
     <!-- pen options in a row of their own above the bar, so the tools and the way out stay in reach on a phone -->
     <div class="pv-bars">
@@ -1751,15 +1752,15 @@ function onClipboard(e) {
       <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
       <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
       <span v-if="rehearsal" class="pv-timer">⏱ {{ clock(rhTotal) }}</span>
-      <button v-else-if="presenterView" class="tb small pv-timer" :title="t('Reset timer') + ' (R)'" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
-      <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="t('Laser pointer') + ' (L)'" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
-      <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="t('Pen') + ' (D)'" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
-      <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="t('Arrow') + ' (A)'" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
-      <button class="tb icon small" :title="t('Slide overview') + ' (O)'" :aria-label="t('Slide overview')" @click.stop="overview = true"><Icon name="grid" :size="16" /></button>
+      <button v-else-if="presenterView" class="tb small pv-timer" :title="`${t('Reset timer')} (${kbd('present-timer')})`" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
+      <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="`${t('Laser pointer')} (${kbd('present-laser')})`" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
+      <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="`${t('Pen')} (${kbd('present-draw')})`" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
+      <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="`${t('Arrow')} (${kbd('present-arrow')})`" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
+      <button class="tb icon small" :title="`${t('Slide overview')} (${kbd('present-overview')})`" :aria-label="t('Slide overview')" @click.stop="overview = true"><Icon name="grid" :size="16" /></button>
       <Recorder ref="recorder" />
       <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
-      <button v-if="strokes.length" class="tb icon small" :title="t('Clear drawing') + ' (E)'" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
-      <button class="tb icon small" :title="t('Presenter view (P)')" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
+      <button v-if="strokes.length" class="tb icon small" :title="`${t('Clear drawing')} (${kbd('present-erase')})`" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
+      <button class="tb icon small" :title="`${t('Presenter view')} (${kbd('present-view')})`" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
       <!-- like Esc: with a tool on, the first press puts the tool away, so the tool buttons come back instead of the presentation ending -->
       <button class="tb icon small" :title="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" :aria-label="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" @click.stop="tool ? (tool = null) : stopPresenting()"><Icon name="x" :size="16" /></button>
     </div>

@@ -5,9 +5,9 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { tour, stepsFor, nextStep, place } from './tour.js'
 import { deck, ui, removeProject } from './store.js'
 import { t } from './i18n.js'
+import { kbd } from './keys.js'
 import { openTutorial } from './tutorial.js'
 
-const mod = computed(() => /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : t('Ctrl+'))
 const steps = computed(() => stepsFor(tour.full))
 const step = computed(() => steps.value[tour.i])
 const bubble = ref(), spot = ref(null), pos = ref({ x: 0, y: 0 }), count = ref([0, 0])
@@ -90,7 +90,7 @@ function key(e) {
       aria-labelledby="tour-title" aria-describedby="tour-text" tabindex="-1" @keydown="key">
       <small class="tour-count">{{ t('{0} of {1}', count[0], count[1]) }}</small>
       <h2 id="tour-title">{{ t(step.title) }}</h2>
-      <p id="tour-text">{{ t(step.text, mod) }}</p>
+      <p id="tour-text">{{ t(step.text, kbd('palette'), kbd('editMarkdown')) }}</p>
       <button v-if="!tour.full && step.id === 'palette'" type="button" class="tb small tour-extra" @click="startTutorial">{{ t('Learn Markdown slides (hands-on)') }}</button>
       <div class="tour-actions">
         <button type="button" class="tb small" @click="end(true)">{{ t('Skip tour') }}</button>
