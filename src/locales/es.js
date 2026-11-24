@@ -1241,4 +1241,9 @@ export default {
   "Lists": "Listas",
   "Table cells": "Celdas de la tabla",
   "Callouts": "Recuadros",
+  "Git project": "Proyecto Git",
+  "Git · GitHub · GitLab": "Git · GitHub · GitLab",
+  "The Slidev project, with every saved version as a commit": "El proyecto de Slidev, con cada versión guardada como commit",
+  "Git project exported: unzip, “git log” lists the saved versions.": "Proyecto Git exportado: descomprímelo, “git log” muestra las versiones guardadas.",
+  "Export: Git project with versions (ZIP)": "Exportar: proyecto Git con versiones (ZIP)",
 }

@@ -228,6 +228,7 @@ const EXPORTS = [
   { id: 'png', icon: 'image', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
   { id: 'pptx-image', icon: 'images', name: 'PowerPoint as images', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
   { id: 'slidev', icon: 'markdown', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
+  { id: 'git', icon: 'git', name: 'Git project', ext: '.zip', apps: 'Git · GitHub · GitLab', note: 'The Slidev project, with every saved version as a commit', editable: true, project: true },
 ]
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 const exportClicks = ref(false) // PDF and images: one page per click step
@@ -849,7 +850,7 @@ const commands = computed(() => [
   [t('Bring to front'), () => A.order('front'), 'front'], [t('Send to back'), () => A.order('back'), 'back'],
   [t('Group'), A.group, 'group'], [t('Ungroup'), A.ungroup, 'ungroup'],
   [t('Export …'), () => openExport(), 'export'],
-  [t('Export: PDF (all)'), () => A.pdf(), 'exportPdf'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'exportPptx'], [t('Export: Slidev project (ZIP)'), A.slidev, 'exportSlidev'],
+  [t('Export: PDF (all)'), () => A.pdf(), 'exportPdf'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'exportPptx'], [t('Export: Slidev project (ZIP)'), A.slidev, 'exportSlidev'], [t('Export: Git project with versions (ZIP)'), () => A.exportAs('git')],
   [t('Export: PowerPoint as images (all)'), () => A.exportAs('pptx-image'), 'exportPptxImage'], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp'), 'exportOdp'], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google'), 'exportGoogle'],
   [t('Export: HTML presentation (all)'), () => A.exportAs('html'), 'exportHtml'], [t('Export: PNG images (all)'), () => A.exportAs('png'), 'exportPng'],
   ...decks.value.filter(d => d.file !== deck.entry).map(d => [t('Export: deck “{0}” …', d.name), () => openExport(d.file)]),

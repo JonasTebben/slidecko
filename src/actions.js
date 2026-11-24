@@ -1,6 +1,6 @@
 import { toggleList } from './lists.js'
 import { computed, nextTick, ref } from 'vue'
-import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout } from './store.js'
+import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData } from './store.js'
 import { ELEMENTS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
 import { formatSize, parseRatio } from './format.js'
@@ -652,6 +652,7 @@ export const FORMATS = {
 export const exportAs = (format, file, clicks) => {
   if (format === 'pdf') return pdf(file, clicks)
   if (format === 'slidev') return slidev()
+  if (format === 'git') return slidev({ git: true })
   const [label, ext, build] = FORMATS[format]
   return run(async () => {
     toast(t('Creating {0} …', t(label)), 0)
@@ -662,25 +663,49 @@ export const exportAs = (format, file, clicks) => {
     toast(t('{0} exported.', t(label)))
   })
 }
-// zip with the Slidev project: entry file, deck files, images (and style.css for generic themes)
-export const slidev = () => run(async () => {
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
+// the Slidev project as { path: text or bytes }: entry file, deck files, images, fonts (and style.css for generic themes)
+async function slidevFiles(data, assets, shapeFont = {}) {
+  const { files, images, fonts } = toSlidev(data, deck.files, { shapeFont, assets })
+  const out = {}
+  // bundled font files come from the app itself, uploaded ones from the project
+  for (const [path, src] of Object.entries(fonts)) {
+    if (assets[src]) { out[path] = b64(assets[src].split(',')[1]); continue }
+    const r = await fetch(src)
+    if (!r.ok) throw new Error(t('Font file {0} could not be loaded', src))
+    out[path] = new Uint8Array(await r.arrayBuffer())
+  }
+  // nothing may unzip outside the project folder: no absolute paths, no '..' segments
+  const inside = p => safePath(p) === p
+  for (const [path, text] of Object.entries(files)) if (inside(path) && !text.startsWith('data:')) out[path] = text
+  // images keep their project paths (Slidev serves the project root and public/ at /)
+  for (const [path, id] of Object.entries(images)) if (inside(path) && assets[id] && !files[path]) out[path] = b64(assets[id].split(',')[1])
+  for (const [path, text] of Object.entries(files)) if (inside(path) && text.startsWith('data:')) out[path] = b64(text.split(',')[1])
+  return { out, files }
+}
+// the saved versions (snapshots) and the current state as Git commits, oldest first
+async function gitFiles(current) {
+  const { gitRepo } = await import('./git.js')
+  const { list, assets } = await snapshotsWithData()
+  const commits = []
+  // shortcut: older versions use today's project files (Slidev originals), snapshots do not keep them
+  for (const s of list) commits.push({ at: s.at, message: `Version of ${new Date(s.at).toISOString().slice(0, 16).replace('T', ' ')} (UTC)`, files: (await slidevFiles(JSON.parse(s.json), { ...assets, ...deck.assets })).out })
+  commits.push({ at: Date.now(), message: 'Current state', files: current })
+  return gitRepo(commits)
+}
+// zip with the Slidev project; git: also a .git folder whose commits are the saved versions
+export const slidev = ({ git } = {}) => run(async () => {
   // text that shrinks to fit its shape (shrinkShapeText) keeps that size: Slidev cannot fit text itself
   const shapeFont = {}
   if (deck.slides.some(s => s.elements.some(e => e.type === 'shape' && e.html))) {
     try { for (const c of (await renderOutput(undefined, true)).querySelectorAll('[data-el] > .shape-text > .content')) if (c.style.fontSize) shapeFont[c.closest('[data-el]').dataset.el] = c.style.fontSize }
     finally { exportSlides.value = null }
   }
-  const { files, images, fonts } = toSlidev(deckData(), deck.files, { shapeFont, assets: deck.assets })
+  const { out, files } = await slidevFiles(deckData(), deck.assets, shapeFont)
   const zip = new (await loadZip())()
-  // bundled font files come from the app itself, uploaded ones from the project
-  for (const [path, src] of Object.entries(fonts)) zip.file(path, deck.assets[src] ? deck.assets[src].split(',')[1] : fetch(src).then(r => r.ok ? r.blob() : Promise.reject(new Error(t('Font file {0} could not be loaded', src)))), { base64: !!deck.assets[src] })
-  // nothing may unzip outside the project folder: no absolute paths, no '..' segments
-  const inside = p => safePath(p) === p
-  for (const [path, text] of Object.entries(files)) if (inside(path) && !text.startsWith('data:')) zip.file(path, text)
-  // images keep their project paths (Slidev serves the project root and public/ at /)
-  for (const [path, id] of Object.entries(images)) if (inside(path) && deck.assets[id] && !files[path]) zip.file(path, deck.assets[id].split(',')[1], { base64: true })
-  for (const [path, text] of Object.entries(files)) if (inside(path) && text.startsWith('data:')) zip.file(path, text.split(',')[1], { base64: true })
-  download(await zip.generateAsync({ type: 'blob' }), safe(deck.title) + '-slidev.zip')
+  for (const [path, content] of Object.entries(out)) zip.file(path, content)
+  if (git) for (const [path, content] of Object.entries(await gitFiles(out))) zip.file(path, content)
+  download(await zip.generateAsync({ type: 'blob' }), safe(deck.title) + (git ? '-git.zip' : '-slidev.zip'))
   // images the Markdown refers to but the project lacks (e.g. loose .md files without public/): slidev build stops on them
   // relative paths resolve against their .md file; http(s), data: and //host links are skipped
   const raw = Object.entries(files).filter(([p]) => p.endsWith('.md')).flatMap(([p, t]) => [...t.matchAll(/!\[[^\]]*\]\(<?([^)\s>]+)|<img\b[^>]*?\ssrc="([^"]+)"/g)]
@@ -692,7 +717,7 @@ export const slidev = () => run(async () => {
     lacking.length && t('{0} (put them at this path in the project before “npx slidev”, for /… also in public/): {1}', n(lacking.length, 'image missing', 'images missing'), list(lacking)),
     bare.length && t('Slidev needs “./” before {0}', list(bare)),
   ].filter(Boolean)
-  toast(issues.length ? t('Slidev project exported – {0}', issues.join(' · ')) : t('Slidev project exported: unzip and start with “npx slidev”.'), issues.length ? 12000 : undefined)
+  toast(issues.length ? t('Slidev project exported – {0}', issues.join(' · ')) : git ? t('Git project exported: unzip, “git log” lists the saved versions.') : t('Slidev project exported: unzip and start with “npx slidev”.'), issues.length ? 12000 : undefined)
 })
 // every stored project as .slides.json in one ZIP; importPresentations reads it back
 export const exportAllProjects = () => run(async () => {

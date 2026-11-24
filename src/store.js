@@ -760,6 +760,12 @@ export async function listSnapshots() {
   await saving
   return deck.id ? (await readSnaps(deck.id)).list.map(({ at, slides }) => ({ at, slides })) : []
 }
+// every snapshot with its JSON, oldest first, and the images they use (the Git export makes a commit of each)
+export async function snapshotsWithData() {
+  await saving
+  const v = deck.id ? await readSnaps(deck.id) : { list: [], assets: {} }
+  return { list: [...v.list].sort((a, b) => a.at - b.at), assets: v.assets }
+}
 export const deleteSnapshot = at => changeSnaps(list => list.filter(s => s.at !== at))
 // the current state becomes a snapshot first, so a restore can itself be restored (and undone: it is a normal edit)
 export async function restoreSnapshot(at) {

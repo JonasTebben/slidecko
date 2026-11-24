@@ -69,6 +69,7 @@ const P = {
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.3-4.3',
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   notes: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5',
+  git: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
   markdown: 'M3 6h18v12H3zM6 15V9l3 3 3-3v6M17 9v6M15 13l2 2 2-2',
   check: 'M20 6 9 17l-5-5',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
