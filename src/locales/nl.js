@@ -717,6 +717,7 @@ export default {
   "New here? Take the 1-minute tour": "Nieuw hier? Volg de rondleiding van 1 minuut",
   "1-minute tour": "Rondleiding van 1 minuut",
   "No thanks": "Nee, bedankt",
+  "New to Markdown?": "Nieuw met Markdown?",
   "Markdown tutorial": "Markdown-tutorial",
   "Markdown tutorial …": "Markdown-tutorial …",
   "Learn Slidev Markdown by doing it, in 5 minutes: type a little, get finished slides": "Leer Slidev-Markdown in 5 minuten door het te doen: een beetje typen, kant-en-klare dia's krijgen",

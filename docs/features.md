@@ -2,7 +2,7 @@
 
 ## Start page
 
-Ways to start (new, open Markdown, import, Markdown tutorial; a saved `.slides.json` or the ZIP from "Save all" is restored through Import), then your projects (only when there are any), then the theme gallery. What Slidecko can do is shown on the landing page; its screenshots and demo video live in `public/showcase/`, recorded by `scripts/showcase.js`.
+Ways to start (four cards: new, open project folder, open Markdown, import; a saved `.slides.json` or the ZIP from "Save all" is restored through Import), below them "New to Markdown?" with the Markdown tutorial, then your projects (only when there are any), then the theme gallery. What Slidecko can do is shown on the landing page; its screenshots and demo video live in `public/showcase/`, recorded by `scripts/showcase.js`.
 
 ## Import
 
