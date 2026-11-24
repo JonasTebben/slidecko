@@ -25,6 +25,7 @@ const count = s => props.findings.filter(f => f.severity === s).length
 const elOf = f => deck.slides[f.slide]?.elements.find(e => e.id === f.el)
 // shows the slide and selects the element, as a click on the canvas would
 function go(f) {
+  dock()
   Object.assign(ui, { master: null, editing: null })
   A.go(f.slide)
   nextTick(() => { ui.sel = f.el ? [f.el] : [] })
@@ -40,11 +41,16 @@ watch(() => props.findings, () => nextTick(() => {
 }))
 function fix(f) { keep(f); applyFix(deck.slides[f.slide], f); if (f.fix !== 'delete') go(f) }
 function setAlt(f, v) { const el = elOf(f); if (!el || !v.trim()) return; keep(f); el.alt = v.trim() }
-onMounted(() => { root.value.show(); root.value.querySelector('.a11y-go, .a11y-close')?.focus() })
+// opens as a modal dialog in the middle, so the result can't be missed; going to a finding docks it at the corner
+function dock() {
+  if (root.value?.matches(':modal')) { root.value.close(); root.value.show() }
+}
+const closed = () => { if (!root.value?.open) emit('close') } // close fires later: after docking it is open again
+onMounted(() => { root.value.showModal(); root.value.querySelector('.a11y-go, .a11y-close')?.focus() })
 </script>
 
 <template>
-  <dialog ref="root" class="a11y" aria-labelledby="a11y-title" @keydown.esc.stop.prevent="emit('close')" @close="emit('close')">
+  <dialog ref="root" class="a11y" aria-labelledby="a11y-title" @keydown.esc.stop.prevent="emit('close')" @close="closed">
     <header class="a11y-head">
       <h2 id="a11y-title"><Icon name="eye" :size="16" />{{ t('Accessibility check') }}</h2>
       <span class="a11y-badge" :class="{ ok: !findings.length }" role="img" :aria-label="t('{0} issues', findings.length)" :title="t('{0} issues', findings.length)">{{ findings.length }}</span>
@@ -104,4 +110,6 @@ dialog.a11y .a11y-sum { display: flex; align-items: center; gap: 4px; margin: 0;
   dialog.a11y { inset: auto 8px max(8px, env(safe-area-inset-bottom)) 8px; width: auto; max-height: 50dvh; }
   .a11y-fix { padding-left: 6px; flex-wrap: wrap; }
 }
+dialog.a11y:modal { inset: 0; margin: auto; width: min(560px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 64px)); box-shadow: 0 12px 40px #0006; }
+dialog.a11y::backdrop { background: #0005; }
 </style>

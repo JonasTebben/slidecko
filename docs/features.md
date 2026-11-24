@@ -146,7 +146,7 @@ The letters follow what they do: **L**aser, **D**raw, **A**rrow, **E**rase, **B*
 
 ## Accessibility
 
-**Accessibility check** (View → Check accessibility …, or ⌘K): a panel at the bottom right (on phones at the bottom) lists what makes the presentation hard to use with a screen reader or hard to read, grouped by slide, with a count in its head and on the slide thumbnails. It follows every edit while open. A click on an entry shows its slide and selects the element; quick fixes take one click and Undo takes them back. Hidden slides are not checked.
+**Accessibility check** (View → Check accessibility …, or ⌘K): a dialog in the middle of the window lists what makes the presentation hard to use with a screen reader or hard to read, grouped by slide, with a count in its head and on the slide thumbnails. It follows every edit while open. A click on an entry shows its slide, selects the element and moves the list to the bottom right (on phones the bottom), where it stays open next to the slide; quick fixes take one click and Undo takes them back. Hidden slides are not checked.
 
 | Rule | Severity | Quick fix |
 | --- | --- | --- |
