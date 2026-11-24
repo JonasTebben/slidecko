@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chartSvg, niceScale, pieAngles, slicePath, parseNum, toGrid, fromGrid, applyGrid, inkOn } from './chart.js'
+import { chartSvg, niceScale, pieAngles, slicePath, parseNum, toGrid, fromGrid, applyGrid, inkOn, percentOff, sliceColor } from './chart.js'
 import { slideToMarkdown } from './toSlidev.js'
 // the store wants a browser: just enough of one
 globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
@@ -101,4 +101,24 @@ test('Slidev: the chart as inline SVG with its data, read back the same', () => 
   const data = JSON.parse(attr.replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&'))
   const back = cleanEl({ ...data, type: 'chart', x: 0, y: 0, w: 600, h: 300 })
   for (const k of ['kind', 'categories', 'series', 'legend', 'values', 'title']) assert.deepEqual(back[k], el[k], k)
+})
+
+test('pie slices take their own colours; values in percent get a % and are checked against 100', () => {
+  const pie = chart({ kind: 'pie', values: true, percent: true, categories: ['A', 'B', 'C'], series: [{ name: 'S', values: [50, 30, 15] }], catColors: [null, '#123456'] })
+  const svg = chartSvg(pie, '#2563eb')
+  assert.ok(svg.includes('fill:#123456'))
+  assert.equal(sliceColor(pie, 0, '#2563eb'), '#2563eb')
+  assert.ok(svg.includes('>50%<') && svg.includes('>15%<'))
+  assert.deepEqual(percentOff(pie), [['S', 95]])
+  assert.deepEqual(percentOff({ ...pie, series: [{ name: 'S', values: [50, 30, 20] }] }), [])
+  // stacked bars: each category should make 100
+  const st = chart({ stacked: true, percent: true, categories: ['A', 'B'], series: [{ name: 'x', values: [40, 70] }, { name: 'y', values: [60, 20] }] })
+  assert.deepEqual(percentOff(st), [['B', 90]])
+  assert.ok(chartSvg(st).includes('>100%<')) // the axis too
+})
+test('cleanEl keeps percent and valid slice colours, one per category', () => {
+  const c = cleanEl(chart({ percent: true, catColors: ['#ff0000', 'red; x', '#00ff00', '#0000ff'] }))
+  assert.equal(c.percent, true)
+  assert.deepEqual(c.catColors, ['#ff0000', null])
+  assert.equal(cleanEl(chart({ catColors: [null, 'red; x'] })).catColors, undefined)
 })

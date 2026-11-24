@@ -234,8 +234,8 @@ function measure(slide, parsed) {
     } else if (n.dataset.chart) {
       let d = {}
       try { d = JSON.parse(n.dataset.chart) } catch { /* broken data: an empty chart, cleanEl checks the rest */ }
-      const { kind, categories, series, legend, values, stacked, title, min, max } = d || {}
-      Object.assign(el, { type: 'chart', kind, categories, series, legend, values, stacked, title, min, max })
+      const { kind, categories, series, legend, values, stacked, title, min, max, percent, catColors } = d || {}
+      Object.assign(el, { type: 'chart', kind, categories, series, legend, values, stacked, title, min, max, percent, catColors })
     } else if (img) {
       if (!img.dataset.asset) continue
       Object.assign(el, { type: 'image', asset: img.dataset.asset, src: img.dataset.src, ...(img.getAttribute('class') && { cls: img.getAttribute('class') }),

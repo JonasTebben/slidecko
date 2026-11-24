@@ -370,7 +370,7 @@ function nativeChart(pptx, svg, m, bg) {
   return [pie ? (m.kind === 'donut' ? pptx.ChartType.doughnut : pptx.ChartType.pie) : m.kind === 'line' ? pptx.ChartType.line : pptx.ChartType.bar, data, {
     chartColors: (pie ? m.categories : m.series).map((_, i) => colorOf(i)),
     showLegend: !!m.legend, legendPos: 'b', ...text('legend'),
-    showValue: !!m.values, ...text('dataLabel'), dataLabelFormatCode: 'General', valAxisLabelFormatCode: 'General', ...(pie && { showPercent: false, dataLabelPosition: 'outEnd' }), ...(m.kind === 'donut' && { holeSize: 55 }),
+    showValue: !!m.values, ...text('dataLabel'), dataLabelFormatCode: m.percent ? '0.##"%"' : 'General', valAxisLabelFormatCode: m.percent ? '0.##"%"' : 'General', ...(pie && { showPercent: false, dataLabelPosition: 'outEnd' }), ...(m.kind === 'donut' && { holeSize: 55 }),
     ...(m.title && { showTitle: true, title: m.title, titleColor: ink, titleFontFace: font, titleFontSize: Math.round(size * 1.47 * 10) / 10 }),
     ...(!pie && {
       barDir: m.kind === 'bar' ? 'bar' : 'col', barGrouping: m.stacked ? 'stacked' : 'clustered',

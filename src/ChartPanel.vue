@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import Menu from './Menu.vue'
 import { deck, cleanEl } from './store.js'
 import { themeOf } from './themes.js'
-import { CHART_KINDS, toGrid, applyGrid, seriesColor } from './chart.js'
+import { CHART_KINDS, toGrid, applyGrid, seriesColor, sliceColor, isPie, percentOff, fmt } from './chart.js'
 import { textGrid } from './tableOps.js'
 import { PALETTE } from './presets.js'
 import { t } from './i18n.js'
@@ -36,7 +36,15 @@ function paste(e, r, c) {
 }
 const addRow = () => { const g = grid.value; g.push([t('Category {0}', g.length), ...Array(g[0].length - 1).fill('0')]); save(g) }
 const addSeries = () => { const g = grid.value; g.forEach((row, i) => row.push(i ? '0' : t('Series {0}', row.length))); save(g) }
-const delRow = r => { const g = grid.value; g.splice(r, 1); save(g) }
+const delRow = r => { const g = grid.value; g.splice(r, 1); props.el.catColors?.splice(r - 1, 1); save(g) }
+// a pie slice's colour (null: the default one, by position)
+function setSlice(j, c) {
+  const cc = props.el.catColors = props.el.categories.map((_, k) => props.el.catColors?.[k] || null)
+  cc[j] = c
+  if (!cc.some(Boolean)) delete props.el.catColors
+}
+// values in percent that don't add up to 100: named, with their sum
+const off = computed(() => (props.el.percent ? percentOff(props.el) : []))
 const delSeries = c => { props.el.series.splice(c - 1, 1) }
 const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
 </script>
@@ -49,6 +57,8 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
     <label v-if="el.kind === 'column' || el.kind === 'bar'" class="check"><input type="checkbox" :checked="!!el.stacked" @change="el.stacked = $event.target.checked || undefined" /> {{ t('Stacked') }}</label>
     <label class="check"><input type="checkbox" :checked="el.legend" @change="el.legend = $event.target.checked" /> {{ t('Legend') }}</label>
     <label class="check"><input type="checkbox" :checked="!!el.values" @change="el.values = $event.target.checked || undefined" /> {{ t('Show values') }}</label>
+    <label class="field">{{ t('Values as') }}
+      <select :value="el.percent ? 'percent' : 'number'" @change="el.percent = $event.target.value === 'percent' || undefined"><option value="number">{{ t('Numbers') }}</option><option value="percent">{{ t('Percent (%)') }}</option></select></label>
     <div v-if="el.kind !== 'pie' && el.kind !== 'donut'" class="btn-row axis">
       <label class="field">{{ t('Axis minimum') }} <input type="number" :value="el.min ?? ''" :placeholder="t('Auto')" @change="el.min = num($event.target.value)" /></label>
       <label class="field">{{ t('Axis maximum') }} <input type="number" :value="el.max ?? ''" :placeholder="t('Auto')" @change="el.max = num($event.target.value)" /></label>
@@ -60,7 +70,7 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
             <th />
             <th v-for="(s, i) in el.series" :key="i">
               <div class="btn-row">
-                <span class="chip" :style="{ '--chip': seriesColor(el, i, accent) }"><Menu icon="fill" :title="t('Series color')">
+                <span v-if="!isPie(el)" class="chip" :style="{ '--chip': seriesColor(el, i, accent) }"><Menu icon="fill" :title="t('Series color')">
                   <div class="swatches pop-sw">
                     <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: s.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="s.color === c" @click="s.color = c" />
                     <button class="sw none" :title="t('Theme color')" :aria-label="t('Theme color')" :aria-pressed="!s.color" @click="delete s.color" />
@@ -71,7 +81,13 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
             </th>
           </tr>
           <tr v-for="(row, r) in grid" :key="r">
-            <td v-for="(v, c) in row" :key="c">
+            <td v-for="(v, c) in row" :key="c" :class="{ cat: r && !c && isPie(el) }">
+              <span v-if="r && !c && isPie(el)" class="chip" :style="{ '--chip': sliceColor(el, r - 1, accent) }"><Menu icon="fill" :title="t('Slice color')">
+                <div class="swatches pop-sw">
+                  <button v-for="col in PALETTE" :key="col" class="sw" :class="{ on: el.catColors?.[r - 1] === col }" :style="{ background: col }" :title="col" :aria-label="col" :aria-pressed="el.catColors?.[r - 1] === col" @click="setSlice(r - 1, col)" />
+                  <button class="sw none" :title="t('Theme color')" :aria-label="t('Theme color')" :aria-pressed="!el.catColors?.[r - 1]" @click="setSlice(r - 1, null)" />
+                </div>
+              </Menu></span>
               <input :value="v" :inputmode="r && c ? 'decimal' : null" :aria-label="!r && !c ? t('Data (paste from Excel, Sheets or Numbers)') : !r ? t('Series {0}', c) : !c ? t('Category {0}', r) : `${row[0]} · ${grid[0][c]}`"
                 @change="setCell(r, c, $event.target.value)" @paste="paste($event, r, c)" />
             </td>
@@ -79,7 +95,9 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
           </tr>
         </table>
       </div>
-      <div class="btn-row">
+      <p v-if="isPie(el) && el.series.length > 1" class="hint">{{ t('A pie chart shows the first series only.') }}</p>
+      <p v-for="[name, sum] in off" :key="name" class="hint warn" role="status">{{ t('{0} adds up to {1}%, not 100%.', name || t('Total'), fmt(sum)) }}</p>
+      <div class="btn-row add">
         <button class="ib wide" :disabled="el.categories.length >= 100" @click="addRow"><Icon name="plus" /> {{ t('Add category') }}</button>
         <button class="ib wide" :disabled="el.series.length >= 20" @click="addSeries"><Icon name="plus" /> {{ t('Add series') }}</button>
       </div>
@@ -89,6 +107,13 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
 
 <style scoped>
 .chart-panel { display: flex; flex-direction: column; gap: 8px; }
+/* side by side when they fit, else one under the other (never on top of each other) */
+.add { margin-top: 6px; gap: 6px; }
+.add .ib.wide { flex: 1 1 auto; white-space: nowrap; }
+.chart-grid td.cat { display: flex; align-items: center; }
+.chart-grid td.cat .chip { flex: none; margin-left: 2px; }
+.hint { margin: 4px 0 0; font-size: 12px; color: var(--ui-muted); }
+.hint.warn { color: var(--ui-danger); }
 .chart-grid th .btn-row { flex-wrap: nowrap; }
 .axis { flex-wrap: nowrap; gap: 8px; }
 .axis .field { flex: 1; min-width: 0; }

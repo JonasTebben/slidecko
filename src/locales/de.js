@@ -1229,4 +1229,11 @@ export default {
   "Click to draw · {0}": "Klicken zum Ziehen · {0}",
   "{0} name": "{0} Name",
   "{0} names": "{0} Namen",
+  // chart values in percent, slice colours
+  "Values as": "Werte als",
+  "Numbers": "Zahlen",
+  "Percent (%)": "Prozent (%)",
+  "Slice color": "Farbe des Segments",
+  "A pie chart shows the first series only.": "Ein Kreisdiagramm zeigt nur die erste Reihe.",
+  "{0} adds up to {1}%, not 100%.": "{0} ergibt zusammen {1} %, nicht 100 %.",
 }

@@ -5,11 +5,23 @@ export const CHART_KINDS = { column: 'Column chart', bar: 'Bar chart', line: 'Li
 // series colours after the first, which is the theme's accent: PALETTE's strong colours (presets.js)
 export const SERIES_COLORS = ['#ea580c', '#16a34a', '#7c3aed', '#db2777', '#0891b2', '#f59e0b', '#dc2626', '#475569']
 export const seriesColor = (el, i, accent = '#2563eb') => el.series?.[i]?.color || (i ? SERIES_COLORS[(i - 1) % SERIES_COLORS.length] : accent)
+export const isPie = el => el.kind === 'pie' || el.kind === 'donut'
+// a pie's slices are its categories: each has its own colour (catColors), in the same default order
+export const sliceColor = (el, i, accent = '#2563eb') => el.catColors?.[i] || seriesColor({}, i, accent)
+// values in percent: which sums are not 100 (a pie: its slices; stacked bars: each category; else each series)
+export function percentOff(el) {
+  const cats = el.categories || [], series = el.series || [], sum = a => Math.round(a.reduce((x, v) => x + (v || 0), 0) * 100) / 100
+  const sums = isPie(el) ? series.slice(0, 1).map(s => [s.name, sum(s.values)])
+    : el.stacked && el.kind !== 'line' ? cats.map((c, j) => [c, sum(series.map(s => s.values[j]))])
+    : series.map(s => [s.name, sum(s.values)])
+  return sums.filter(([, v]) => Math.abs(v - 100) > 0.05)
+}
 
 // "{" as an entity: Slidev compiles slides as Vue templates, where "{{" would be read as an interpolation
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\{/g, '&#123;')
 const r1 = v => Math.round(v * 10) / 10
 export const fmt = v => String(Math.round(v * 100) / 100)
+const fmtNum = fmt
 
 // a "nice" axis around lo..hi (1, 2, 2.5 or 5 times a power of ten per step); a fixed min/max replaces its end
 export function niceScale(lo, hi, fixMin, fixMax, ticks = 5) {
@@ -51,8 +63,8 @@ const text = (x, y, s, fs, o = '') => `<text x="${r1(x)}" y="${r1(y)}" font-size
 export function chartSvg(el, accent) {
   const W = Math.max(1, el.w), H = Math.max(1, el.h), fs = el.fontSize || 16
   const cats = el.categories || [], series = el.series || []
-  const color = i => seriesColor(el, i, accent)
-  const pie = el.kind === 'pie' || el.kind === 'donut'
+  const pie = isPie(el), color = i => (pie ? sliceColor : seriesColor)(el, i, accent)
+  const fmt = v => fmtNum(v) + (el.percent ? '%' : '')
   let top = 4, bottom = H - 4
   const out = []
   if (el.title) { out.push(text(W / 2, top + fs * 1.1, el.title, fs * 1.25, ' text-anchor="middle" font-weight="600"')); top += fs * 1.6 }

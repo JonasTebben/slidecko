@@ -183,8 +183,8 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
     case 'icon': // Slidev's Iconify component in the box; its colour and turns are on the icon
       return `<div style="${boxStyle({ ...el, color: undefined })}">\n\n${iconTag(el)}\n\n</div>`
     case 'chart': { // the picture as inline SVG in the theme's accent; data-chart (JSON, one line) brings the editable chart back on import
-      const { kind, categories, series, legend, values, stacked, title, min, max } = el
-      return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
+      const { kind, categories, series, legend, values, stacked, title, min, max, percent, catColors } = el
+      return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max, percent, catColors })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
     }
     case 'toc': { // Slidev's own <Toc>; data-toc brings the options (also the highlight Slidev lacks) back on import
       const { minDepth, maxDepth, columns, current } = el
