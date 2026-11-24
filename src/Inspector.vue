@@ -381,7 +381,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             <button v-for="[a, i, lbl] in [['top', 'vTop', 'Text top'], ['middle', 'vMiddle', 'Text middle'], ['bottom', 'vBottom', 'Text bottom']]" :key="a" class="ib" :class="{ on: (el.valign || 'top') === a }" :aria-pressed="(el.valign || 'top') === a" :aria-label="t(lbl)" :title="t(lbl)" @click="el.valign = a === 'top' ? undefined : a"><Icon :name="i" /></button>
           </span>
         </div>
-        <label class="check" :title="t('While presenting, a click into the box lets you type the class’s ideas into it; they are saved in the project.')"><input type="checkbox" :checked="!!el.board" @change="el.board = $event.target.checked || undefined" /> {{ t('Editable while presenting') }}</label>
+        <label class="check" :title="t('While presenting, a click into the box lets you type into it, e.g. ideas from the audience; it is saved in the project.')"><input type="checkbox" :checked="!!el.board" @change="el.board = $event.target.checked || undefined" /> {{ t('Editable while presenting') }}</label>
         <label class="check"><input v-model="el.title" type="checkbox" /> {{ t('Slide title') }}</label>
       </Sec>
       <Sec v-if="el.type === 'text'" id="colors" icon="fill" :title="t('Fill & outline')">

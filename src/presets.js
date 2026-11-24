@@ -46,7 +46,7 @@ export const ELEMENTS = {
   }),
   video: youtube => ({ type: 'video', youtube, x: 240, y: 120, w: 500, h: 281 }),
   // notes box for the class: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
-  board: () => T(`<p><strong>${t('Ideas from the class …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
+  board: () => T(`<p><strong>${t('Collected ideas …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
   math: () => ({ type: 'math', tex: FORMULAS.quadratic[1], fontSize: 40, x: 230, y: 200, w: 520, h: 130 }),
   diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),
   timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),

@@ -832,7 +832,7 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'insertTable']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), 'shape-' + s]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'insertVideo'], [t('Insert chart'), () => A.insert('chart'), 'insertChart'], [t('Insert diagram (Mermaid)'), () => A.insert('diagram'), 'insertDiagram'], [t('Insert table of contents'), () => A.insert('toc'), 'insertToc'], [t('Insert formula'), () => A.insert('math'), 'insertMath'], [t('Insert icon'), openIcons, 'insertIcon'], [t('Insert timer'), () => A.insert('timer'), 'insertTimer'], [t('Insert quiz'), () => A.insert('quiz'), 'insertQuiz'], [t('Insert random picker'), () => A.insert('picker'), 'insertPicker'], [t('Notes box for the class'), () => A.insert('board'), 'insertBoard'],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'insertVideo'], [t('Insert chart'), () => A.insert('chart'), 'insertChart'], [t('Insert diagram (Mermaid)'), () => A.insert('diagram'), 'insertDiagram'], [t('Insert table of contents'), () => A.insert('toc'), 'insertToc'], [t('Insert formula'), () => A.insert('math'), 'insertMath'], [t('Insert icon'), openIcons, 'insertIcon'], [t('Insert timer'), () => A.insert('timer'), 'insertTimer'], [t('Insert quiz'), () => A.insert('quiz'), 'insertQuiz'], [t('Insert random picker'), () => A.insert('picker'), 'insertPicker'], [t('Live notes box'), () => A.insert('board'), 'insertBoard'],
   [t('Hide/show slide'), () => A.toggleHidden(), 'toggleHidden'], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'editMarkdown'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'markdownSlides'], [t('Markdown tutorial'), () => openTutorial(), 'markdownTutorial'], [t('Edit all Markdown (source editor)'), () => (source.open = true), 'sourceEditor'],
   [t('New deck'), newDeck, 'newDeck'],
   [t('Present from current slide'), () => present(), 'present'], [t('Present from beginning'), () => present(0), 'presentStart'],
@@ -1100,7 +1100,7 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
             <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
-            <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
+            <button class="mi" @click="A.insert('board')"><Icon name="notes" />{{ t('Live notes box') }}</button>
             <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ kbd('markdownSlides') }}</kbd></button>
           </Menu>
@@ -1184,7 +1184,7 @@ function onClipboard(e) {
           <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
           <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
           <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
-          <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
+          <button class="mi" @click="A.insert('board')"><Icon name="notes" />{{ t('Live notes box') }}</button>
           <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
           <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>⇧M</kbd></button>
         </Menu></span>
