@@ -219,15 +219,15 @@ watch([findOpen, occ, findAt, () => ui.slide, () => ui.editing, collapsed, mdOpe
 // --- export dialog: one place for every format, for the whole project or one deck ---
 // sorted by purpose: editable office formats, web, picture-exact copies, developer project
 const EXPORTS = [
-  { id: 'pdf', name: 'PDF', ext: '.pdf', apps: 'For sharing, printing and archiving', note: 'Vector PDF, selectable text', exact: true },
-  { id: 'pptx', name: 'PowerPoint', ext: '.pptx', apps: 'PowerPoint · Keynote · LibreOffice', note: 'Text, tables and shapes stay editable. Not for Google Slides – text shifts there; use its own variant instead.', editable: true },
-  { id: 'pptx-google', name: 'Google Slides', ext: '.pptx', apps: 'Google Slides (File → Import)', note: 'Editable; line spacing written the way Google reads it', editable: true },
-  { id: 'odp', name: 'OpenDocument', ext: '.odp', apps: 'LibreOffice Impress · OpenOffice · Collabora', note: 'Open format, editable', editable: true },
-  { id: 'html', name: 'HTML presentation', ext: '.html', apps: 'Any browser, also offline', note: 'A single file. Present with the arrow keys, F for fullscreen.', exact: true },
-  { id: 'html-zip', name: 'HTML presentation (ZIP)', ext: '.zip', apps: 'Web servers, learning platforms, any browser', note: 'index.html with images as separate files – smaller than the single file', exact: true },
-  { id: 'png', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
-  { id: 'pptx-image', name: 'PowerPoint as images', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
-  { id: 'slidev', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
+  { id: 'pdf', icon: 'fileText', name: 'PDF', ext: '.pdf', apps: 'For sharing, printing and archiving', note: 'Vector PDF, selectable text', exact: true },
+  { id: 'pptx', icon: 'presentation', name: 'PowerPoint', ext: '.pptx', apps: 'PowerPoint · Keynote · LibreOffice', note: 'Text, tables and shapes stay editable. Not for Google Slides – text shifts there; use its own variant instead.', editable: true },
+  { id: 'pptx-google', icon: 'cloud', name: 'Google Slides', ext: '.pptx', apps: 'Google Slides (File → Import)', note: 'Editable; line spacing written the way Google reads it', editable: true },
+  { id: 'odp', icon: 'slides', name: 'OpenDocument', ext: '.odp', apps: 'LibreOffice Impress · OpenOffice · Collabora', note: 'Open format, editable', editable: true },
+  { id: 'html', icon: 'globe', name: 'HTML presentation', ext: '.html', apps: 'Any browser, also offline', note: 'A single file. Present with the arrow keys, F for fullscreen.', exact: true },
+  { id: 'html-zip', icon: 'archive', name: 'HTML presentation (ZIP)', ext: '.zip', apps: 'Web servers, learning platforms, any browser', note: 'index.html with images as separate files – smaller than the single file', exact: true },
+  { id: 'png', icon: 'image', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
+  { id: 'pptx-image', icon: 'images', name: 'PowerPoint as images', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
+  { id: 'slidev', icon: 'markdown', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
 ]
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 const exportClicks = ref(false) // PDF and images: one page per click step
@@ -1237,7 +1237,7 @@ function onClipboard(e) {
         </Menu>
         <span data-tour="export" class="tour-anchor"><Menu icon="download" label="Export">
           <h4 class="mh">{{ t('Everything · {0} slides', deck.slides.length) }}</h4>
-          <button v-for="f in EXPORTS" :key="f.id" class="mi" @click="A.exportAs(f.id)"><Icon :name="f.id === 'slidev' ? 'markdown' : 'file'" />{{ t(f.name) }} <small class="mi-ext">{{ f.ext }}</small></button>
+          <button v-for="f in EXPORTS" :key="f.id" class="mi" @click="A.exportAs(f.id)"><Icon :name="f.icon" />{{ t(f.name) }} <small class="mi-ext">{{ f.ext }}</small></button>
           <hr />
           <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}<kbd>{{ kbd('export') }}</kbd></button>
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Export single deck …') }}</button>
