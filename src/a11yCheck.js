@@ -145,6 +145,7 @@ function paintAt(stack, x, y, ctx) {
     if (p.image) return { colors: [], image: true }
     return over(p, p[3] < 1 ? paintAt(stack.slice(0, i), x, y, ctx) : null)
   }
+  if (ctx.bgImage) return { colors: [], image: true } // the slide's background picture: checked by eye
   const centered = CENTERED.includes(ctx.layout)
   if (!centered && ctx.v.bar && y < BAR_H) return paint(ctx.v.bar, ctx.el, ctx.W, BAR_H)
   return paint(centered ? ctx.v['cover-bg'] || ctx.v.bg : ctx.v.bg, ctx.el, ctx.W, ctx.H)
@@ -154,7 +155,7 @@ function paintAt(stack, x, y, ctx) {
 function looks(el, below, slide, d) {
   const v = vars(d.theme), typo = d.typo || {}, layout = slide.layout || 'default'
   const cx = el.x + el.w / 2, cy = el.y + el.h / 2
-  const W = d.canvasWidth || BASE_W, base = { v, el, layout, typo, W, H: Math.ceil(W / (parseRatio(d.aspectRatio) || 16 / 9)) }
+  const W = d.canvasWidth || BASE_W, base = { v, el, layout, typo, bgImage: !!slide.bg, W, H: Math.ceil(W / (parseRatio(d.aspectRatio) || 16 / 9)) }
   const under = () => paintAt(below, cx, cy, base)
   const own = ownPaint(el, v)
   const bgOf = () => (own && !own.image && own[3] ? over(own, own[3] < 1 ? under() : null) : under())

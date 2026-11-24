@@ -51,6 +51,7 @@ export const ELEMENTS = {
   diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),
   timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
   picker: () => ({ type: 'picker', names: [1, 2, 3, 4].map(n => t('Group {0}', n)), fontSize: 64, x: 280, y: 190, w: 420, h: 160 }),
+  toc: () => ({ type: 'toc', x: 56, y: 110, w: 868, h: 380 }), // the slide titles as links, kept up to date
   chart: () => ({ type: 'chart', kind: 'column', legend: true, categories: ['Q1', 'Q2', 'Q3', 'Q4'], series: [{ name: t('Series {0}', 1), values: [12, 19, 15, 24] }, { name: t('Series {0}', 2), values: [8, 11, 14, 17] }], x: 140, y: 100, w: 700, h: 380 }),
   quiz: () => ({ type: 'quiz', question: t('Question?'), answers: [{ text: t('Answer {0}', 1), correct: true }, { text: t('Answer {0}', 2) }, { text: t('Answer {0}', 3) }, { text: t('Answer {0}', 4) }], x: 80, y: 90, w: 800, h: 360 }),
 }

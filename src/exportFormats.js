@@ -124,6 +124,7 @@ body[data-tool=arrow] .deck * { pointer-events: none; }
 const viewerJs = () => `
 const project = JSON.parse(document.getElementById('slides-builder-project').textContent), assets = project.assets
 for (const img of document.querySelectorAll('img[data-a]')) img.src = assets[img.dataset.a]
+for (const s of document.querySelectorAll('[data-bg]')) s.style.backgroundImage = s.style.backgroundImage.replace(/url\\(["']?#bg["']?\\)/, 'url("' + assets[s.dataset.bg] + '")')
 const slides = [...document.querySelectorAll('.deck > .slide')], no = document.querySelector('.hud span')
 let i = Math.min(slides.length, Math.max(1, parseInt(location.hash.slice(1)) || 1)) - 1
 function fit() {
@@ -236,6 +237,14 @@ for (const f of document.querySelectorAll('.picker-face')) {
   })
   f.addEventListener('dblclick', () => { left = []; f.replaceChildren(...label) })
 }
+// links to slides (table of contents, Link to slide) jump there, as when presenting in the editor
+document.querySelector('.deck').addEventListener('click', e => {
+  const a = !tool && e.target.closest('a[href^="#slide-"]')
+  if (!a) return
+  e.preventDefault()
+  const n = slides.findIndex(s => s.id === a.getAttribute('href').slice(1))
+  if (n >= 0) go(n)
+})
 // runnable code: Run executes it in a sandboxed iframe (opaque origin, own CSP, no network), as in the editor
 const runnerSrc = document.getElementById('slides-builder-runner'), runCb = {}
 let runBox = null, runReady = null, runSeq = 0
@@ -372,6 +381,9 @@ export async function htmlDeck(root, title, list, files) {
       if (id && files) img.setAttribute('src', data.assets[id])
       else if (id) { img.removeAttribute('src'); img.dataset.a = id }
     }
+    // a background picture is stored once too (data-bg; the viewer fills it in)
+    const bg = c.style.backgroundImage.match(/url\("?(data:[^")]+)"?\)/)?.[1], bgId = bg && byData.get(bg)
+    if (bgId) { c.style.backgroundImage = c.style.backgroundImage.replace(bg, files ? data.assets[bgId] : '#bg'); if (!files) c.dataset.bg = bgId }
     for (const el of c.querySelectorAll('[contenteditable]')) el.removeAttribute('contenteditable')
     return c.outerHTML
   }).join('\n')

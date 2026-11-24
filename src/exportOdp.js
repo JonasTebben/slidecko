@@ -5,7 +5,7 @@ import JSZip from 'jszip'
 // defineLayout, defineSlideMaster, addSlide → addText / addImage / addShape / addTable / addNotes.
 // Units as in pptxgenjs: positions in inches, font sizes, spacing and line widths in points.
 
-const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.3"'
+const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.3" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"'
 // control characters (terminal escapes pasted into code, notes) are not allowed in XML: Impress would refuse the file
 const esc = s => String(s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const inch = v => `${(+v || 0).toFixed(4)}in`
@@ -103,6 +103,9 @@ export function clickAnimations(clicks, id) {
     .flatMap(([c, show]) => c.objs.map(o => [o, show])).map(([o, show], j) => set(o, show, !j)).join('')}</anim:par></anim:par>`
   return `<anim:par presentation:node-type="timing-root"><anim:seq presentation:node-type="main-sequence">${steps.map(step).join('')}</anim:seq></anim:par>`
 }
+// a click on a picture or shape jumps to a slide (pptxgenjs' hyperlink: { slide })
+const onClick = o => (o.hyperlink?.slide ? `<office:event-listeners><presentation:event-listener script:event-name="dom:click" presentation:action="show" xlink:href="#Slide ${o.hyperlink.slide}" xlink:type="simple"/></office:event-listeners>` : '')
+const withClick = (xml, o) => (onClick(o) ? xml.replace(/^(<(draw:\w+)[^>]*?)\/>$/, `$1>${onClick(o)}</$2>`) : xml)
 
 class OdpSlide {
   constructor(doc, master) {
@@ -112,21 +115,21 @@ class OdpSlide {
     this.notes = ''
   }
   addNotes(t) { this.notes = t }
-  addImage(o) { this.items.push(`<draw:frame draw:style-name="${this.doc.style('graphic', `<style:graphic-properties draw:stroke="none" draw:fill="none" ${shadow(o)}/>`, 'gr')}" svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"><draw:image xlink:href="${this.doc.image(o.data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>${o.altText ? `<svg:desc>${esc(o.altText)}</svg:desc>` : ''}</draw:frame>`) }
+  addImage(o) { this.items.push(`<draw:frame draw:style-name="${this.doc.style('graphic', `<style:graphic-properties draw:stroke="none" draw:fill="none" ${shadow(o)}/>`, 'gr')}" svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"><draw:image xlink:href="${this.doc.image(o.data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>${o.altText ? `<svg:desc>${esc(o.altText)}</svg:desc>` : ''}${onClick(o)}</draw:frame>`) }
 
   addShape(kind, o) {
-    const d = this.doc
+    const d = this.doc, add = x => this.items.push(withClick(x, o))
     const stroke = o.line && o.line.type !== 'none' && o.line.color ? `draw:stroke="solid" svg:stroke-color="${color(o.line.color)}" svg:stroke-width="${pt(o.line.width || 1)}"${o.line.transparency ? ` svg:stroke-opacity="${100 - o.line.transparency}%"` : ''}${kind === 'custGeom' ? ' draw:stroke-linejoin="round" svg:stroke-linecap="round"' : ''}` : 'draw:stroke="none"'
     const st = d.style('graphic', `<style:graphic-properties ${stroke} ${kind === 'line' ? 'draw:fill="none"' : d.fill(o.fill)} ${shadow(o)}/>`, 'gr')
     const pos = `svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"`
     const poly = pts => `<draw:polygon draw:style-name="${st}" ${pos} svg:viewBox="0 0 1000 1000" draw:points="${pts}"/>`
-    if (kind === 'line') this.items.push(`<draw:line draw:style-name="${st}" svg:x1="${inch(o.x)}" svg:y1="${inch(o.y)}" svg:x2="${inch(o.x + o.w)}" svg:y2="${inch(o.y + o.h)}"/>`)
-    else if (kind === 'ellipse') this.items.push(`<draw:ellipse draw:style-name="${st}" ${pos}/>`)
+    if (kind === 'line') add(`<draw:line draw:style-name="${st}" svg:x1="${inch(o.x)}" svg:y1="${inch(o.y)}" svg:x2="${inch(o.x + o.w)}" svg:y2="${inch(o.y + o.h)}"/>`)
+    else if (kind === 'ellipse') add(`<draw:ellipse draw:style-name="${st}" ${pos}/>`)
     // freeform (pptxgenjs points in inches from the shape's corner; moveTo starts a new stroke): a path in 1/1000 in
-    else if (kind === 'custGeom') this.items.push(`<draw:path draw:style-name="${st}" ${pos} svg:viewBox="0 0 ${Math.round(o.w * 1000) || 1} ${Math.round(o.h * 1000) || 1}" svg:d="${o.points.map((q, i) => `${!i || q.moveTo ? 'M' : 'L'}${Math.round(q.x * 1000)} ${Math.round(q.y * 1000)}`).join(' ')}"/>`)
-    else if (kind === 'triangle') this.items.push(poly('500,0 1000,1000 0,1000'))
-    else if (kind === 'rightArrow') this.items.push(poly('0,250 620,250 620,0 1000,500 620,1000 620,750 0,750'))
-    else this.items.push(`<draw:rect draw:style-name="${st}" ${pos}${o.rectRadius ? ` draw:corner-radius="${inch(o.rectRadius)}"` : ''}/>`)
+    else if (kind === 'custGeom') add(`<draw:path draw:style-name="${st}" ${pos} svg:viewBox="0 0 ${Math.round(o.w * 1000) || 1} ${Math.round(o.h * 1000) || 1}" svg:d="${o.points.map((q, i) => `${!i || q.moveTo ? 'M' : 'L'}${Math.round(q.x * 1000)} ${Math.round(q.y * 1000)}`).join(' ')}"/>`)
+    else if (kind === 'triangle') add(poly('500,0 1000,1000 0,1000'))
+    else if (kind === 'rightArrow') add(poly('0,250 620,250 620,0 1000,500 620,1000 620,750 0,750'))
+    else add(`<draw:rect draw:style-name="${st}" ${pos}${o.rectRadius ? ` draw:corner-radius="${inch(o.rectRadius)}"` : ''}/>`)
   }
 
   // runs as in pptxgenjs: a run with breakLine ends its paragraph; paragraph options come from its first run
@@ -159,7 +162,8 @@ class OdpSlide {
       function span(r, ro) {
         const ts = d.style('text', `<style:text-properties fo:color="${color(ro.color)}" fo:font-size="${pt(ro.fontSize || 18)}" fo:font-family="'${esc(ro.fontFace || 'Arial')}'" style:font-family-generic="swiss" fo:font-weight="${ro.bold ? 'bold' : 'normal'}" fo:font-style="${ro.italic ? 'italic' : 'normal'}"${ro.underline ? ` style:text-underline-style="${{ dash: 'dash', dotted: 'dotted' }[ro.underline.style] || 'solid'}" style:text-underline-width="auto" style:text-underline-color="${ro.underline.color ? color(ro.underline.color) : 'font-color'}"` : ''}${ro.strike ? ' style:text-line-through-style="solid"' : ''}${ro.highlight ? ` fo:background-color="${color(ro.highlight)}"` : ''}${ro.charSpacing ? ` fo:letter-spacing="${pt(ro.charSpacing)}"` : ''}/>`, 'T')
         // the link goes inside the span: Impress drops the text of a <text:a> wrapped around a span
-        const text = ro.hyperlink?.url ? `<text:a xlink:type="simple" xlink:href="${esc(ro.hyperlink.url)}">${textXml(r.text)}</text:a>` : textXml(r.text)
+        const href = ro.hyperlink?.url || (ro.hyperlink?.slide && `#Slide ${ro.hyperlink.slide}`) // pages are named "Slide n"
+        const text = href ? `<text:a xlink:type="simple" xlink:href="${esc(href)}">${textXml(r.text)}</text:a>` : textXml(r.text)
         return `<text:span text:style-name="${ts}">${text}</text:span>`
       }
       const para = `<text:p text:style-name="${pStyle}">${spans}</text:p>`

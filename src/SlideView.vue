@@ -7,6 +7,7 @@ import { chartSvg } from './chart.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
 import { shapeSvg, fillFields } from './toSlidev.js'
+import { slideHref, tocEntries, tocHtml } from './links.js'
 import TableEl from './TableEl.vue'
 import { pasteHtml } from './paste.js'
 import { toggleList, undoList, typed, indent, autoList } from './lists.js'
@@ -442,6 +443,13 @@ watch(() => props.slide.elements.map(e => e.type === 'text' && (e.fill || e.stro
     if (c && c.offsetHeight > el.h + 1) el.h = Math.ceil(c.offsetHeight)
   })
 })
+// background picture of the slide (over the theme's colour), darkened by dim % so text on it stays readable
+const bgStyle = computed(() => {
+  const b = props.slide.bg, d = b && deck.assets[b.asset], k = (b?.dim || 0) / 100
+  return d ? { backgroundImage: `${k ? `linear-gradient(rgba(0,0,0,${k}), rgba(0,0,0,${k})), ` : ''}url("${d.replace(/"/g, '%22')}")`, backgroundSize: b.fit || 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundBlendMode: 'normal' } : null
+})
+// a click target outside the editor: only while the slide it names exists
+const linked = el => !props.editable && el.to && deck.slides.some(s => s.id === el.to)
 // v-mark: hand-drawn marks over spans of text, measured where the browser laid the text out (so they follow
 // reflow); recomputed after every render, while typing, after a mark change ("marks" event) and when fonts load
 const marks = ref({})
@@ -486,7 +494,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
 </script>
 
 <template>
-  <div ref="root" class="slide" :data-steps="steps.length || null" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown" @marks="layoutMarks">
+  <div ref="root" class="slide" :data-steps="steps.length || null" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="[themeStyle(theme || deck.theme), bgStyle]" @pointerdown.self="backgroundDown" @marks="layoutMarks">
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
       :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-until="untilOf(el, steps) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
@@ -496,7 +504,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, '--out-h': el.outH ? el.outH + 'px' : null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
       :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
-      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram', icon: 'Icon', math: 'Formula' }[el.type]) : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram', toc: 'Table of contents', icon: 'Icon', math: 'Formula' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
@@ -505,6 +513,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); layoutMarks()" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"
       />
+      <div v-else-if="el.type === 'toc'" class="content toc" :style="{ columns: el.columns || null }" v-html="tocHtml(tocEntries(deck.slides, el), el, slide.id)" />
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
         <textarea v-else-if="live && runEdit === el.id" v-model="runOf(el).code" class="code" spellcheck="false" :aria-label="t('Code')" @blur="endRunEdit" @keydown.stop="runKey($event, el)" @click.stop />
@@ -565,6 +574,8 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       </div>
       <!-- the series' first colour is the theme's accent -->
       <div v-else-if="el.type === 'chart'" class="chart-box" role="img" :aria-label="el.title || t('Chart')" v-html="chartSvg(el, themeOf(theme || deck.theme).vars?.accent)" />
+      <a v-if="linked(el)" class="el-link" :href="slideHref(el.to)" :aria-label="t('Go to slide {0}', deck.slides.findIndex(s => s.id === el.to) + 1)" />
+      <span v-if="editable && el.to && !decor(el)" class="click-badge link-badge" :title="t('Goes to slide {0} on click', deck.slides.findIndex(s => s.id === el.to) + 1 || '?')">→ {{ deck.slides.findIndex(s => s.id === el.to) + 1 || '?' }}</span>
       <svg v-if="marks[el.id]" class="marks" :width="el.w" :height="el.h" aria-hidden="true">
         <g v-for="(m, i) in marks[el.id]" :key="i" :data-type="m.mark" :data-click="(m.at && steps.indexOf(m.at) + 1) || null" :data-unshown="!markShown(m) || null" :style="{ stroke: m.color }">
           <path v-for="(p, j) in m.paths" :key="j" :d="p.d" pathLength="1" :stroke-width="p.w" :stroke-opacity="p.o" :style="{ transitionDelay: j * 80 + 'ms' }" />

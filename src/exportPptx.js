@@ -6,6 +6,7 @@ import { onePPr, numberFont, decorative, DECORATIVE, clickTiming } from './pptxF
 import { W, H, deck } from './store.js'
 import { SHADOWS } from './themes.js'
 import { t } from './i18n.js'
+import { linkTarget } from './links.js'
 import { pathPoints, markColor } from './marks.js'
 import { iconSvg } from './icons.js'
 
@@ -93,8 +94,8 @@ function runs(root, pre, top = root.getBoundingClientRect().top, left = root.get
       italic: cs.fontStyle === 'italic',
       // dimmed code lines (Slidev's highlighted lines) and line numbers are see-through
       ...(pre && n.parentElement.closest('.dim, .ln') && { transparency: n.parentElement.closest('.dim') ? 70 : 55 }),
-      // links stay clickable
-      ...(/^(https?|mailto):/.test(n.parentElement.closest('a[href]')?.href) && { hyperlink: { url: n.parentElement.closest('a[href]').href } }),
+      // links stay clickable; a link to a slide jumps to it (when that slide is exported)
+      ...hyperlink(n.parentElement.closest('a[href]')),
       ...decoration(n.parentElement, root),
       ...(!pre && highlightOf(n.parentElement)),
     }
@@ -168,6 +169,15 @@ function runs(root, pre, top = root.getBoundingClientRect().top, left = root.get
     if (edge.r > 0.5) out.push(spacer(edge.r, cs, options))
   }
   return out
+}
+
+// slide id -> its number in the exported file, set per export
+let slideNo = new Map()
+const toSlide = id => (slideNo.get(id) ? { hyperlink: { slide: slideNo.get(id) } } : {})
+function hyperlink(a) {
+  if (!a) return {}
+  const to = linkTarget(a.getAttribute('href'))
+  return to ? toSlide(to) : /^(https?|mailto):/.test(a.href) ? { hyperlink: { url: a.href } } : {}
 }
 
 // CSS text-transform, which other apps don't know (theme titles in capitals)
@@ -435,6 +445,8 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
   pptx.title = name
   const masters = {} // background key -> master name
   // the master's and layouts' elements are rendered on the slides too (behind their own), and exported like them
+  slideNo = new Map()
+  slides.forEach((s, i) => { if (!slideNo.has(s.id)) slideNo.set(s.id, i + 1) }) // a quiz's solution copy comes second
   const model = new Map([...slides, { elements: deck.master }, ...deck.layouts].flatMap(s => s.elements.map(e => [e.id, e])))
   const timing = [] // per slide: the objects of each element that appears or disappears on click, with its steps
 
@@ -476,7 +488,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       if (type === 'image' && !el.querySelector('img')?.naturalWidth) continue // broken picture: nothing to export
       if (type === 'image' && m.crop) {
         // cropped: the visible part as its own picture, filling the box
-        slide.addImage({ data: croppedImage(el.querySelector('img'), m.crop), x: el.offsetLeft * IN, y: el.offsetTop * IN, w: el.offsetWidth * IN, h: el.offsetHeight * IN, ...sh, ...altOf(m) })
+        slide.addImage({ data: croppedImage(el.querySelector('img'), m.crop), x: el.offsetLeft * IN, y: el.offsetTop * IN, w: el.offsetWidth * IN, h: el.offsetHeight * IN, ...sh, ...altOf(m), ...toSlide(m.to) })
       } else if (type === 'image') {
         const img = el.querySelector('img'), is = getComputedStyle(img)
         // the picture sits inside the img's padding and border (classes like p-4, border), object-fit: contain done by hand
@@ -487,7 +499,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         const k = Math.min(cw / (img.naturalWidth || cw), ch / (img.naturalHeight || ch))
         const w = (img.naturalWidth || cw) * k, h = (img.naturalHeight || ch) * k
         const data = pptxImage(img)
-        if (data) slide.addImage({ data, x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh, ...altOf(m) })
+        if (data) slide.addImage({ data, x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh, ...altOf(m), ...toSlide(m.to) })
       } else if (type === 'table') {
         const table = el.querySelector('table')
         const rows = [...table.rows].map(tr => [...tr.cells].map(cell))
@@ -506,7 +518,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
           ...(!line && gs && fillOf(gs.fill) ? { fill: (f => +gs.fillOpacity < 1 ? { ...f, transparency: Math.round(100 - (100 - (f.transparency || 0)) * gs.fillOpacity) } : f)(fillOf(gs.fill)) } : {}),
           line: stroke ? { color: stroke, width: Math.max(0.5, (parseFloat(gs.strokeWidth) || (line ? 3 : 0)) * PT) } : { type: 'none' },
           ...(m.shape === 'rounded' && { rectRadius: Math.min(el.offsetWidth, el.offsetHeight) / 4 * IN }),
-          ...(m.shape === 'rect' && m.radius && { rectRadius: m.radius * IN }), ...sh,
+          ...(m.shape === 'rect' && m.radius && { rectRadius: m.radius * IN }), ...sh, ...toSlide(m.to),
         })
         // text in the shape: one text box over it, centred like in the browser
         const st = el.querySelector('.shape-text')

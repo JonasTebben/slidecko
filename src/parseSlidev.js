@@ -90,6 +90,17 @@ function boxOf(attrs) {
   return box
 }
 
+// Slidev's <Link to="n"> and <Toc> as HTML the editor reads (outside code): a link to "#n", a box with data-toc
+// (filled with a few lines, so a bare <Toc /> gets a height when measured)
+const attrOf = (a, k) => a?.match(new RegExp(`(?:^|\\s):?${k}=["']([^"']*)["']`, 'i'))?.[1]
+const TAGS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<Link\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Link>)|<Toc\b([^>]*?)(?:\/>|>\s*<\/Toc>)/gm
+export const slidevTags = (md, lines = 4) => md.replace(TAGS, (m, f, c, la, text, ta) => {
+  if (la != null) return `<a href="#${attrOf(la, 'to') || ''}">${text ?? attrOf(la, 'title') ?? ''}</a>`
+  if (ta == null) return m
+  const o = Object.fromEntries(['minDepth', 'maxDepth', 'columns'].map(k => [k, +attrOf(ta, k) || undefined]))
+  return `<div data-toc="${JSON.stringify(o).replace(/"/g, '&quot;')}"><ul>${'<li>&nbsp;</li>'.repeat(lines)}</ul></div>`
+})
+
 // a fenced block: ```mermaid becomes a diagram, everything else a code block
 export const codeEl = (code, lang) => (lang === 'mermaid' ? { type: 'diagram', code } : { type: 'code', code, lang: lang || 'plaintext' })
 

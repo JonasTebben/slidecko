@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent, clickOf, clickAttrs, fmGet, codeEl } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, clickOf, clickAttrs, fmGet, codeEl, slidevTags } from './parseSlidev.js'
 import { imagePath, readLayers } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
@@ -37,7 +37,7 @@ const clicky = el => ['v-click', 'v-click.hide', 'v-after'].some(a => el.hasAttr
 const soleIn = (p, n) => /^V-(CLICK|AFTER)$/.test(p?.tagName) && p.children.length === n
 const compAttr = c => k => (c.tagName === 'V-AFTER' ? (k === 'v-after' ? '' : null)
   : k === (c.hasAttribute('hide') ? 'v-click.hide' : 'v-click') ? c.getAttribute('at') ?? '' : null)
-const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
+const special = el => el.dataset.toc || el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -48,7 +48,18 @@ function unmix(bg) {
   if (!m) return { fill: bg }
   return { ...(!m[1].startsWith('var(') && { fill: m[1] }), fillAlpha: +m[2] }
 }
-export async function importSlidev(path, files, theme, known = {}) {
+// slide numbers in links ("#5", "/5", data-to) -> slide ids; ids: the slides by Slidev number
+function slideLinks(els, ids) {
+  for (const e of els) {
+    if (e.html) e.html = e.html.replace(/href="[#/](\d+)"/g, (m, n) => (ids[n - 1] ? `href="#slide-${ids[n - 1]}"` : m))
+    if (e.toNum) e.to = ids[e.toNum - 1]
+    delete e.toNum
+  }
+}
+// a frontmatter background that is a picture (not a colour or gradient)
+const bgPath = v => (v && !/^(#|rgb|hsl|linear-|radial-)/i.test(v) && /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$|^data:image\//i.test(v) ? v : null)
+// known: path -> existing asset id; slideIds: what slide numbers in links mean (default: the imported slides)
+export async function importSlidev(path, files, theme, known = {}, { slideIds } = {}) {
   const assets = {}, bySrc = {}, missingFiles = []
   let missing = 0
   const texts = new Map(await Promise.all(
@@ -80,7 +91,7 @@ export async function importSlidev(path, files, theme, known = {}) {
   const size = formatSize(parseRatio(format.aspectRatio) || 16 / 9, format.canvasWidth || 980)
   // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML
   // sanitized: the markdown may come from a pasted text or a downloaded project (raw HTML, onerror=…)
-  const htmls = parsed.map(s => clean(marked.parse(iconTags(stripNonContent(s.md)))))
+  const htmls = parsed.map(s => clean(marked.parse(slidevTags(iconTags(stripNonContent(s.md)), Math.min(10, parsed.length)))))
   await applyUno(htmls.join('\n'))
 
   const host = document.body.appendChild(document.createElement('div'))
@@ -112,11 +123,16 @@ export async function importSlidev(path, files, theme, known = {}) {
       }))
       // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them)
       const elements = (await Promise.all(measure(slide, s).map(async e => (e.type !== 'icon' ? e : Object.assign(e, await getIcon(e.icon).catch(() => null)))))).filter(e => e.type !== 'icon' || e.body)
-      slides.push({ layout: s.layout, elements, fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true', duration: +fmGet(s.fm, 'plannedTime') || undefined })
+      const bg = bgPath(fmGet(s.fm, 'background')), bgId = bg && await asset(bg)
+      slides.push({ id: uid(), layout: s.layout, elements,
+        ...(bgId && { bg: { asset: bgId, src: bg, fit: fmGet(s.fm, 'backgroundSize'), dim: +fmGet(s.fm, 'backgroundDim') || undefined } }),
+        ...(fmGet(s.fm, 'hideInToc') === 'true' && { hideInToc: true }), cls: fmGet(s.fm, 'class'), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true', duration: +fmGet(s.fm, 'plannedTime') || undefined })
     }
   } finally {
     host.remove()
   }
+  const ids = slideIds || slides.filter(s => !s.hidden).map(s => s.id)
+  for (const s of slides) slideLinks(s.elements, ids)
   return { slides, assets, missing, missingFiles, ...format }
 }
 
@@ -211,6 +227,10 @@ function measure(slide, parsed) {
       let q = {}
       try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }
       Object.assign(el, { type: 'quiz', question: q?.question, answers: q?.answers })
+    } else if (n.dataset.toc) {
+      let o = {}
+      try { o = JSON.parse(n.dataset.toc) } catch { /* broken data: the default options */ }
+      Object.assign(el, { type: 'toc', ...o })
     } else if (n.dataset.chart) {
       let d = {}
       try { d = JSON.parse(n.dataset.chart) } catch { /* broken data: an empty chart, cleanEl checks the rest */ }
@@ -270,6 +290,8 @@ function measure(slide, parsed) {
       if (isTitle) titled = true
       if (!box) sized(el, group.map(rect))
     }
+    const to = (box || img || n).getAttribute('data-to') // a jump to a slide (number), written by toSlidev on the box
+    if (+to) el.toNum = +to
     // Slidev's appear/disappear on click: toSlidev writes it on the box; a <v-click>/<v-after> around just this element counts too
     const comp = !box && soleIn(n.parentElement, span) && n.parentElement, src = box || img || n
     const c = clickAttrs(comp ? compAttr(comp) : k => src.getAttribute(k), clicks)

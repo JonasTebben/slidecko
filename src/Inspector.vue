@@ -10,7 +10,7 @@ import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyl
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
 import { LANGS, codeOpts } from './hl.js'
 import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from './run.js'
-import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup } from './actions.js'
+import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup, setBackground, slideChoices, setSlideProp } from './actions.js'
 import { layoutOf } from './toSlidev.js'
 import * as table from './tableOps.js'
 import { clock, parseClock } from './timer.js'
@@ -635,6 +635,18 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </label>
       </Sec>
 
+      <Sec v-else-if="el.type === 'toc'" id="toc" icon="list" :title="t('Table of contents')">
+        <div class="grid3">
+          <label>{{ t('From level') }}<select :value="el.minDepth || 1" @change="el.minDepth = +$event.target.value > 1 ? +$event.target.value : undefined"><option v-for="n in 6" :key="n" :value="n">{{ n }}</option></select></label>
+          <label>{{ t('To level') }}<select :value="el.maxDepth || 6" @change="el.maxDepth = +$event.target.value < 6 ? +$event.target.value : undefined"><option v-for="n in 6" :key="n" :value="n">{{ n === 6 ? t('all') : n }}</option></select></label>
+          <label>{{ t('Columns') }}<select :value="el.columns || 1" @change="el.columns = +$event.target.value > 1 ? +$event.target.value : undefined"><option v-for="n in 4" :key="n" :value="n">{{ n }}</option></select></label>
+        </div>
+        <label class="check"><input type="checkbox" :checked="!!el.current" @change="el.current = $event.target.checked || undefined" /> {{ t('Highlight the current slide') }}</label>
+        <label class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
+          <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+        </label>
+        <p class="hint">{{ t('Lists the slide titles (their first heading, by its level) as links. Hidden slides and slides with “Hide in table of contents” are left out.') }}</p>
+      </Sec>
       <Sec v-else-if="el.type === 'chart'" id="chart" icon="chart" :title="t('Chart')"><ChartPanel :el="el" /></Sec>
       <Sec v-else-if="el.type === 'diagram'" id="diagram" icon="diagram" :title="t('Diagram')">
         <select :aria-label="t('Start from a template')" @change="setDiagram(el, DIAGRAMS[$event.target.value][1](), 0); $event.target.value = ''">
@@ -698,6 +710,9 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button class="ib wide" :class="{ on: el.clickUntil }" :aria-pressed="!!el.clickUntil" :title="t('Hidden from this click on while presenting; with “Appear on click” the element is visible only in between')" @click="setUntil(el, el.clickUntil ? undefined : nextClick(el.click))"><Icon name="pointer" /> {{ t('Disappear on click') }}</button>
           <input v-if="el.clickUntil" type="number" class="click-num" :min="(el.click || 0) + 1" max="99" :aria-label="t('Disappear at click')" :title="t('Disappear at click')" :value="el.clickUntil" @change="setUntil(el, clickNum($event.target.value))" />
         </div>
+        <label v-if="['shape', 'image'].includes(el.type)" class="field">{{ t('On click while presenting, go to') }}
+          <select :value="el.to || ''" @change="el.to = $event.target.value || undefined"><option value="">{{ t('nothing') }}</option><option v-if="el.to && !slideChoices.some(c => c.id === el.to)" :value="el.to">{{ t('a deleted slide') }}</option><option v-for="c in slideChoices" :key="c.id" :value="c.id">{{ c.label }}</option></select>
+        </label>
         <label v-if="el.type === 'text' && /<(ul|ol)\b/.test(el.html)" class="check" :title="t('While presenting, the list items appear one per click, from the box’s click step on')"><input type="checkbox" :checked="!!el.clickItems" @change="el.clickItems = $event.target.checked || undefined" /> {{ t('List items one by one') }}</label>
         <!-- empty: Magic move pairs it automatically (same text, picture or shape) -->
         <label class="field" :title="t('Magic move pairs elements with the same name on this slide and the next one')">{{ t('Magic move name') }}
@@ -720,6 +735,19 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <select :aria-label="t('Layout')" :value="slideLayout?.id" @change="pickLayout"><option v-for="l in deck.layouts" :key="l.id" :value="l.id">{{ l.name }}</option><option value="">{{ t('Edit layouts …') }}</option></select>
         </label>
         <label class="check"><input type="checkbox" :checked="!!slide.hideMaster" @change="$event.target.checked ? (slide.hideMaster = true) : delete slide.hideMaster" />{{ t('Hide master elements') }}</label>
+        <label class="check"><input type="checkbox" :checked="!!slide.hideInToc" @change="setSlideProp(slide, 'hideInToc', $event.target.checked)" />{{ t('Hide in table of contents') }}</label>
+        <h4 class="sub-head">{{ t('Background image') }}</h4>
+        <div class="btn-row">
+          <label class="ib wide file"><Icon name="image" /> {{ slide.bg ? t('Replace') : t('Choose image …') }}<input type="file" accept="image/*" hidden @change="run(() => setBackground(slide, $event.target.files[0]))" /></label>
+          <button v-if="slide.bg" class="ib" :aria-label="t('Remove background image')" :title="t('Remove background image')" @click="delete slide.bg"><Icon name="trash" /></button>
+        </div>
+        <template v-if="slide.bg">
+          <label class="row-ico" :title="t('Fit')"><Icon name="crop" :size="16" />
+            <select :aria-label="t('Fit')" :value="slide.bg.fit || 'cover'" @change="slide.bg.fit = $event.target.value === 'contain' ? 'contain' : undefined"><option value="cover">{{ t('Fill the slide') }}</option><option value="contain">{{ t('Show the whole image') }}</option></select>
+          </label>
+          <label class="slider" :title="t('Darken (for readable text)')"><Icon name="opacity" :size="16" /><input type="range" min="0" max="90" step="5" :aria-label="t('Darken (for readable text)')" :value="slide.bg.dim || 0" @input="slide.bg.dim = +$event.target.value || undefined" /><output>{{ slide.bg.dim || 0 }} %</output></label>
+        </template>
+        <label class="field" :title="t('Slidev’s class: frontmatter, kept for the Slidev export')">{{ t('Slidev classes') }}<input :value="slide.cls || ''" placeholder="text-white" @change="setSlideProp(slide, 'cls', $event.target.value.replace(/[^\w\s:.\-[\]%/!#()]/g, '').trim())" /></label>
         <h4 class="sub-head">{{ t('Transition') }}</h4>
         <!-- plays when presenting, between this slide and the next -->
         <label class="field">{{ t('Transition to next slide') }}

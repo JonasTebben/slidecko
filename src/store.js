@@ -1,12 +1,13 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { slideHash, layoutOf, decorations, readLayers } from './toSlidev.js'
-import { TRANSITIONS } from './parseSlidev.js'
+import { TRANSITIONS, fmGet } from './parseSlidev.js'
 import { THEMES, FONTS, fontStack, setOwnFonts, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from './themes.js'
 import { SLIDE_PRESETS } from './presets.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
 import { clickSteps } from './clicks.js'
+import { remapLinks } from './links.js'
 import { vmarkToData, checkMark } from './marks.js'
 import { ICON_NAME } from './icons.js'
 import { cleanOutput } from './run.js'
@@ -149,7 +150,7 @@ export function cleanEl(e) {
       ...(cleanOutput(e.output)?.length && { output: cleanOutput(e.output) }), ...(e.outPos === 'right' && { outPos: 'right' }), ...(e.outH != null && { outH: num(e.outH, 20, 400) }),
     }
     case 'image': return deck.assets[e.asset] ? {
-      ...base, asset: e.asset, src: str(e.src) || '/images/image.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),
+      ...base, asset: e.asset, ...(SLIDE_ID.test(e.to) && { to: e.to }), src: str(e.src) || '/images/image.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),
       ...(e.radius && { radius: num(e.radius, 0, 500) }), ...(cleanCrop(e.crop) && { crop: cleanCrop(e.crop) }),
       // alt text for screen readers and exports; decorative: screen readers skip it (empty alt)
       ...(str(e.alt)?.trim() && { alt: e.alt.trim().slice(0, 2000) }), ...(e.decorative === true && { decorative: true }),
@@ -174,9 +175,14 @@ export function cleanEl(e) {
     }
     case 'shape': return {
       ...base, shape: SHAPES.includes(e.shape) ? e.shape : 'rect', fill: color(e.fill) || 'none', stroke: color(e.stroke) || 'none',
-      strokeWidth: num(e.strokeWidth, 0, 40), radius: num(e.radius, 0, 300), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }),
+      strokeWidth: num(e.strokeWidth, 0, 40), radius: num(e.radius, 0, 300), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(SLIDE_ID.test(e.to) && { to: e.to }), // to: a slide id, jumped to on click
       // text inside the shape (centred), with its own colour
       ...(e.shape !== 'line' && str(e.html)?.trim() && { html: clean(e.html) }), ...(color(e.color) && { color: color(e.color) }), ...(ALIGN.includes(e.align) && { align: e.align }),
+    }
+    // table of contents (Slidev's <Toc>): heading levels minDepth–maxDepth (1–6), columns, current slide marked
+    case 'toc': return {
+      ...base, ...(e.minDepth > 1 && { minDepth: Math.min(6, Math.round(e.minDepth)) }), ...(e.maxDepth >= 1 && e.maxDepth < 6 && { maxDepth: Math.round(e.maxDepth) }),
+      ...(e.columns > 1 && { columns: Math.min(4, Math.round(e.columns)) }), ...(e.current === true && { current: true }), ...(color(e.color) && { color: color(e.color) }),
     }
     // Mermaid source, rendered (and sanitized) by diagram.js; capped so a pasted file cannot stall the renderer
     case 'diagram': return { ...base, code: (str(e.code) || '').slice(0, 20000) }
@@ -222,6 +228,12 @@ export function cleanEl(e) {
   return null
 }
 
+// slide background picture: an asset, cover (default) or contain, darkened by dim % for readable text
+function cleanBg(b) {
+  if (!b || typeof b !== 'object' || !deck.assets[b.asset]) return undefined
+  return { asset: b.asset, src: str(b.src) || '/images/background.png', ...(b.fit === 'contain' && { fit: 'contain' }), ...(b.dim > 0 && { dim: Math.round(num(b.dim, 0, 90)) }) }
+}
+const SLIDE_ID = /^[\w-]{1,40}$/
 function cleanSlide(s) {
   return {
     id: uid(),
@@ -234,12 +246,29 @@ function cleanSlide(s) {
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
     ...(s.hidden === true && { hidden: true }), // skipped when presenting and exporting
     ...(s.hideMaster === true && { hideMaster: true }), // the master's elements are not drawn on it
+    // left out of tables of contents (Slidev's hideInToc); without the field (older projects) the frontmatter says it
+    ...((s.hideInToc ?? fmGet(str(s.fm), 'hideInToc') === 'true') === true && { hideInToc: true }),
+    ...(cleanBg(s.bg) && { bg: cleanBg(s.bg) }),
+    ...(c => str(c)?.trim() && { cls: c.replace(/[^\w\s:.\-[\]%/!#()]/g, '').trim().slice(0, 300) })(s.cls ?? fmGet(str(s.fm), 'class')), // Slidev's class: frontmatter, kept for the export
     ...(validDuration(s.duration) && { duration: Math.round(s.duration) }), // planned seconds for rehearsing
     type: /^[\w-]{1,40}$/.test(str(s.type) ?? '') ? s.type : undefined, // its project layout (see layoutOf)
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
   }
 }
-export const cleanSlides = slides => slides.filter(s => s && typeof s === 'object').map(cleanSlide)
+// slides keep their id (links name slides by it) unless it is taken (taken: ids of the open project); links within the
+// batch follow a slide that got a new one
+export function cleanSlides(slides, taken = new Set(deck.slides.map(s => s.id))) {
+  const map = {}, seen = new Set() // seen: a second slide with the same id is a copy, links stay with the first
+  const out = slides.filter(s => s && typeof s === 'object').map(s => {
+    const c = cleanSlide(s)
+    if (SLIDE_ID.test(s.id) && !seen.has(s.id)) { if (!taken.has(s.id)) c.id = s.id; else map[s.id] = c.id }
+    seen.add(s.id)
+    taken.add(c.id)
+    return c
+  })
+  if (Object.keys(map).length) remapLinks(out.flatMap(s => s.elements), map)
+  return out
+}
 const cleanEls = list => (Array.isArray(list) ? list : []).map(cleanEl).filter(Boolean)
 export function cleanLayouts(list) {
   const ids = new Set()
@@ -322,7 +351,7 @@ export function loadDeck(d) {
     : ['text', 'title', 'titleLine', 'h2', 'h3', 'code', 'codeLine'].includes(k) ? Number.isFinite(v) && v >= 4 && v <= 160
       : ['line', 'liLine'].includes(k) && Number.isFinite(v) && v > 0.5 && v < 4))
   deck.entry = /^[\w./-]+\.md$/.test(d.entry) ? d.entry.replace(/^\/+/, '') : 'slides.md'
-  deck.slides = cleanSlides(d.slides)
+  deck.slides = cleanSlides(d.slides, new Set())
   Object.assign(deck, setupLayouts(d, deck.slides, deck.files, deck.theme))
   // freshly imported slides: remember their content, so the Slidev export can tell if they changed
   for (const s of deck.slides) if (s.md != null) s.hash ??= slideHash(s)
@@ -341,6 +370,7 @@ export function newSlide(layout = 'default', elements) {
 const withLayers = d => [...d.slides, { elements: d.master || [] }, ...(d.layouts || []), { elements: Object.keys(d.fonts || {}).map(asset => ({ asset })) }]
 const assetIds = slides => {
   const used = new Set()
+  for (const s of slides) if (s.bg?.asset) used.add(s.bg.asset)
   for (const s of slides) for (const e of s.elements || []) {
     if (e.asset) used.add(e.asset)
     for (const m of JSON.stringify(e.html || e.rows || '').matchAll(/data-asset=\\?"([^"\\]+)/g)) used.add(m[1])

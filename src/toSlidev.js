@@ -6,6 +6,7 @@ import { parseRatio } from './format.js'
 import { clock } from './timer.js'
 import { chartSvg } from './chart.js'
 import { clickSteps, stepOf } from './clicks.js'
+import { linkTarget, slideNumbers } from './links.js'
 import { MARKS, toVMark } from './marks.js'
 import { iconTag, iconSet, ICON_SETS, ICONIFY_JSON } from './icons.js'
 import { BUNDLED, bundledFaces, fontCss, usesFamily, FONT_EXT } from './fonts.js'
@@ -45,6 +46,12 @@ turndown.addRule('clickItems', {
     listAt += [...n.childNodes].filter(c => c.nodeName === 'LI').length
     return `\n\n<v-clicks at="${at}">\n\n${content.replace(/^\n+|\n+$/g, '')}\n\n</v-clicks>\n\n`
   },
+})
+// a link to a slide: Slidev's <Link to="n"> with the slide's number now; to a deleted or hidden slide: just the text
+let curNums = new Map() // slide id -> Slidev number while toSlidev() runs
+turndown.addRule('slideLink', {
+  filter: n => n.nodeName === 'A' && !!linkTarget(n.getAttribute('href')),
+  replacement: (content, n) => { const no = curNums.get(linkTarget(n.getAttribute('href'))); return no ? `<Link to="${no}">${content}</Link>` : content },
 })
 // v-mark: the mark span becomes Slidev's directive again (its text stays Markdown, which Slidev renders inside inline HTML)
 turndown.addRule('vmark', {
@@ -177,6 +184,11 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       const { kind, categories, series, legend, values, stacked, title, min, max } = el
       return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
     }
+    case 'toc': { // Slidev's own <Toc>; data-toc brings the options (also the highlight Slidev lacks) back on import
+      const { minDepth, maxDepth, columns, current } = el
+      const props = [columns && ` columns="${columns}"`, minDepth && ` minDepth="${minDepth}"`, maxDepth && ` maxDepth="${maxDepth}"`].filter(Boolean).join('')
+      return `<div data-toc="${esc(JSON.stringify({ minDepth, maxDepth, columns, current }))}" style="${boxStyle(el)}">\n<Toc${props} />\n</div>`
+    }
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: { // text
@@ -280,12 +292,24 @@ function withClick(el, md, steps) {
   const attr = el.click && el.clickUntil ? `v-click="[${at(el.click)}, ${at(el.clickUntil)}]"` : el.click ? `v-click="${at(el.click)}"` : el.clickUntil ? `v-click.hide="${at(el.clickUntil)}"` : ''
   return attr ? md.replace(/^<(div|img)\b/, `<$1 ${attr}`) : md
 }
+// a shape or picture that jumps to a slide: Slidev's $nav.go on its box, data-to brings it back on import
+const withTo = (el, md) => (el.to && curNums.get(el.to) ? md.replace(/^<(div|img)\b/, `<$1 data-to="${curNums.get(el.to)}" @click="$nav.go(${curNums.get(el.to)})"`) : md)
+// an unchanged slide's links (<Link to="n">, [x](/n), [x](#n)) get the numbers their slides have now, in order of appearance
+// shortcut: assumes the Markdown lists its slide links in the order of the slide's elements; data-to on boxes keeps its number
+function relink(slide, md) {
+  const ids = slide.elements.flatMap(e => [...(e.html || '').matchAll(/href="#slide-([\w-]+)"/g)].map(m => m[1]))
+  let k = 0
+  return ids.length && curNums.size ? md.replace(/(<Link\b[^>]*?\bto=")(\d+)(")|(\]\([/#])(\d+)(\))/g, (m, a, n, b, c, n2, d) => {
+    const no = curNums.get(ids[k++])
+    return !no ? m : a ? a + no + b : c + no + d
+  }) : md
+}
 function slideMd(slide) {
-  if (slide.md != null && slide.hash === slideHash(slide)) return slide.md
+  if (slide.md != null && slide.hash === slideHash(slide)) return relink(slide, slide.md)
   const flow = slide.flow != null && slide.flow === flowHash(slide)
   const els = flow ? [...slide.elements].sort((a, b) => a.y - b.y) : slide.elements
   const steps = clickSteps(slide)
-  const body = escapeMustache(els.map(e => withClick(e, elementMd(e, flow, stepOf(slide, e, steps)), steps)).join('\n\n') + slideStyle(slide))
+  const body = escapeMustache(els.map(e => withClick(e, withTo(e, elementMd(e, flow, stepOf(slide, e, steps))), steps)).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
   return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
 }
@@ -307,12 +331,23 @@ function slideFm(slide) {
   // planned seconds for rehearsing: Slidev ignores the key, an import reads it back
   if ((slide.duration || 0) !== (+fmGet(fm, 'plannedTime') || 0)) fm = [fm.replace(/^plannedTime:.*\n?/gm, '').trim(), slide.duration && `plannedTime: ${slide.duration}`].filter(Boolean).join('\n')
   fm = withTransition(fm, slide.transition)
+  // table of contents, background picture (fit and darkening are Slidecko's, Slidev ignores them) and Slidev's class:
+  // (written only when set: the editor removes them from slide.fm itself, see setSlideProp, so older projects keep theirs)
+  if (slide.hideInToc) fm = fmSet(fm, 'hideInToc', 'true')
+  // a background the editor could not load (a web address, a colour) stays as written
+  if (slide.bg || /^(\.{0,2}\/|[\w-]+\/)\S*\.(png|jpe?g|gif|webp|svg|avif)$/i.test(fmGet(fm, 'background') || '')) fm = fmSet(fmSet(fmSet(fm, 'background', slide.bg?.src), 'backgroundSize', slide.bg?.fit), 'backgroundDim', slide.bg?.dim)
+  if (slide.cls) fm = fmSet(fm, 'class', slide.cls)
   if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
   const rest = fm.replace(/^layout:.*\n?/m, '').trim()
   return slide.layout === 'default' && !fmGet(fm, 'layout') ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
 }
 
-export function slideToMarkdown(slide) {
+// one frontmatter key set to v (removed when v is empty), unchanged when it already says so
+export const fmSet = (fm, key, v) => ((fmGet(fm, key) ?? '') === String(v ?? '') ? fm : [fm.replace(new RegExp(`^${key}:.*\\n?`, 'm'), '').trim(), v != null && v !== '' && `${key}: ${v}`].filter(Boolean).join('\n'))
+
+// slides: all of the project's, for the numbers of slide links (one slide's Markdown in the editor)
+export function slideToMarkdown(slide, slides) {
+  curNums = slides ? slideNumbers(slides) : new Map()
   const fm = slideFm(slide)
   return (fm ? `---\n${fm}\n---\n\n` : '') + slideMd(slide).trim() + '\n'
 }
@@ -324,6 +359,7 @@ export function slideToMarkdown(slide) {
 // image path in the Markdown -> asset id, for every image of these slides
 export function imageMap(slides) {
   const images = {}
+  for (const s of slides) if (s.bg) images[imagePath(s.bg.src)] = s.bg.asset // a slide's background picture
   for (const s of slides) for (const el of s.elements) {
     if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
     for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
@@ -340,6 +376,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
   curTheme = theme
   curShapeFont = shapeFont
+  curNums = slideNumbers(slides)
   const { slidev: own, pkg } = themeOf(theme)
   // consecutive slides of the same file form one part
   const head = transition !== 'none' ? transition : undefined // Slidev's default is no transition

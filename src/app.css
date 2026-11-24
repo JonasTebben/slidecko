@@ -124,6 +124,7 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .handle.nw { left: 0; top: 0; cursor: nwse-resize; }
 /* click step of an element that appears on click (editor only), same screen size at any zoom */
 .click-badge { position: absolute; z-index: 2; right: 0; top: 0; min-width: calc(18px / var(--s, 1)); padding: 0 calc(4px / var(--s, 1)); border-radius: calc(9px / var(--s, 1)); background: #2f6fed; color: #fff; font: 600 calc(11px / var(--s, 1)) / calc(18px / var(--s, 1)) system-ui, sans-serif; text-align: center; pointer-events: none; transform: translate(40%, -40%); }
+.click-badge.link-badge { right: auto; left: 0; transform: translate(-40%, -40%); background: #0f766e; } /* a shape or picture that jumps to a slide */
 .click-badge.mark-badge { right: auto; background: #7c3aed; transform: translate(-60%, -70%); } /* a mark's click step, at its start */
 .handle.n { left: 50%; top: 0; cursor: ns-resize; }
 .handle.ne { left: 100%; top: 0; cursor: nesw-resize; }
@@ -243,6 +244,7 @@ dialog.wide { width: min(860px, calc(100vw - 32px)); }
 dialog h2 { margin: 0 0 6px; font-size: 17px; }
 dialog p { margin: 0 0 12px; color: var(--ui-muted); line-height: 1.5; }
 dialog input:not([type]), dialog select { width: 100%; height: 36px; }
+dialog .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--ui-muted); }
 dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 18px 0 0; }
 dialog menu button { height: 34px; padding: 0 14px; border: 1px solid var(--ui-line-strong); border-radius: 7px; background: var(--ui-panel); cursor: pointer; }
 dialog menu button:hover { background: var(--ui-hover); }

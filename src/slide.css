@@ -131,6 +131,12 @@
 .slide .el.timer .timer-face.done { animation: timer-done 1s steps(2, jump-none) infinite; }
 @keyframes timer-done { 50% { opacity: .25; } }
 .presenter .timer-face, .deck .timer-face { cursor: pointer; }
+/* table of contents (Slidev's <Toc>): nested lists of slide links; the slide it sits on is marked when asked */
+.slide .el.toc .toc { height: 100%; overflow: hidden; column-gap: 32px; }
+.slide .el.toc li { break-inside: avoid; }
+.slide .el.toc a.toc-current { font-weight: 700; border-bottom-style: solid; }
+/* a shape or picture that jumps to a slide: the whole box is the link (not in the editor) */
+.slide .el > .el-link { position: absolute; inset: 0; z-index: 1; border: 0; cursor: pointer; }
 /* random picker: the drawn name large, how many are left small; a short pop-in (off with reduced motion) */
 .slide .el.picker .picker-face { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; user-select: none; }
 .slide .el.picker .picker-face p { margin: 0; }

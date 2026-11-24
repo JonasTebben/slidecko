@@ -30,6 +30,7 @@ import { BUNDLED, fontCss } from './fonts.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { PALETTE, FILLS } from './presets.js'
 import { shapeSvg } from './toSlidev.js'
+import { slideHref, linkTarget } from './links.js'
 import { applyUno } from './uno.js'
 import { morphSlides } from './morph.js'
 import * as A from './actions.js'
@@ -46,7 +47,7 @@ const stage = ref(), view = ref(), fitScale = ref(1)
 // canvas zoom: null = fit the stage; SlideView divides pointer movement by scale either way
 const zoom = ref(null), scale = computed(() => zoom.value ?? fitScale.value)
 const presenter = ref(), presenting = ref(false), presenterView = ref(false), presentScale = ref(1), started = ref(0), now = ref(Date.now())
-const linkDialog = ref(), linkUrl = ref('')
+const linkDialog = ref(), linkUrl = ref(''), linkSlide = ref('') // linkSlide: id of the slide the link goes to ('' = a web address)
 const importDialog = ref(), importFiles = ref([]), importEntries = ref([]), importPick = ref([]), importMode = ref('project')
 const mdDialog = ref(), mdText = ref(''), mdTarget = ref('slide')
 const paletteDialog = ref(), paletteQuery = ref(''), paletteIndex = ref(0)
@@ -479,17 +480,23 @@ function openLink() {
   const a = n?.closest('a')
   if (a) s.selectAllChildren(a)
   linkRange = s.getRangeAt(0).cloneRange() // the dialog takes the focus, and with it the selection
-  linkUrl.value = a?.getAttribute('href') || 'https://'
+  const to = linkTarget(a?.getAttribute('href'))
+  linkSlide.value = to && deck.slides.some(s => s.id === to) ? to : ''
+  linkUrl.value = (!to && a?.getAttribute('href')) || 'https://'
   openDlg(linkDialog.value)
 }
 let linkRange
-function applyLink() {
+async function applyLink() {
   if (linkDialog.value.returnValue !== 'ok') return
-  const s = getSelection(), url = linkUrl.value.trim()
+  // the dialog took the focus and so ended the editing: the box has to be editable again for the link
+  const box = linkRange.startContainer.parentElement?.closest('[data-el]')
+  if (box && ui.editing !== box.dataset.el) { ui.editing = box.dataset.el; await nextTick() }
+  box?.querySelector('[contenteditable=true]')?.focus()
+  const s = getSelection(), url = linkSlide.value ? slideHref(linkSlide.value) : linkUrl.value.trim()
   s.removeAllRanges()
   s.addRange(linkRange)
   if (!url || url === 'https://') A.format('unlink')
-  else if (s.isCollapsed) A.format('insertHTML', `<a href="${url.replace(/"/g, '%22')}">${url.replace(/</g, '&lt;')}</a>`)
+  else if (s.isCollapsed) A.format('insertHTML', `<a href="${url.replace(/"/g, '%22')}">${(linkSlide.value ? A.slideChoices.value.find(c => c.id === linkSlide.value).label : url).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</a>`)
   else A.format('createLink', url)
 }
 const confirmLabel = ref(''), confirmUndo = ref(true)
@@ -569,10 +576,11 @@ const applyMarkdown = () => A.run(async () => {
   mdOpen.value = false
   if (mdDialog.value.returnValue !== 'ok') return
   const file = mdTarget.value === 'slide' ? fileOf(slide.value) : `${String(decks.value.length).padStart(2, '0')}_New.md`
-  const slides = await A.markdownToSlides(mdText.value, file)
+  const slides = await A.markdownToSlides(mdText.value, file, mdTarget.value === 'slide' ? A.slideIds() : undefined)
   if (!slides.length) return A.toast(t('No slide content found.'))
   if (mdTarget.value === 'slide') {
     for (const s of slides) s.file = slide.value.file
+    slides[0].id = slide.value.id // links to the slide stay
     deck.slides.splice(ui.slide, 1, ...slides)
   } else {
     deck.slides.splice(ui.slide + 1, 0, ...slides.map(s => ({ ...s, file: slide.value.file })))
@@ -740,6 +748,9 @@ function swipeUp(e) {
 function presentClick(e) {
   if (swiped) { swiped = false; return }
   const a = e.target.closest('a[href]')
+  // a link to a slide jumps there (one to a deleted slide does nothing); others open in a new tab
+  const to = a && linkTarget(a.getAttribute('href'))
+  if (to) { e.preventDefault(); const i = deck.slides.findIndex(s => s.id === to); if (i >= 0) presentGo(i); return }
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (tool.value) return // pointing or drawing does not turn the slide
   if (e.target.closest('iframe, .pv-side, .pv-bar, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar')) return // a timer click starts the timer, a picker click draws, not the next slide
@@ -815,7 +826,7 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert formula'), () => A.insert('math')], [t('Insert icon'), openIcons], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert table of contents'), () => A.insert('toc')], [t('Insert formula'), () => A.insert('math')], [t('Insert icon'), openIcons], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
   [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
@@ -1089,6 +1100,7 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
             <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
+            <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ keyLabel('shift+m') }}</kbd></button>
           </Menu>
           <Menu :label="t('Arrange')">
@@ -1171,6 +1183,7 @@ function onClipboard(e) {
           <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
           <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
           <button class="mi" @click="A.insert('board')"><Icon name="list" />{{ t('Notes box for the class') }}</button>
+          <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
           <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>⇧M</kbd></button>
         </Menu></span>
         <span class="divider" />
@@ -1576,7 +1589,10 @@ function onClipboard(e) {
     <dialog ref="linkDialog" @close="applyLink">
       <form method="dialog">
         <h2>{{ t('Link') }}</h2>
-        <input v-model="linkUrl" :aria-label="t('Address')" :placeholder="t('https://… (empty = remove link)')" autofocus />
+        <label class="field">{{ t('Link to') }}
+          <select v-model="linkSlide"><option value="">{{ t('Web address') }}</option><option v-for="c in A.slideChoices.value" :key="c.id" :value="c.id">{{ c.label }}</option></select>
+        </label>
+        <input v-if="!linkSlide" v-model="linkUrl" :aria-label="t('Address')" :placeholder="t('https://… (empty = remove link)')" autofocus />
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok">{{ t('Apply') }}</button></menu>
       </form>
     </dialog>
@@ -1747,6 +1763,7 @@ function onClipboard(e) {
   </div>
 
   <div v-if="A.exportSlides.value" class="output">
-    <SlideView v-for="(s, i) in A.exportSlides.value" :key="s.id" :slide="s" :index="s.no ?? i" :step="s.step" />
+    <!-- the id is the target of links to the slide (internal links in the PDF, jumps in the HTML presentation) -->
+    <SlideView v-for="(s, i) in A.exportSlides.value" :id="'slide-' + s.id" :key="s.id" :slide="s" :index="s.no ?? i" :step="s.step" />
   </div>
 </template>
