@@ -86,7 +86,7 @@ function key(e) {
 <template>
   <div v-if="tour.on && step" class="tour">
     <div v-if="spot" class="tour-spot" :style="spot" aria-hidden="true" />
-    <div ref="bubble" class="tour-bubble" :class="pos.side" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" role="dialog" aria-modal="false"
+    <div ref="bubble" class="tour-bubble" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" role="dialog" aria-modal="false"
       aria-labelledby="tour-title" aria-describedby="tour-text" tabindex="-1" @keydown="key">
       <small class="tour-count">{{ t('{0} of {1}', count[0], count[1]) }}</small>
       <h2 id="tour-title">{{ t(step.title) }}</h2>
