@@ -14,7 +14,9 @@ import { capturing } from './recording.js'
 import { tour, begin } from './tour.js'
 const Tour = defineAsyncComponent(() => import('./Tour.vue')) // loaded only when someone takes the tour
 import { tutorial, openTutorial } from './tutorial.js'
+import { source } from './source.js'
 const MarkdownTutorial = defineAsyncComponent(() => import('./MarkdownTutorial.vue')) // loaded on first open
+const SourceEditor = defineAsyncComponent(() => import('./SourceEditor.vue')) // with CodeMirror, markdownlint and Prettier: only when opened
 import { picker as iconPicker } from './icons.js'
 const IconPicker = defineAsyncComponent(() => import('./IconPicker.vue')) // loaded on first open, the icon sets on first search
 const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
@@ -827,7 +829,7 @@ const commands = computed(() => [
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
   [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert table of contents'), () => A.insert('toc')], [t('Insert formula'), () => A.insert('math')], [t('Insert icon'), openIcons], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
-  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()],
+  [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()], [t('Edit all Markdown (source editor)'), () => (source.open = true), 'alt+m'],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
@@ -1054,6 +1056,7 @@ function onClipboard(e) {
             <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
+            <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ keyLabel('alt+m') }}</kbd></button>
             <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
             <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ mod }}S</kbd></button>
@@ -1545,6 +1548,7 @@ function onClipboard(e) {
 
     <Tour v-if="tour.on" />
     <MarkdownTutorial v-if="tutorial.open" />
+    <SourceEditor v-if="source.open" />
     <IconPicker v-if="iconPicker.open" />
     <div v-if="ui.status" class="toast" role="status">{{ ui.status }}<button class="tb icon small" :aria-label="t('Close')" @click="ui.status = ''"><Icon name="x" :size="14" /></button></div>
 

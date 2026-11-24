@@ -1,5 +1,8 @@
 // The source editor's logic: a deck file as one Slidev Markdown text, back to slides, lint and format.
+import { reactive } from 'vue'
 import { splitSlides } from './parseSlidev.js'
+
+export const source = reactive({ open: false }) // the source editor (SourceEditor.vue) is shown
 
 // the Markdown of one slide as slideToMarkdown writes it, from a splitSlides part
 const chunkOf = s => (s.fm ? `---\n${s.fm}\n---\n\n` : '') + s.body.join('\n').trim() + '\n'
@@ -7,8 +10,8 @@ const chunkOf = s => (s.fm ? `---\n${s.fm}\n---\n\n` : '') + s.body.join('\n').t
 // slideToMarkdown texts -> one file; a slide without frontmatter needs its own `---`
 export const joinSlides = mds => mds.map((md, i) => (i && !md.startsWith('---\n') ? '---\n\n' + md : md)).join('\n')
 
-// one file -> slide texts; the empty part before a leading frontmatter is no slide
-export const splitSource = text => splitSlides(text).filter(s => s.fm || s.body.some(l => l.trim())).map(chunkOf)
+// one file -> slide texts; the empty part before a leading frontmatter is no slide (an empty one later becomes none on import)
+export const splitSource = text => splitSlides(text).filter((s, i) => i || s.fm || s.body.some(l => l.trim())).map(chunkOf)
 
 // which slides stay as they are: [{ keep: original } | { md: changed text }] in the new order.
 // An unchanged text keeps its slide object, so free positions, ids and everything Markdown does not carry survive.

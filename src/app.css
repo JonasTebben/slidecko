@@ -830,3 +830,36 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 .mark-steps .mi { flex: 0 0 auto; width: auto; min-width: 32px; justify-content: center; border: 1px solid var(--ui-line); }
 .mark-steps .mi.on { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent); }
 .mark-hint { margin: 4px 10px; font-size: 12px; color: var(--ui-muted); }
+
+/* source editor (SourceEditor.vue): full window, VS Code's Light+ / Dark+ chrome */
+dialog.source-editor { --se-bar: #f3f3f3; --se-tab: #ececec; --se-tab-fg: #616161; --se-bg: #fff; --se-fg: #333; --se-line: #e5e5e5;
+  position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border-radius: 0;
+  display: flex; flex-direction: column; background: var(--se-bg); color: var(--se-fg); font-size: 13px; }
+dialog.source-editor.dark { --se-bar: #252526; --se-tab: #2d2d2d; --se-tab-fg: #969696; --se-bg: #1e1e1e; --se-fg: #ccc; --se-line: #2b2b2b; }
+.source-editor button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 4px; background: none; color: inherit; cursor: pointer; font: inherit; }
+.source-editor button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 12%, transparent); }
+.source-editor button:disabled { opacity: .5; cursor: default; }
+.source-editor button.primary { background: #0e639c; color: #fff; }
+.source-editor button.primary:hover:not(:disabled) { background: #1177bb; }
+.source-editor button:focus-visible { outline: 1px solid #007fd4; outline-offset: -1px; }
+.se-bar { display: flex; align-items: stretch; background: var(--se-bar); border-bottom: 1px solid var(--se-line); min-height: 35px; }
+.se-tabs { display: flex; flex: 1; overflow-x: auto; }
+.se-tabs .se-tab { height: auto; border-radius: 0; background: var(--se-tab); color: var(--se-tab-fg); border-right: 1px solid var(--se-line); border-top: 1px solid transparent; white-space: nowrap; }
+.se-tabs .se-tab.on { background: var(--se-bg); color: var(--se-fg); border-top-color: #007acc; }
+.se-dot { font-size: 10px; }
+.se-actions { display: flex; align-items: center; gap: 4px; padding: 0 8px; }
+.se-main { flex: 1; display: flex; min-height: 0; }
+.se-code { flex: 1; min-width: 0; overflow: hidden; }
+.se-code .cm-editor { height: 100%; }
+.se-code .cm-editor.cm-focused { outline: none; }
+.se-preview { width: min(40%, 520px); padding: 12px; background: var(--se-bar); border-left: 1px solid var(--se-line); overflow: auto; }
+.se-frame { overflow: hidden; border-radius: 2px; }
+.se-frame > * { transform-origin: 0 0; }
+.se-hint { margin: 8px 0 0; color: var(--se-tab-fg); font-size: 12px; }
+.se-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--se-bar); border-top: 1px solid var(--se-line); }
+.se-confirm span { flex: 1; }
+.se-status { display: flex; align-items: center; gap: 2px; height: 22px; padding: 0 6px; background: #007acc; color: #fff; font-size: 12px; }
+.se-status button { height: 22px; padding: 0 6px; border-radius: 0; }
+.se-status span { padding: 0 6px; }
+.se-grow { flex: 1; }
+@media (max-width: 760px) { .se-main { flex-direction: column; } .se-preview { width: auto; border-left: 0; border-top: 1px solid var(--se-line); } }
