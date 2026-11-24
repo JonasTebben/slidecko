@@ -1,11 +1,11 @@
 import { createApp } from 'vue'
 import 'highlight.js/styles/github.css'
-import './slide.css'
+import './slide/slide.css'
 import './app.css'
-import './longpress.js'
-import './scheme.js' // sets light/dark before the first paint
+import './core/longpress.js'
+import './core/scheme.js' // sets light/dark before the first paint
 import App from './App.vue'
-import { reloadForUpdate, staleChunk } from './store.js'
+import { reloadForUpdate, staleChunk } from './core/store.js'
 
 const app = createApp(App)
 // a part of the app loaded later (an editor, an export) is gone after a release: reload to the new version

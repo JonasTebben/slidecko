@@ -18,10 +18,10 @@ Run `bun test` and `bun run build` before you call a change done.
 ## Conventions
 
 - Match the surrounding code: no semicolons, single quotes, compact functions, one-line comments that explain the why.
-- Tests sit next to the source as `src/<name>.test.js` (Bun test globals, no import). Add one for new parser, import/export or state logic.
+- Tests sit next to the source as `src/<folder>/<name>.test.js` (Bun test globals, no import). Add one for new parser, import/export or state logic.
 - Dependencies are pinned to exact versions. Do not add one for a few lines of code. Heavy import/export code is loaded lazily with `import()`; keep it that way.
-- Coordinates are in logical slide units (`W`/`H` in `src/store.js`); views only scale them.
-- Sanitize HTML from imports or paste with DOMPurify, through the existing sanitizing in `src/store.js`.
+- Coordinates are in logical slide units (`W`/`H` in `src/core/store.js`); views only scale them.
+- Sanitize HTML from imports or paste with DOMPurify, through the existing sanitizing in `src/core/store.js`.
 
 ## Required updates
 
@@ -34,7 +34,7 @@ Run `bun test` and `bun run build` before you call a change done.
 ## Things to leave alone
 
 - The logo is drawn in `public/icon.svg` (`public/icon.png` is its 256 px render). Keep it free of play triangles and red rounded rectangles, so it cannot be mistaken for the YouTube logo.
-- Slides keep their theme colours in dark mode; only the app chrome follows the light/dark switch (`src/scheme.js`).
+- Slides keep their theme colours in dark mode; only the app chrome follows the light/dark switch (`src/core/scheme.js`).
 
 ## Repository and deployment
 

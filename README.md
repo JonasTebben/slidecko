@@ -34,32 +34,44 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 
 ## Project layout
 
+`src/main.js` and `src/App.vue` are the entry and the app shell; the rest of `src/` is grouped by area:
+
+| Folder | Holds |
+| --- | --- |
+| `src/core/` | project state, persistence, commands, view session, translations, light/dark, shortcuts |
+| `src/slide/` | what a slide is made of: themes, fonts, format, presets, charts, diagrams, formulas, icons, marks, links |
+| `src/editor/` | editing helpers: lists, tables, paste, spacing, search, accessibility check, source editor, tutorial, tour |
+| `src/present/` | presenting: clicks, magic move, drawing, rehearsal, recording, quiz, picker, timer, runnable code |
+| `src/import/`, `src/export/` | reading other formats into slides, writing slides out (Slidev, PPTX, ODP, images, HTML, Git) |
+| `src/components/` | Vue components |
+| `src/locales/` | interface translations |
+
 | Path | Purpose |
 | --- | --- |
-| `src/parseSlidev.js` | Markdown → slides (frontmatter, `src:` includes, blocks) |
-| `src/source.js`, `src/sourceLang.js`, `src/SourceEditor.vue` | Markdown source editor: deck files to slide texts and back, lint and format, Slidev frontmatter highlighting, and its window (lazy-loaded) |
-| `src/tutorial.js`, `src/MarkdownTutorial.vue` | Markdown tutorial: lessons with their checks, and its dialog (lazy-loaded) |
-| `src/importSlidev.js` | renders each slide like Slidev does and measures its elements |
-| `src/importOffice.js` | PowerPoint and OpenDocument import |
-| `src/toSlidev.js` | slides → Slidev project files |
-| `src/marks.js` | hand-drawn marks (`v-mark`): directive parsing and writing, seeded strokes |
-| `src/exportPptx.js` | PPTX and ODP from the rendered slides (one layout pass) |
-| `src/pptxFix.js` | schema fixes for the slide XML pptxgenjs writes |
-| `src/exportOdp.js` | OpenDocument writer with the pptxgenjs interface |
-| `src/exportFormats.js` | images, exact PPTX, HTML presentation, print preparation |
-| `src/fonts.js`, `src/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
-| `src/themes.js`, `src/slide.css` | themes, table and callout styles (shared by the editor and the Slidev export) |
-| `src/ThemeEditor.vue`, `src/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
-| `src/store.js`, `src/actions.js` | project state, persistence, commands |
-| `src/icons.js`, `src/IconPicker.vue` | icons: bundled Iconify sets (one lazy chunk each), search, SVG, Slidev tags; the picker dialog |
-| `src/diagram.js` | Mermaid diagrams: rendering (Mermaid loaded on first use), sanitizing, cache per code and theme |
-| `src/math.js`, `src/katexCss.js` | formulas: `$…$`/`$$…$$` in text and Markdown, KaTeX rendering (loaded on first use, fonts served by the app) |
-| `src/session.js` | view state in the URL hash and per-tab state for reloads |
-| `src/i18n.js`, `src/locales/` | interface translations |
-| `src/scheme.js` | light/dark mode |
-| `src/AppFooter.vue`, `src/support.js` | footer and its build-time links |
+| `src/import/parseSlidev.js` | Markdown → slides (frontmatter, `src:` includes, blocks) |
+| `src/editor/source.js`, `src/editor/sourceLang.js`, `src/components/SourceEditor.vue` | Markdown source editor: deck files to slide texts and back, lint and format, Slidev frontmatter highlighting, and its window (lazy-loaded) |
+| `src/editor/tutorial.js`, `src/components/MarkdownTutorial.vue` | Markdown tutorial: lessons with their checks, and its dialog (lazy-loaded) |
+| `src/import/importSlidev.js` | renders each slide like Slidev does and measures its elements |
+| `src/import/importOffice.js` | PowerPoint and OpenDocument import |
+| `src/export/toSlidev.js` | slides → Slidev project files |
+| `src/slide/marks.js` | hand-drawn marks (`v-mark`): directive parsing and writing, seeded strokes |
+| `src/export/exportPptx.js` | PPTX and ODP from the rendered slides (one layout pass) |
+| `src/export/pptxFix.js` | schema fixes for the slide XML pptxgenjs writes |
+| `src/export/exportOdp.js` | OpenDocument writer with the pptxgenjs interface |
+| `src/export/exportFormats.js` | images, exact PPTX, HTML presentation, print preparation |
+| `src/slide/fonts.js`, `src/components/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
+| `src/slide/themes.js`, `src/slide/slide.css` | themes, table and callout styles (shared by the editor and the Slidev export) |
+| `src/components/ThemeEditor.vue`, `src/components/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
+| `src/core/store.js`, `src/core/actions.js` | project state, persistence, commands |
+| `src/slide/icons.js`, `src/components/IconPicker.vue` | icons: bundled Iconify sets (one lazy chunk each), search, SVG, Slidev tags; the picker dialog |
+| `src/slide/diagram.js` | Mermaid diagrams: rendering (Mermaid loaded on first use), sanitizing, cache per code and theme |
+| `src/slide/math.js`, `src/slide/katexCss.js` | formulas: `$…$`/`$$…$$` in text and Markdown, KaTeX rendering (loaded on first use, fonts served by the app) |
+| `src/core/session.js` | view state in the URL hash and per-tab state for reloads |
+| `src/core/i18n.js`, `src/locales/` | interface translations |
+| `src/core/scheme.js` | light/dark mode |
+| `src/components/AppFooter.vue`, `src/core/support.js` | footer and its build-time links |
 | `index.html` | app entry |
-| `src/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
+| `src/present/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
 | `server.js` | Bun server: serves `dist/`, `/health` |
 | `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |
 
@@ -68,7 +80,7 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
 
 - Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
-- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/i18n.js`.
+- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/core/i18n.js`.
 - Tests always run in English, because they check English text.
 
 ## Theme readability
@@ -78,8 +90,8 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 - Set `accent-fg` when the accent is light (text on table headers). The accent itself must reach 4.5:1 on `bg`, because links use it.
 - Set `cover-fg` when the cover has a coloured background (`cover-bg`). Quotes, numbers and links on centred layouts take this colour.
 - `bar` may be a colour or a gradient.
-- Presets in `src/presets.js` use translucent fills (`fillAlpha`) rather than fixed light ones, so dark themes stay readable.
-- Syntax colours for light code backgrounds are in `src/slide.css`. On dark backgrounds `codeDark()` switches to GitHub Dark.
+- Presets in `src/slide/presets.js` use translucent fills (`fillAlpha`) rather than fixed light ones, so dark themes stay readable.
+- Syntax colours for light code backgrounds are in `src/slide/slide.css`. On dark backgrounds `codeDark()` switches to GitHub Dark.
 
 ## What the app stores
 
@@ -94,7 +106,7 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 
 YouTube loads only after a click on "Load YouTube content" (thumbnails from `i.ytimg.com`, the player from `www.youtube-nocookie.com`).
 
-When this changes (`src/session.js`, `src/store.js`, `src/themes.js`, `src/i18n.js`, `src/scheme.js`, `src/App.vue`), update this table.
+When this changes (`src/core/session.js`, `src/core/store.js`, `src/slide/themes.js`, `src/core/i18n.js`, `src/core/scheme.js`, `src/App.vue`), update this table.
 
 ## Hosting your own copy
 

@@ -84,7 +84,7 @@ const deckFor = x => ({
 // the store the app itself uses (same module URL in the dev server)
 const addDeck = async (page, lang) => {
   await page.evaluate(async d => {
-    const S = await import('/src/store.js')
+    const S = await import('/src/core/store.js')
     await S.createProject({ ...d, slides: d.slides.map(s => ({ ...s, elements: s.elements.map(e => ({ id: S.uid(), ...e })) })) })
   }, deckFor(TEXT[lang]))
   await page.waitForSelector('.stage')
@@ -101,7 +101,7 @@ for (const lang of ['en', 'de']) {
   await page.waitForTimeout(1500)
   const shot = async (name, wait = 600) => { await page.waitForTimeout(wait); await page.screenshot({ path: `${TMP}${name}-${lang}.png` }) }
   const palette = async cmd => { await page.keyboard.press('Escape'); await page.keyboard.press('ControlOrMeta+k'); await page.keyboard.type(cmd); await page.keyboard.press('Enter') }
-  const go = async i => { await page.evaluate(async i => { (await import('/src/store.js')).ui.slide = i }, i); await page.waitForTimeout(500) }
+  const go = async i => { await page.evaluate(async i => { (await import('/src/core/store.js')).ui.slide = i }, i); await page.waitForTimeout(500) }
 
   // editor with the chart selected (chart panel in the inspector)
   await go(1)
@@ -112,12 +112,12 @@ for (const lang of ['en', 'de']) {
   await page.keyboard.press('Escape')
   await shot('diagram', 1500)
   // Markdown source editor
-  await page.evaluate(async () => { (await import('/src/source.js')).source.open = true })
+  await page.evaluate(async () => { (await import('/src/editor/source.js')).source.open = true })
   await page.waitForTimeout(2500)
   // the diagram slide's Markdown at the top, not the long chart SVG before it
   await page.evaluate(() => [...document.querySelectorAll('.cm-line')].find(l => l.textContent.includes('flowchart'))?.scrollIntoView({ block: 'center' }))
   await shot('markdown')
-  await page.evaluate(async () => { (await import('/src/source.js')).source.open = false })
+  await page.evaluate(async () => { (await import('/src/editor/source.js')).source.open = false })
   // accessibility check
   await palette(lang === 'de' ? 'Barrierefreiheit' : 'accessibility')
   await shot('a11y', 1500)
@@ -143,8 +143,8 @@ for (const lang of ['en', 'de']) {
   await page.locator('.inspector select:has(option[value="line"])').selectOption('column')
   await page.keyboard.press('Escape')
   await go(0)
-  for (const id of ['ozean', 'sonne', 'dunkel', 'serif']) { await page.evaluate(async id => { (await import('/src/store.js')).deck.theme = id }, id); await still('theme-' + id) }
-  await page.evaluate(async () => { (await import('/src/store.js')).deck.theme = 'ozean' })
+  for (const id of ['ozean', 'sonne', 'dunkel', 'serif']) { await page.evaluate(async id => { (await import('/src/core/store.js')).deck.theme = id }, id); await still('theme-' + id) }
+  await page.evaluate(async () => { (await import('/src/core/store.js')).deck.theme = 'ozean' })
   await palette(lang === 'de' ? 'Exportieren' : 'Export …')
   await shot('export', 1200)
   await page.locator('dialog[open]').screenshot({ path: `${TMP}panel-export-${lang}.png` })
@@ -152,7 +152,7 @@ for (const lang of ['en', 'de']) {
   // the title slide alone in several themes (theme gallery on the landing page)
   await page.waitForTimeout(400)
   for (const id of ['ozean', 'sonne', 'dunkel', 'serif', 'wald', 'neon']) {
-    await page.evaluate(async id => { (await import('/src/store.js')).deck.theme = id }, id)
+    await page.evaluate(async id => { (await import('/src/core/store.js')).deck.theme = id }, id)
     await page.waitForTimeout(500)
     await page.locator('.stage .slide').first().screenshot({ path: `${TMP}slide-${id}-${lang}.png` })
   }
@@ -164,7 +164,7 @@ for (const lang of ['en', 'de']) {
   await m.goto(`${URL_}?lang=${lang}`)
   await m.waitForSelector('.home')
   await addDeck(m, lang)
-  await m.evaluate(async () => { (await import('/src/store.js')).ui.slide = 1 })
+  await m.evaluate(async () => { (await import('/src/core/store.js')).ui.slide = 1 })
   await m.waitForTimeout(1500)
   await m.screenshot({ path: `${TMP}mobile-${lang}.png` })
   await mctx.close()
