@@ -22,6 +22,10 @@ const groups = computed(() => {
   return out
 })
 const count = s => props.findings.filter(f => f.severity === s).length
+// "1 error, 2 warnings": singular for one, kinds without findings left out
+const NOUNS = [['error', '{0} error', '{0} errors'], ['warning', '{0} warning', '{0} warnings'], ['tip', '{0} tip', '{0} tips']]
+const summary = computed(() => NOUNS.filter(([s]) => count(s)).map(([s, one, many]) => t(count(s) === 1 ? one : many, count(s))).join(', '))
+const issues = computed(() => t(props.findings.length === 1 ? '{0} issue' : '{0} issues', props.findings.length))
 const elOf = f => deck.slides[f.slide]?.elements.find(e => e.id === f.el)
 // shows the slide and selects the element, as a click on the canvas would
 function go(f) {
@@ -53,11 +57,11 @@ onMounted(() => { root.value.showModal(); root.value.querySelector('.a11y-go, .a
   <dialog ref="root" class="a11y" aria-labelledby="a11y-title" @keydown.esc.stop.prevent="emit('close')" @close="closed">
     <header class="a11y-head">
       <h2 id="a11y-title"><Icon name="eye" :size="16" />{{ t('Accessibility check') }}</h2>
-      <span class="a11y-badge" :class="{ ok: !findings.length }" role="img" :aria-label="t('{0} issues', findings.length)" :title="t('{0} issues', findings.length)">{{ findings.length }}</span>
+      <span class="a11y-badge" :class="{ ok: !findings.length }" role="img" :aria-label="issues" :title="issues">{{ findings.length }}</span>
       <button type="button" class="tb icon small a11y-close" :title="t('Close (Esc)')" :aria-label="t('Close')" @click="emit('close')"><Icon name="x" :size="14" /></button>
     </header>
     <p class="a11y-sum" role="status">
-      <template v-if="findings.length">{{ t('{0} errors, {1} warnings, {2} tips', count('error'), count('warning'), count('tip')) }}</template>
+      <template v-if="findings.length">{{ summary }}</template>
       <template v-else><Icon name="check" :size="14" /> {{ t('No issues found. Hidden slides are not checked.') }}</template>
     </p>
     <div class="a11y-list">
