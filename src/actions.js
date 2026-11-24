@@ -463,7 +463,7 @@ async function gitVersions(map, entry, title, source) {
   } catch (e) { return ' · ' + t('Git history could not be read: {0}', e.message) }
 }
 // presentations from other programs, one new project each: .pptx, .odp, .pdf, .html (own export), images (one slide each)
-export const IMPORT_ACCEPT = '.pptx,.potx,.odp,.otp,.pdf,.html,.htm,.zip,image/*'
+export const IMPORT_ACCEPT = '.pptx,.potx,.odp,.otp,.pdf,.html,.htm,.zip,.json,application/json,image/*'
 // what restoreProject did with the projects of one file, as a toast
 function restored(name, how) {
   const c = k => how.filter(h => h === k).length
