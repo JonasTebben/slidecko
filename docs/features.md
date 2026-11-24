@@ -31,7 +31,7 @@ From the Export menu or the export dialog (⌘E), for the whole project or one d
   - The slide XML follows the OOXML schema (ISO/IEC 29500). A second `<a:pPr>` per paragraph that pptxgenjs writes, against the schema, is removed.
   - Opens in PowerPoint, Keynote, Google Slides and LibreOffice.
 - **Google Slides (`.pptx`)**: the same file with line spacing as multiples. Google Slides enlarges fixed spacing by 1.2 and Keynote handles multiples differently, hence two variants.
-- **PowerPoint exact (`.pptx`)**: each slide as a 1960 × 1104 px image, with notes. Looks exactly like the editor in every program.
+- **PowerPoint as images (`.pptx`)**: each slide as a 1960 × 1104 px image, with notes. Looks exactly like the editor in every program, but the text is no longer editable.
 - **OpenDocument (`.odp`)**: editable, for LibreOffice Impress, OpenOffice and Collabora. Comes from the same layout pass as the PPTX.
 - **HTML presentation (`.html`)**: one file with all slides, images and fonts. Runs offline in any browser (arrow keys, swipe, F for full screen where the browser allows it, `#12` jumps to slide 12, printable; on touch screens the previous/next buttons stay visible).
 - **HTML presentation (ZIP)**: the same as `index.html` with images and fonts as separate files. Smaller, good for web servers and learning platforms.

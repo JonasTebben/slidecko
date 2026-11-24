@@ -215,15 +215,16 @@ watch([findOpen, occ, findAt, () => ui.slide, () => ui.editing, collapsed, mdOpe
 }, { flush: 'post' })
 
 // --- export dialog: one place for every format, for the whole project or one deck ---
+// sorted by purpose: editable office formats, web, picture-exact copies, developer project
 const EXPORTS = [
   { id: 'pdf', name: 'PDF', ext: '.pdf', apps: 'For sharing, printing and archiving', note: 'Vector PDF, selectable text', exact: true },
   { id: 'pptx', name: 'PowerPoint', ext: '.pptx', apps: 'PowerPoint · Keynote · LibreOffice', note: 'Text, tables and shapes stay editable. Not for Google Slides – text shifts there; use its own variant instead.', editable: true },
   { id: 'pptx-google', name: 'Google Slides', ext: '.pptx', apps: 'Google Slides (File → Import)', note: 'Editable; line spacing written the way Google reads it', editable: true },
-  { id: 'pptx-image', name: 'PowerPoint exact copy', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
   { id: 'odp', name: 'OpenDocument', ext: '.odp', apps: 'LibreOffice Impress · OpenOffice · Collabora', note: 'Open format, editable', editable: true },
   { id: 'html', name: 'HTML presentation', ext: '.html', apps: 'Any browser, also offline', note: 'A single file. Present with the arrow keys, F for fullscreen.', exact: true },
   { id: 'html-zip', name: 'HTML presentation (ZIP)', ext: '.zip', apps: 'Web servers, learning platforms, any browser', note: 'index.html with images as separate files – smaller than the single file', exact: true },
   { id: 'png', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
+  { id: 'pptx-image', name: 'PowerPoint as images', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
   { id: 'slidev', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
 ]
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
@@ -845,7 +846,7 @@ const commands = computed(() => [
   [t('Group'), A.group, 'mod+g'], [t('Ungroup'), A.ungroup, 'mod+shift+g'],
   [t('Export …'), () => openExport(), 'mod+e'],
   [t('Export: PDF (all)'), () => A.pdf(), 'mod+p'], [t('Export: PowerPoint (all)'), () => A.pptx(), 'mod+shift+e'], [t('Export: Slidev project (ZIP)'), A.slidev, 'mod+alt+s'],
-  [t('Export: PowerPoint exact copy (all)'), () => A.exportAs('pptx-image')], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp')], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google')],
+  [t('Export: PowerPoint as images (all)'), () => A.exportAs('pptx-image')], [t('Export: OpenDocument .odp (all)'), () => A.exportAs('odp')], [t('Export: PowerPoint for Google Slides (all)'), () => A.exportAs('pptx-google')],
   [t('Export: HTML presentation (all)'), () => A.exportAs('html')], [t('Export: PNG images (all)'), () => A.exportAs('png')],
   ...decks.value.filter(d => d.file !== deck.entry).map(d => [t('Export: deck “{0}” …', d.name), () => openExport(d.file)]),
   [t('Save project as file'), A.saveFile, 'mod+s'], [t('Go to project overview'), () => { ui.home = true }],
@@ -1637,7 +1638,7 @@ function onClipboard(e) {
           </label>
         </div>
         <label v-if="['pdf', 'png'].includes(exportFormat)" class="check"><input v-model="exportClicks" type="checkbox" /> {{ t('One page per click step') }}</label>
-        <p class="export-hint">{{ t('Keynote opens') }} <code>.pptx</code> {{ t('directly. For Google Slides pick its own variant and open it there via “File → Import”. For an exact look there, choose “exact copy”.') }}</p>
+        <p class="export-hint">{{ t('Keynote opens') }} <code>.pptx</code> {{ t('directly. For Google Slides pick its own variant and open it there via “File → Import”. For an exact look there, choose “PowerPoint as images”.') }}</p>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok" :disabled="EXPORTS.find(f => f.id === exportFormat)?.project && !!exportScope">{{ t('Export') }}</button></menu>
       </form>
     </dialog>

@@ -638,7 +638,7 @@ const progress = (i, n) => toast(t('Rendering slide {0} of {1} …', i, n), 0)
 export const FORMATS = {
   pptx: ['PowerPoint', 'pptx', (out, name, slides) => exportPptx(out, name, slides)],
   'pptx-google': ['PowerPoint for Google Slides', 'pptx', (out, name, slides) => exportPptx(out, name, slides, { forGoogle: true })],
-  'pptx-image': ['PowerPoint (true to original)', 'pptx', async (out, name, slides) => exportPptx(out, name, slides, { images: await slideImages(out, 2, progress, true) })],
+  'pptx-image': ['PowerPoint as images', 'pptx', async (out, name, slides) => exportPptx(out, name, slides, { images: await slideImages(out, 2, progress, true) })],
   odp: ['OpenDocument', 'odp', (out, name, slides) => exportPptx(out, name, slides, { format: 'odp' })],
   html: ['HTML presentation', 'html', (out, name, slides) => htmlDeck(out, name, slides)],
   'html-zip': ['HTML presentation (ZIP)', 'zip', (out, name, slides) => htmlZip(out, name, slides)],
