@@ -1107,10 +1107,10 @@ function onClipboard(e) {
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ keyLabel('shift+m') }}</kbd></button>
           </Menu>
           <Menu :label="t('Arrange')">
-            <button class="mi" :disabled="!selection.length" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!selection.length" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
-            <button class="mi" :disabled="!selection.length" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
-            <button class="mi" :disabled="!selection.length" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
             <hr />
             <button class="mi" :disabled="selection.length < 2" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
             <button class="mi" :disabled="!selection.some(e => e.group)" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
@@ -1508,10 +1508,10 @@ function onClipboard(e) {
             <button v-if="selection.some(e => e.group)" class="mi" @click="A.ungroup"><Icon name="ungroup" />{{ t('Ungroup') }}<kbd>{{ keyLabel('mod+shift+g') }}</kbd></button>
             <button v-else-if="selection.length > 1" class="mi" @click="A.group"><Icon name="group" />{{ t('Group') }}<kbd>{{ keyLabel('mod+g') }}</kbd></button>
             <hr />
-            <button class="mi" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
-            <button class="mi" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
-            <button class="mi" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
-            <button class="mi" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ keyLabel('mod+shift+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ keyLabel('mod+arrowup') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('backward')" @click="A.order('backward')"><Icon name="backward" />{{ t('Send backward') }}<kbd>{{ keyLabel('mod+arrowdown') }}</kbd></button>
+            <button class="mi" :disabled="!A.canOrder('back')" @click="A.order('back')"><Icon name="toBack" />{{ t('Send to back') }}<kbd>{{ keyLabel('mod+shift+arrowdown') }}</kbd></button>
             <hr />
             <div class="mi-row" role="group" :aria-label="selection.length > 1 ? t('Align to each other') : t('Align on slide')">
               <button v-for="[a, i, tip] in [['left', 'alignL', 'Left'], ['center', 'alignC', 'Center horizontally'], ['right', 'alignR', 'Right'], ['top', 'alignT', 'Top'], ['middle', 'alignM', 'Center vertically'], ['bottom', 'alignB', 'Bottom']]" :key="a"

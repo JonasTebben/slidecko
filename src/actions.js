@@ -165,6 +165,11 @@ export function order(where) {
     if (j >= 0 && j < els.length && !ui.sel.includes(els[j].id)) [els[i], els[j]] = [els[j], els[i]]
   }
 }
+// false when it would change nothing: the selection is already at the top (front, forward) or the bottom (back, backward)
+export function canOrder(where) {
+  const els = slide.value?.elements || [], n = els.filter(e => ui.sel.includes(e.id)).length
+  return n > 0 && !(where === 'front' || where === 'forward' ? els.slice(-n) : els.slice(0, n)).every(e => ui.sel.includes(e.id))
+}
 // --- format painter: the look of one element onto others (⌘⌥C / ⌘⌥V or the brush in the inspector) ---
 const LOOK = {
   text: ['shadow', 'font', 'fontSize', 'color', 'fill', 'fillAlpha', 'stroke', 'strokeWidth', 'strokeStyle', 'align', 'valign'],

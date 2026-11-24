@@ -10,7 +10,7 @@ import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyl
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
 import { LANGS, codeOpts } from './hl.js'
 import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from './run.js'
-import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup, setBackground, slideChoices, setSlideProp } from './actions.js'
+import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, canOrder, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup, setBackground, slideChoices, setSlideProp } from './actions.js'
 import { layoutOf } from './toSlidev.js'
 import * as table from './tableOps.js'
 import { clock, parseClock } from './timer.js'
@@ -244,7 +244,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       <Sec id="arrange" icon="layers" :title="t('Arrange')">
         <div class="seg-row">
           <span class="seg" role="group" :aria-label="t('Arrange')">
-            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" @click="order(o)"><Icon :name="i" /></button>
+            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
           </span>
           <button v-if="selection.some(e => e.group)" class="ib" :aria-label="bare('Ungroup (⌘⇧G)')" :title="t('Ungroup (⌘⇧G)')" @click="ungroup"><Icon name="ungroup" /></button>
           <button v-else class="ib" :aria-label="bare('Group (⌘G)')" :title="t('Group (⌘G)')" @click="group"><Icon name="group" /></button>
@@ -689,7 +689,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       <Sec id="arrange" icon="layers" :title="t('Arrange')">
         <div class="seg-row">
           <span class="seg" role="group" :aria-label="t('Arrange')">
-            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" @click="order(o)"><Icon :name="i" /></button>
+            <button v-for="[o, i, lbl] in ORDERS" :key="o" class="ib" :aria-label="bare(lbl)" :title="t(lbl)" :disabled="!canOrder(o)" @click="order(o)"><Icon :name="i" /></button>
           </span>
         </div>
         <div class="seg-row">
