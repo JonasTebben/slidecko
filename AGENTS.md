@@ -33,7 +33,7 @@ Run `bun test` and `bun run build` before you call a change done.
 
 ## Things to leave alone
 
-- The "JBT" in `public/icon.png` is intended.
+- The logo is drawn in `public/icon.svg` (`public/icon.png` is its 256 px render). Keep it free of play triangles and red rounded rectangles, so it cannot be mistaken for the YouTube logo.
 - Slides keep their theme colours in dark mode; only the app chrome follows the light/dark switch (`src/scheme.js`).
 
 ## Repository and deployment

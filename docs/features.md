@@ -2,7 +2,7 @@
 
 ## Start page
 
-Ways to start (new, open, import, Markdown tutorial), then your projects (only when there are any), then "See what Slidecko can do": a short muted demo video (plays by itself unless the system asks for reduced motion) and six screenshots with captions (editor, diagrams and formulas, Markdown, presenter view, quiz, accessibility check), in the interface language (German or English). Then why Slidecko and the theme gallery. The screenshots and the video live in `public/showcase/` and are recorded by `scripts/showcase.js`.
+Ways to start (new, open, import, Markdown tutorial), then your projects (only when there are any), then the theme gallery. What Slidecko can do is shown on the landing page; its screenshots and demo video live in `public/showcase/`, recorded by `scripts/showcase.js`.
 
 ## Import
 

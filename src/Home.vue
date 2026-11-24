@@ -77,25 +77,6 @@ const rename = go(async e => {
   await renameProject(id, e.target.value)
 })
 const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', timeStyle: 'short' }).format(d)
-// claims checked against the code: no external scripts (CSP), system fonts, YouTube only after consent
-const WHY = [
-  ['Everything stays in your browser', 'Slides are created, stored and exported on your device. Nothing is uploaded: the server only delivers the app.'],
-  ['No tracking, no account', 'No cookies, no analytics, no ads, no sign-up. Nobody sees what you present or how you work.'],
-  ['Independent of US cloud services', 'No Google or Microsoft account, no fonts or scripts from other servers. YouTube videos load only when you allow it.'],
-  ['Open formats, no lock-in', 'Export to PowerPoint, OpenDocument, PDF, HTML or Slidev Markdown, or save the project as a file. Your work goes with you.'],
-  ['Open source', 'Apache 2.0 licensed: read the code, adapt it or host it on your own server.'],
-]
-// screenshots and the demo video in public/showcase/, made by scripts/showcase.js in English and German
-const SHOWCASE = [
-  ['editor', 'Design on the slide', 'Text, tables, charts, shapes, icons and images: drag, snap, align. Chart data comes straight from a spreadsheet.'],
-  ['diagram', 'Diagrams and formulas', 'Mermaid flowcharts and Gantt charts, KaTeX formulas and code with syntax highlighting, all editable on the slide.'],
-  ['markdown', 'Write in Markdown', 'Edit the whole talk as Slidev Markdown with a live preview, or paste slides an AI wrote for you.'],
-  ['presenter', 'Present with notes', 'Presenter view with notes, next slide and timer; pen, laser pointer and slide overview while you talk.'],
-  ['quiz', 'Quizzes for the class', 'Quizzes, timers and a random draw for “who’s next?”, right on the slide while presenting.'],
-  ['a11y', 'Accessible slides', 'The check finds missing alt text, weak contrast, small fonts and missing titles, and fixes most with one click.'],
-]
-const shot = name => `showcase/${name}-${lang.value === 'de' ? 'de' : 'en'}`
-const still = matchMedia('(prefers-reduced-motion: reduce)').matches // no autoplay; the video still plays on request
 </script>
 
 <template>
@@ -168,25 +149,6 @@ const still = matchMedia('(prefers-reduced-motion: reduce)').matches // no autop
           <button class="mi danger" @click="confirmId = ctxProject.id"><Icon name="trash" />{{ t('Delete …') }}</button>
         </template>
       </Menu>
-    </section>
-
-    <section class="home-show">
-      <h2>{{ t('See what Slidecko can do') }}</h2>
-      <video class="show-video" :src="shot('demo') + '.mp4'" :poster="shot('editor') + '.webp'" :autoplay="!still" muted loop playsinline controls preload="metadata"
-        :aria-label="t('Demo: change a chart, switch themes and present')" />
-      <div class="show-grid">
-        <figure v-for="[name, title, text] in SHOWCASE" :key="name" class="show-card">
-          <a :href="shot(name) + '.webp'" target="_blank" rel="noopener"><img :src="shot(name) + '.webp'" :alt="t(title)" width="1600" height="1000" loading="lazy" /></a>
-          <figcaption><b>{{ t(title) }}</b><p>{{ t(text) }}</p></figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="home-why">
-      <h2>{{ t('Why Slidecko') }}</h2>
-      <div class="why-grid">
-        <div v-for="[title, text] in WHY" :key="title" class="why-card"><b>{{ t(title) }}</b><p>{{ t(text) }}</p></div>
-      </div>
     </section>
 
     <section class="home-themes">
