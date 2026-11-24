@@ -245,7 +245,7 @@ for (const f of document.querySelectorAll('.picker-face')) {
     const p = document.createElement('p'), s = document.createElement('small')
     p.className = 'pick'
     p.textContent = left.splice(Math.floor(Math.random() * left.length), 1)[0]
-    s.textContent = f.dataset.left.replace('{0}', left.length).replace('{1}', names.length)
+    s.textContent = left.length ? f.dataset.left.replace('{0}', left.length).replace('{1}', names.length) : f.dataset.all
     f.replaceChildren(p, s)
   })
   f.addEventListener('dblclick', () => { left = []; f.replaceChildren(...label) })

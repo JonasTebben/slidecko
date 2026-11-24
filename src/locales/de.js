@@ -1244,4 +1244,5 @@ export default {
   "Blues": "Blautöne",
   "Grays": "Grautöne",
   "Color-blind safe": "Farbenblind-sicher",
+  "Everyone drawn · click to start over": "Alle gezogen · Klick beginnt von vorn",
 }

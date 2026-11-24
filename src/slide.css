@@ -133,13 +133,17 @@
 .presenter .timer-face, .deck .timer-face { cursor: pointer; }
 /* timer designs: --p is the share shown (timer.js progress), --timer-accent the element's accent or the theme's */
 .slide .el.timer .timer-face { position: relative; --timer-accent: var(--accent); }
-.slide .el.timer .timer-face p { position: relative; }
+.slide .el.timer .timer-face p { position: relative; line-height: 1.1; }
 .slide .el.timer .timer-face.filled { border-radius: 12px; }
+/* the ring has its box's size (a circle, 92 % of the height at most); the digits shrink to fit inside it, by their count */
+.slide .el.timer .timer-face.ring { container-type: size; }
+.slide .el.timer .timer-face.ring p { font-size: min(1em, calc(min(92cqh, 96cqw) * 1.1 / var(--chars, 4))); }
 .slide .el.timer .timer-face.ring::before { content: ''; position: absolute; top: 4%; bottom: 4%; left: 50%; aspect-ratio: 1; max-width: 96%; transform: translateX(-50%); border-radius: 50%;
   background: conic-gradient(var(--timer-accent) calc(var(--p) * 1turn), color-mix(in srgb, var(--timer-accent) 18%, transparent) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9%), #000 calc(100% - 9% + 1px)); mask: radial-gradient(farthest-side, transparent calc(100% - 9%), #000 calc(100% - 9% + 1px)); }
-.slide .el.timer .timer-face.bar { padding-bottom: 14%; }
-.slide .el.timer .timer-face.bar::after { content: ''; position: absolute; left: 8%; right: 8%; bottom: 10%; height: max(6px, 7%); border-radius: 999px;
+/* the bar right under the digits, both centred together */
+.slide .el.timer .timer-face.bar { flex-direction: column; gap: .1em; }
+.slide .el.timer .timer-face.bar::after { content: ''; flex: none; width: 84%; height: max(6px, .14em); border-radius: 999px;
   background: linear-gradient(to right, var(--timer-accent) calc(var(--p) * 100%), color-mix(in srgb, var(--timer-accent) 18%, transparent) 0); }
 /* the last minute of a countdown ("last minute in red"); the ring and bar turn red too */
 .slide .el.timer .timer-face.warn { color: #dc2626; --timer-accent: #dc2626; }
@@ -157,7 +161,8 @@
 .slide .el.picker .picker-face .label strong { font-size: .5em; }
 .slide .el.picker .picker-face .die { width: .7em; height: .7em; fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .slide .el.picker .picker-face .die circle { fill: var(--accent); stroke: none; }
-.slide .el.picker .picker-face small { font-size: .3em; font-weight: 400; opacity: .75; margin-top: .3em; }
+.slide .el.picker .picker-face .pick { line-height: 1.15; }
+.slide .el.picker .picker-face small { line-height: 1.3; font-size: .3em; font-weight: 400; opacity: .75; margin-top: .3em; }
 .slide .el.picker .picker-face .pick + small { padding: .15em .7em; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); opacity: 1; }
 .slide .el.picker .picker-face .pick { animation: pick-in .4s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes pick-in { from { transform: scale(.6); opacity: 0; } }

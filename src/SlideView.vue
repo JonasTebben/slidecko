@@ -561,12 +561,12 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       </div>
       <!-- while presenting a click starts or pauses it, a double click sets it back -->
       <div v-else-if="el.type === 'timer'" class="content timer-face" :class="[el.face, { running: live && running(el.id), done: live && done(el), warn: warning(el, live), filled: el.fill }]"
-        :data-timer="el.seconds" :data-warn="el.warn ? 1 : null" :data-auto="el.auto ? 1 : null" :data-silent="el.silent ? 1 : null" :style="{ '--p': progress(el, live), '--timer-accent': (!warning(el, live) && el.accent) || null, background: el.fill || null }"
+        :data-timer="el.seconds" :data-warn="el.warn ? 1 : null" :data-auto="el.auto ? 1 : null" :data-silent="el.silent ? 1 : null" :style="{ '--p': progress(el, live), '--chars': face(el, live).length, '--timer-accent': (!warning(el, live) && el.accent) || null, background: el.fill || null }"
         :role="live ? 'button' : null" :aria-label="live ? t(el.seconds ? 'Start or pause the timer' : 'Start or pause the stopwatch') : null" @click="live && toggle(el)" @dblclick="live && reset(el.id)"><p>{{ face(el, live) }}</p></div>
       <!-- while presenting a click draws a name (nobody twice until everyone was drawn), a double click starts over; data-left is for the HTML export -->
-      <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-left="t('{0} of {1} left', '{0}', '{1}')" :role="live ? 'button' : null"
+      <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-left="t('{0} of {1} left', '{0}', '{1}')" :data-all="t('Everyone drawn · click to start over')" :role="live ? 'button' : null"
         :aria-label="live ? t('Draw a name') : null" :aria-live="live ? 'polite' : null" @click="live && picker.next(el)" @dblclick="live && picker.reset(el.id)">
-        <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small>{{ t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) }}</small></template>
+        <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small>{{ picker.picks[el.id].left.length ? t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) : t('Everyone drawn · click to start over') }}</small></template>
         <span v-else class="label"><svg class="die" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" /><circle cx="8.5" cy="8.5" r="1.4" /><circle cx="15.5" cy="15.5" r="1.4" /><circle cx="15.5" cy="8.5" r="1.4" /><circle cx="8.5" cy="15.5" r="1.4" /><circle cx="12" cy="12" r="1.4" /></svg>
           <strong>{{ t('Who’s next?') }}</strong><small>{{ t('Click to draw · {0}', t(el.names.length === 1 ? '{0} name' : '{0} names', el.names.length)) }}</small></span>
       </div>
