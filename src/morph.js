@@ -23,10 +23,11 @@ export function morphPairs(a = [], b = []) {
 export function playMorph(from, to, pairs, ms = 700) {
   const els = root => new Map([...root.querySelectorAll(':scope > .el[data-el]')].filter(n => !n.matches('[data-unshown], .unshown')).map(n => [n.dataset.el, n]))
   const box = n => ['left', 'top', 'width', 'height'].map(k => parseFloat(n.style[k]) || 0) // inline px: also right for a detached slide
-  const map = (p, q) => `translate(${q[0] - p[0]}px, ${q[1] - p[1]}px) scale(${q[2] / (p[2] || 1)}, ${q[3] / (p[3] || 1)})`
+  // the box itself moves and resizes (left/top/width/height), so text reflows instead of being squeezed by a scale
+  const at = q => ({ left: q[0] + 'px', top: q[1] + 'px', width: q[2] + 'px', height: q[3] + 'px' })
   const look = n => n.innerHTML + n.className + n.style.cssText.replace(/(left|top|width|height):[^;]*;?/g, '')
   const opt = { duration: ms, easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'backwards' }
-  const fly = (n, k) => n.animate(k.map(f => ({ transformOrigin: '0 0', ...f })), opt)
+  const fly = (n, k) => n.animate(k, opt)
   // a copy of an element of the old slide, drawn on the new one while it fades
   const ghost = (n, k) => {
     const c = n.cloneNode(true)
@@ -41,8 +42,8 @@ export function playMorph(from, to, pairs, ms = 700) {
     if (!na || !nb) continue
     done.add(ia).add(ib)
     const pa = box(na), pb = box(nb), same = look(na) === look(nb)
-    fly(nb, [{ transform: map(pb, pa), opacity: same ? 1 : 0 }, { transform: 'none', opacity: 1 }])
-    if (!same) ghost(na, [{ transform: 'none', opacity: 1 }, { transform: map(pa, pb), opacity: 0 }])
+    fly(nb, [{ ...at(pa), opacity: same ? 1 : 0 }, { ...at(pb), opacity: 1 }])
+    if (!same) ghost(na, [{ ...at(pa), opacity: 1 }, { ...at(pb), opacity: 0 }])
   }
   // the same element on both (the master's): stays as it is
   for (const [id, n] of A) if (!done.has(id) && !B.has(id)) ghost(n, [{ opacity: 1 }, { opacity: 0 }])
