@@ -14,6 +14,7 @@ bun run dev      # editor with hot reload (Vite)
 bun run build    # static files in dist/
 bun run start    # serve dist/ with the Bun server: http://localhost:3000
 bun test         # parser, export and server tests
+bun run smoke    # the whole app in a browser (Playwright): dialogs, every export and its import, dev and built
 ```
 
 ## Features

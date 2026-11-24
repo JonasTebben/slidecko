@@ -11,9 +11,10 @@ bun install
 bun run dev      # Vite with hot reload
 bun run build    # static files in dist/ (relative paths)
 bun test         # all *.test.js next to their source
+bun run smoke    # browser check of dev server and build: modules, dialogs, every export and its import (several minutes)
 ```
 
-Run `bun test` and `bun run build` before you call a change done.
+Run `bun test` and `bun run build` before you call a change done. Also run `bun run smoke` when you move files, change imports, upgrade dependencies or touch import/export code.
 
 ## Conventions
 

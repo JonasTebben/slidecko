@@ -1,6 +1,6 @@
 // Screenshots and the demo video (with poster) for the start page (public/showcase/), in English and German.
-// Needs the dev server and a temporary Playwright (not a dependency):
-//   bun run dev --port 5199 &  bun add --no-save playwright && bun scripts/showcase.js
+// Needs the dev server and Playwright (a devDependency) with Chromium:
+//   bun run dev --port 5199 &  bunx playwright install chromium && bun scripts/showcase.js
 // Then needs cwebp and ffmpeg on the PATH.
 import { chromium } from 'playwright'
 import { mkdirSync, rmSync, readdirSync, readFileSync } from 'node:fs'
