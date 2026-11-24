@@ -66,8 +66,20 @@ function runner() {
   })
   return ready
 }
-// runs code; onLine gets each output line; resolves with all lines ({ timeout: true } when stopped)
-export async function runCode(code, onLine = () => {}) {
+// TypeScript -> JavaScript: only the types go (Sucrase keeps the lines, so errors name the right one); loaded on first use
+export const isTs = lang => /^(ts|typescript)$/i.test(lang || '')
+export async function toJs(code, lang) {
+  if (!isTs(lang)) return code
+  const { transform } = await import('sucrase')
+  return transform(String(code), { transforms: ['typescript'], disableESTransforms: true }).code
+}
+// runs code (TypeScript too); onLine gets each output line; resolves with all lines ({ timeout: true } when stopped)
+export async function runCode(code, onLine = () => {}, lang) {
+  try { code = await toJs(code, lang) } catch (e) {
+    const l = { k: 'error', t: 'SyntaxError: ' + String(e.message || e) }
+    onLine(l)
+    return [l]
+  }
   await runner()
   const run = ++seq, out = []
   return new Promise(resolve => {
@@ -85,13 +97,13 @@ export async function runLive(el, stopped) {
   if (s.busy) return
   s.busy = s.ran = true
   s.out = []
-  const out = await runCode(s.code, l => s.out.push(l))
+  const out = await runCode(s.code, l => s.out.push(l), el.lang)
   if (out.timeout) s.out.push({ k: 'error', t: stopped })
   s.busy = false
 }
 // the editor's Run button: the output becomes the element's (shown in the exports), one undo step
 export async function runInto(el, stopped) {
-  const res = await runCode(el.code), out = [...res]
+  const res = await runCode(el.code, undefined, el.lang), out = [...res]
   if (res.timeout) out.push({ k: 'error', t: stopped })
   el.output = out.length ? out : undefined
 }

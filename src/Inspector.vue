@@ -414,7 +414,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label v-if="!isRun(el.meta)" class="field" :title="t('Line numbers in braces, e.g. {2,4-5}; steps separated by | advance one per click while presenting, e.g. {1|3-4|all}')">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5} or {1|3|all}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
         <label class="check"><input type="checkbox" :checked="codeOpts(el.meta).lines" @change="el.meta = setLines(el.meta, $event.target.checked)" /> {{ t('Line numbers') }}</label>
         <!-- Slidev's {monaco-run}: runs in a sandbox, while presenting and here; the last run is kept for the exports -->
-        <label v-if="RUN_LANGS.includes(el.lang) || isRun(el.meta)" class="check"><input type="checkbox" :checked="isRun(el.meta)" @change="el.meta = withRun(el.meta, $event.target.checked)" /> {{ t('Runnable (JavaScript)') }}</label>
+        <label v-if="RUN_LANGS.includes(el.lang) || isRun(el.meta)" class="check"><input type="checkbox" :checked="isRun(el.meta)" @change="el.meta = withRun(el.meta, $event.target.checked)" /> {{ t('Runnable (JavaScript, TypeScript)') }}</label>
         <template v-if="isRun(el.meta)">
           <label class="check"><input type="checkbox" :checked="autorun(el.meta)" @change="el.meta = withAutorun(el.meta, $event.target.checked)" /> {{ t('Run automatically when shown') }}</label>
           <label class="field">{{ t('Output') }} <select :value="el.outPos || 'below'" @change="el.outPos = $event.target.value === 'right' ? 'right' : undefined"><option value="below">{{ t('below the code') }}</option><option value="right">{{ t('right of the code') }}</option></select></label>

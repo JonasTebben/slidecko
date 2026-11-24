@@ -1147,7 +1147,7 @@ export default {
   "Reset": "Zurücksetzen",
   "Save this code and output in the presentation": "Diesen Code und die Ausgabe in der Präsentation speichern",
   "Keep changes": "Änderungen behalten",
-  "Runnable (JavaScript)": "Ausführbar (JavaScript)",
+  "Runnable (JavaScript, TypeScript)": "Ausführbar (JavaScript, TypeScript)",
   "Run automatically when shown": "Beim Anzeigen automatisch ausführen",
   "below the code": "unter dem Code",
   "right of the code": "rechts vom Code",

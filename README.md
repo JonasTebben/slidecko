@@ -117,7 +117,7 @@ If you run Slidecko publicly, you are responsible for your own legal notice and 
 ## Known limitations
 
 - Click steps show as the fully revealed slide in PDF and images, unless "One page per click step" is ticked. PPTX/ODP animate whole elements only: list items shown one by one appear together, code highlight steps show the last step.
-- Runnable code: JavaScript only (TypeScript type annotations are not removed); no Monaco editor, a plain text field while presenting; the HTML presentation runs the code as on the slide, without editing.
+- Runnable code: TypeScript types are removed, not checked; no Monaco editor, a plain text field while presenting; the HTML presentation runs the code as on the slide, without editing.
 - Vue components other than `<Youtube>` stay in the Markdown but are not rendered in the editor.
 - Editable PPTX/ODP: line breaks match the editor, so they stay as soft breaks if the text is reworded later. Text shadows are missing. `system-ui` is written as Helvetica Neue (Mac) or Segoe UI (Windows). Use the "exact" export for identical looks.
 - PPTX/ODP cannot embed fonts: included and uploaded fonts are written by name and must be installed where the file is opened.

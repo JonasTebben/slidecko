@@ -20,7 +20,7 @@ import { withMath, formulaHtml } from './math.js'
 import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 import { measureMark } from './marks.js'
 import { iconSvg, picker as iconPicker } from './icons.js'
-import { isRun, autorun, live as runs, runLive, outLine } from './run.js'
+import { isRun, isTs, autorun, live as runs, runLive, outLine } from './run.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
@@ -517,7 +517,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
         <textarea v-else-if="live && runEdit === el.id" v-model="runOf(el).code" class="code" spellcheck="false" :aria-label="t('Code')" @blur="endRunEdit" @keydown.stop="runKey($event, el)" @click.stop />
-        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" :data-stages="stageStarts(el)" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta, stageOf(el))]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }" :data-on="lineStages(el, i)"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" :data-ts="isRun(el.meta) && !editable && isTs(el.lang) || null" :data-stages="stageStarts(el)" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta, stageOf(el))]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }" :data-on="lineStages(el, i)"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
         <!-- runnable: the output panel (the last kept run in the editor and exports, the live one while presenting) -->
         <template v-if="isRun(el.meta)">
           <pre class="code run-out" :class="{ dark: codeDarkOf(el) }" :aria-live="live ? 'polite' : null" :aria-label="t('Output')"><span v-for="(l, i) in runShown(el).out" :key="i" :class="'out-' + l.k">{{ outLine(l) }}{{ '\n' }}</span></pre>

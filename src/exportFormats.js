@@ -4,6 +4,7 @@ import { W, H, readDataUrl, deckFile } from './store.js'
 import { lang, t } from './i18n.js'
 import { morphPairs, playMorph } from './morph.js'
 import { usesFamily } from './fonts.js'
+import { toJs } from './run.js'
 
 // Exports that reuse the rendered slides (root: one .slide per slide at 1:1) as they are:
 // pictures of each slide and a self-contained HTML presentation. Both look exactly like the editor.
@@ -373,9 +374,13 @@ export async function htmlDeck(root, title, list, files) {
   const project = JSON.stringify(data)
   // runnable code blocks: the runner (public/runner.js) rides along and runs in a sandboxed srcdoc iframe
   const runner = root.querySelector('pre[data-run]') ? await fetch('runner.js').then(r => (r.ok ? r.text() : ''), () => '') : ''
+  // TypeScript runs as JavaScript there (the file carries no compiler); broken code stays as written and shows its error
+  const js = new Map()
+  for (const p of root.querySelectorAll('pre[data-run][data-ts]')) js.set(p.dataset.run, await toJs(p.dataset.run, 'ts').catch(() => p.dataset.run))
   const slides = [...root.querySelectorAll('.slide')].map(n => {
     const c = n.cloneNode(true)
     c.classList.remove('on')
+    for (const p of c.querySelectorAll('pre[data-run][data-ts]')) { p.dataset.run = js.get(p.dataset.run) ?? p.dataset.run; delete p.dataset.ts }
     for (const img of c.querySelectorAll('img[src^="data:"]')) {
       const id = byData.get(img.getAttribute('src'))
       if (id && files) img.setAttribute('src', data.assets[id])

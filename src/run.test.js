@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { isRun, autorun, withRun, withAutorun, setLines, cleanOutput, outLine } from './run.js'
+import { isRun, autorun, toJs, withRun, withAutorun, setLines, cleanOutput, outLine } from './run.js'
 import { codeOpts } from './hl.js'
 import { parseSlidev } from './parseSlidev.js'
 import { toSlidev, slideHash } from './toSlidev.js'
@@ -74,4 +74,13 @@ test('runner worker: console output, the last value, errors and timers', async (
   assert.match((await run('let = ;'))[0], /^error:SyntaxError/)
   assert.deepEqual(await run('setTimeout(() => console.log("later"), 20); "now"'), ['result:"now"', 'log:later'])
   assert.deepEqual(await run('await new Promise(r => setTimeout(r, 10)); console.log("awaited")'), ['log:awaited'])
+})
+
+test('TypeScript runs as JavaScript: types go, lines stay, enums work, JavaScript is untouched', async () => {
+  const ts = 'interface P { n: number }\nconst p: P = { n: 2 }\nenum E { A, B }\nfunction f<T>(x: T): T { return x }\nf<number>(p.n) + E.B as number'
+  const js = await toJs(ts, 'ts')
+  assert.equal(js.split('\n').length, ts.split('\n').length)
+  assert.equal(new Function(js.replace(/\n([^\n]*)$/, '\nreturn $1'))(), 3)
+  assert.equal(await toJs('let a: = 1', 'js'), 'let a: = 1')
+  await assert.rejects(toJs('let a: = 1', 'typescript'))
 })
