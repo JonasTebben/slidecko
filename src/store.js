@@ -9,6 +9,7 @@ import { t } from './i18n.js'
 import { clickSteps } from './clicks.js'
 import { vmarkToData, checkMark } from './marks.js'
 import { ICON_NAME } from './icons.js'
+import { cleanOutput } from './run.js'
 import { cleanRehearsals, validDuration } from './rehearse.js'
 import { CHART_KINDS } from './chart.js'
 import { cleanFonts, fontType, fontLabel, FONT_MAX } from './fonts.js'
@@ -142,6 +143,8 @@ export function cleanEl(e) {
       ...base, code: String(e.code ?? ''), lang: String(e.lang || 'plaintext').replace(/[^\w+#-]/g, ''), ...(str(e.meta) && { meta: e.meta.replace(/[\n`]/g, '') }),
       // background (undefined = theme), its opacity in % and the corner radius in px
       ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(e.radius != null && { radius: num(e.radius, 0, 60) }),
+      // runnable code ({monaco-run} in meta): the last kept output (plain text lines, capped), the panel's side and size in px
+      ...(cleanOutput(e.output)?.length && { output: cleanOutput(e.output) }), ...(e.outPos === 'right' && { outPos: 'right' }), ...(e.outH != null && { outH: num(e.outH, 20, 400) }),
     }
     case 'image': return deck.assets[e.asset] ? {
       ...base, asset: e.asset, src: str(e.src) || '/images/image.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),

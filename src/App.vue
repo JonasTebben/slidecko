@@ -25,6 +25,7 @@ import { format, setFormat, deck, ui, decks, library, openProject, fileOf, resto
 import { parseRatio } from './format.js'
 import { slidePoint, arrowHead } from './draw.js'
 import { toggleSolution, resetQuiz } from './quiz.js'
+import { resetLive, setLines } from './run.js'
 import { BUNDLED, fontCss } from './fonts.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { PALETTE, FILLS } from './presets.js'
@@ -33,7 +34,7 @@ import { applyUno } from './uno.js'
 import { morphSlides } from './morph.js'
 import * as A from './actions.js'
 import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells } from './tableOps.js'
-import { toggleMarked, codeOpts, withLines, highlight } from './hl.js'
+import { toggleMarked, codeOpts, highlight } from './hl.js'
 import { find, replace, ranges, pattern } from './search.js'
 import * as R from './rehearse.js'
 import { clock } from './timer.js'
@@ -614,6 +615,7 @@ async function present(from = ui.slide) {
   overview.value = false
   strokes.value = []
   resetQuiz()
+  resetLive()
   clickStep.value = 0
   started.value = Date.now()
   await nextTick()
@@ -682,7 +684,7 @@ const overview = ref(false), recorder = ref()
 const closeOverview = async () => { overview.value = false; await nextTick(); presenter.value?.focus() } // after the modal is gone: until then the presenter is inert
 const recordTalk = async () => { await present(); recorder.value?.open() }
 function presentKey(e) {
-  if (e.target.closest?.('.el.board')) return // typing into a notes box (Esc first ends the typing there)
+  if (e.target.closest?.('.el.board, .el.run textarea')) return // typing into a notes box or runnable code (Esc first ends the typing there)
   if ((e.key === ' ' || e.key === 'Enter') && e.target.closest?.('button')) return // a focused button is pressed, the slide stays
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey
   if (plain && /^[0-9]$/.test(e.key)) {
@@ -735,7 +737,7 @@ function presentClick(e) {
   const a = e.target.closest('a[href]')
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (tool.value) return // pointing or drawing does not turn the slide
-  if (e.target.closest('iframe, .pv-side, .pv-bar, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal')) return // a timer click starts the timer, a picker click draws, not the next slide
+  if (e.target.closest('iframe, .pv-side, .pv-bar, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar')) return // a timer click starts the timer, a picker click draws, not the next slide
   presentStep(e.clientX < innerWidth / 4 ? -1 : 1) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
@@ -1413,7 +1415,7 @@ function onClipboard(e) {
             <button class="mi" @click="taLines(ctxAt.code, l => '  ' + l)"><Icon name="chevronR" />{{ t('Indent') }}<kbd>Tab</kbd></button>
             <button class="mi" @click="taLines(ctxAt.code, l => l.replace(/^( {1,2}|\t)/, ''))"><Icon name="chevronL" />{{ t('Outdent') }}</button>
             <button class="mi" @click="markLines(ctxAt.code, ctxAt.el)"><Icon name="filter" />{{ ctxAt.hasSel ? t('Highlight selected lines') : t('Highlight line') }}</button>
-            <button class="mi" @click="ctxAt.el.meta = withLines(ctxAt.el.meta, !codeOpts(ctxAt.el.meta).lines)"><Icon name="olist" />{{ codeOpts(ctxAt.el.meta).lines ? t('Hide line numbers') : t('Show line numbers') }}</button>
+            <button class="mi" @click="ctxAt.el.meta = setLines(ctxAt.el.meta, !codeOpts(ctxAt.el.meta).lines)"><Icon name="olist" />{{ codeOpts(ctxAt.el.meta).lines ? t('Hide line numbers') : t('Show line numbers') }}</button>
             <hr />
             <button class="mi" @click="ctxAt.code.blur()"><Icon name="x" />{{ t('Stop editing') }}<kbd>Esc</kbd></button>
           </template>

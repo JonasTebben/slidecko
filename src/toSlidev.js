@@ -60,12 +60,12 @@ turndown.addRule('img', {
   },
 })
 
-// identity of a slide's content, ignoring element ids (they change on every load)
+// identity of a slide's content, ignoring element ids (they change on every load) and the output of runnable code (Slidev runs it itself)
 const hashOf = v => { let h = 0; for (const c of JSON.stringify(v)) h = (h * 31 + c.charCodeAt(0)) | 0; return h }
-export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, ...e }) => e)])
+export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, output, ...e }) => e)])
 // a new slide's arrangement without its text (and heights, which grow with the text): while it stays the same,
 // the slide follows the Slidev layout and is written as plain Markdown instead of positioned boxes
-export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, html, code, h, ...e }) => e)])
+export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, html, code, h, output, ...e }) => e)])
 // only one column of text and code flows in Markdown the way it sits in the editor
 export const flowable = els => els.every(e => (e.type === 'text' && !e.board) || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
 // a malformed escape ("100%.png") stays as written instead of stopping the export

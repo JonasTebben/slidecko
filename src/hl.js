@@ -39,13 +39,13 @@ function splitLines(code, lang) {
 export function codeOpts(meta = '') {
   const groups = [...meta.matchAll(/\{([^}]*)\}/g)].map(m => m[1])
   const opts = groups.find(g => g.includes(':')) || ''
-  const first = groups.find(g => !g.includes(':'))?.split('|')[0].trim()
+  const first = groups.find(g => !g.includes(':') && !g.startsWith('monaco'))?.split('|')[0].trim() // {monaco-run} is no line range
   let marked = null
   if (first && !/^(all|\*)$/.test(first)) {
     marked = new Set()
     for (const part of first.split(',')) { const [a, b = a] = part.split('-').map(Number); for (let i = a; i <= b && i - a < 1000; i++) marked.add(i) }
   }
-  return { lines: /lines:\s*true/.test(opts), start: +(opts.match(/startLine:\s*(\d+)/)?.[1] || 1), marked }
+  return { lines: /lines:\s*true|lineNumbers:\s*['"]on/.test(opts), start: +(opts.match(/startLine:\s*(\d+)/)?.[1] || 1), marked }
 }
 // the meta with line numbers switched on or off (other options and the highlighted lines stay)
 // marks lines a..b in the meta's highlight group ({2,4-5}), or unmarks them when all are marked already;

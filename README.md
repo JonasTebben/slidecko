@@ -20,7 +20,7 @@ bun test         # parser, export and server tests
 
 - **Import** Slidev projects (a folder with `slides.md`, `src:` includes, images, theme), PowerPoint (`.pptx`/`.potx`, also from Google Slides and Keynote), OpenDocument (`.odp`/`.otp`), PDF (one image slide per page, text in the notes), Slidecko's own HTML exports and images.
 - **Export** to Slidev (`.zip`), PDF (vector, selectable text), PowerPoint (editable, plus a Google Slides variant and an image-only "exact" variant), OpenDocument, a single-file or zipped HTML presentation, and PNG images.
-- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, charts (column, bar, line, pie; data pasted from a spreadsheet), shapes, Mermaid diagrams, formulas (KaTeX, `$…$` in text), icons (Slidev's Iconify sets Lucide, Tabler, Material Design, Carbon, Phosphor; bundled, searchable), YouTube videos, and timers, random pickers ("who's next?") and quizzes you use while presenting, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
+- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, charts (column, bar, line, pie; data pasted from a spreadsheet), shapes, Mermaid diagrams, formulas (KaTeX, `$…$` in text), icons (Slidev's Iconify sets Lucide, Tabler, Material Design, Carbon, Phosphor; bundled, searchable), YouTube videos, runnable JavaScript code (Slidev's `{monaco-run}`, in a sandbox), and timers, random pickers ("who's next?") and quizzes you use while presenting, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
 - **Master and layouts**: elements on every slide (logo, footer, slide number), editable slide layouts with placeholders and decorations, also in every export.
 - **Fonts**: seven included open-source fonts and your own font files (`.woff2`, `.woff`, `.ttf`, `.otf`), stored with the project and embedded in HTML, image and Slidev exports; served from the app itself, never from a font CDN.
 - **Themes**: 13 built-in themes and a theme editor (colours, fonts, own CSS) whose themes can be exported and imported as `.theme.json`.
@@ -57,6 +57,7 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 | `src/scheme.js` | light/dark mode |
 | `src/AppFooter.vue`, `src/support.js` | footer and its build-time links |
 | `index.html` | app entry |
+| `src/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
 | `server.js` | Bun server: serves `dist/`, `/health` |
 | `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |
 
@@ -114,6 +115,7 @@ If you run Slidecko publicly, you are responsible for your own legal notice and 
 ## Known limitations
 
 - `v-click` steps show as the fully revealed slide (like Slidev's PDF export).
+- Runnable code: JavaScript only (TypeScript type annotations are not removed); no Monaco editor, a plain text field while presenting; the HTML presentation runs the code as on the slide, without editing.
 - Vue components other than `<Youtube>` stay in the Markdown but are not rendered in the editor.
 - Editable PPTX/ODP: line breaks match the editor, so they stay as soft breaks if the text is reworded later. Text shadows are missing. `system-ui` is written as Helvetica Neue (Mac) or Segoe UI (Windows). Use the "exact" export for identical looks.
 - PPTX/ODP cannot embed fonts: included and uploaded fonts are written by name and must be installed where the file is opened.

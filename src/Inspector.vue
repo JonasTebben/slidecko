@@ -8,7 +8,8 @@ import ChartPanel from './ChartPanel.vue'
 import FontOptions from './FontOptions.vue'
 import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont } from './store.js'
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
-import { LANGS, codeOpts, withLines } from './hl.js'
+import { LANGS, codeOpts } from './hl.js'
+import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from './run.js'
 import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup } from './actions.js'
 import { layoutOf } from './toSlidev.js'
 import * as table from './tableOps.js'
@@ -58,6 +59,7 @@ function pickLayout(e) {
   if (l) setSlideLayout(slide.value, l)
   else { e.target.value = slideLayout.value?.id; editMaster(slideLayout.value?.id) }
 }
+const running = ref(false) // the Run button while its code runs
 const langs = computed(() => (el.value?.lang && !LANGS.includes(el.value.lang) ? [el.value.lang, ...LANGS] : LANGS))
 // code backgrounds: light editor greys and the usual dark editor themes
 const CODE_BGS = ['#ffffff', '#f6f8fa', '#f1f5f9', '#fdf6e3', '#fef9c3', '#e0f2fe', '#0d1117', '#1e293b', '#282a36', '#002b36', '#2e3440', '#000000']
@@ -405,8 +407,19 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="field">{{ t('Font size') }}
           <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
         </label>
-        <label class="field">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
-        <label class="check"><input type="checkbox" :checked="codeOpts(el.meta).lines" @change="el.meta = withLines(el.meta, $event.target.checked)" /> {{ t('Line numbers') }}</label>
+        <label v-if="!isRun(el.meta)" class="field">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
+        <label class="check"><input type="checkbox" :checked="codeOpts(el.meta).lines" @change="el.meta = setLines(el.meta, $event.target.checked)" /> {{ t('Line numbers') }}</label>
+        <!-- Slidev's {monaco-run}: runs in a sandbox, while presenting and here; the last run is kept for the exports -->
+        <label v-if="RUN_LANGS.includes(el.lang) || isRun(el.meta)" class="check"><input type="checkbox" :checked="isRun(el.meta)" @change="el.meta = withRun(el.meta, $event.target.checked)" /> {{ t('Runnable (JavaScript)') }}</label>
+        <template v-if="isRun(el.meta)">
+          <label class="check"><input type="checkbox" :checked="autorun(el.meta)" @change="el.meta = withAutorun(el.meta, $event.target.checked)" /> {{ t('Run automatically when shown') }}</label>
+          <label class="field">{{ t('Output') }} <select :value="el.outPos || 'below'" @change="el.outPos = $event.target.value === 'right' ? 'right' : undefined"><option value="below">{{ t('below the code') }}</option><option value="right">{{ t('right of the code') }}</option></select></label>
+          <label class="slider" :title="t('Output size')"><Icon name="layout" :size="16" /><input type="range" min="20" max="400" step="10" :aria-label="t('Output size')" :value="el.outH ?? 80" @input="el.outH = +$event.target.value" /><output>{{ el.outH ? el.outH + ' px' : t('Auto') }}</output></label>
+          <div class="btn-row">
+            <button class="grow" :disabled="running" @click="running = true; runInto(el, t('Stopped after 3 seconds (endless loop?)')).finally(() => { running = false })">▶ {{ t('Run') }}</button>
+            <button class="grow" :disabled="!el.output" @click="el.output = undefined">{{ t('Clear output') }}</button>
+          </div>
+        </template>
         <div class="chips">
           <span class="chip" :style="chip(el.fill, 'var(--ui-panel)')"><Menu icon="fill" :label="t('Background')" :title="t('Background')">
             <div class="swatches pop-sw">

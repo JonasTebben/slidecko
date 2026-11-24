@@ -19,6 +19,7 @@ import { withMath, formulaHtml } from './math.js'
 import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 import { measureMark } from './marks.js'
 import { iconSvg, picker as iconPicker } from './icons.js'
+import { isRun, autorun, live as runs, runLive, outLine } from './run.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
@@ -418,8 +419,8 @@ async function fitCode() {
     if (pre && pre.scrollHeight > pre.clientHeight + 1) el.h += pre.scrollHeight - pre.clientHeight
   }
 }
-// only on the user's own code edits (text, size, width), never on theme/typo changes
-watch(() => props.slide.elements.map(e => e.type === 'code' && [e.code, e.fontSize, e.w]), fitCode, { deep: true })
+// only on the user's own code edits (text, size, width, the runnable output panel), never on theme/typo changes
+watch(() => props.slide.elements.map(e => e.type === 'code' && [e.code, e.fontSize, e.w, e.meta, e.outPos, e.outH]), fitCode, { deep: true })
 // text boxes: a fill adds padding around the text — grow the box so the coloured area stays inside the frame
 // (the user's own change only: compares with the previous state, so loading or switching slides never resizes)
 watch(() => props.slide.elements.map(e => e.type === 'text' && (e.fill || e.stroke) ? 'box' + (e.stroke ? e.strokeWidth : 0) : ''), async (now, before) => {
@@ -451,6 +452,27 @@ onUpdated(layoutMarks)
 onBeforeUnmount(() => document.fonts?.removeEventListener('loadingdone', layoutMarks))
 const markShown = m => props.step == null || !m.at || revealed({ click: m.at }, steps.value, props.step)
 const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+// runnable code while presenting: a click on the code edits it (the deck keeps its code until "Keep changes"), ⌘/Ctrl+Enter runs
+const runEdit = ref(null)
+const runOf = el => (runs[el.id] ??= { code: el.code, out: el.output || [] })
+const runShown = el => (props.live && runs[el.id]) || { code: el.code, out: el.output || [] }
+const run = el => { runOf(el); runLive(el, t('Stopped after 3 seconds (endless loop?)')) }
+async function editRun(el) {
+  runOf(el)
+  runEdit.value = el.id
+  await nextTick()
+  root.value?.querySelector(`[data-el="${el.id}"] textarea`)?.focus()
+}
+function runKey(e, el) {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(el) }
+  if (e.key === 'Tab') { e.preventDefault(); insert('  ') }
+  if (e.key === 'Escape') { e.preventDefault(); e.target.blur() }
+}
+const endRunEdit = () => { runEdit.value = null; root.value?.closest('[tabindex]')?.focus() } // back to the slide keys
+const keepRun = el => { const s = runs[el.id]; el.code = s.code; el.output = s.out.length ? s.out.map(l => ({ ...l })) : undefined; s.out = el.output || [] }
+const resetRun = el => { runs[el.id] = { code: el.code, out: el.output || [] } }
+// Slidev's autorun (on unless {autorun:false}): runs when the slide is shown while presenting
+if (props.live) for (const el of props.slide.elements) if (el.type === 'code' && isRun(el.meta) && autorun(el.meta) && !runs[el.id]) run(el)
 </script>
 
 <template>
@@ -458,10 +480,10 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
       :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
-      class="el" :class="[el.type, { cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
+      class="el" :class="[el.type, { run: el.type === 'code' && isRun(el.meta), 'out-right': el.outPos === 'right', cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
-        '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
+        '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, '--out-h': el.outH ? el.outH + 'px' : null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
       :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
       :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram', icon: 'Icon', math: 'Formula' }[el.type]) : null"
@@ -475,7 +497,19 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
       />
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
-        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(el.code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <textarea v-else-if="live && runEdit === el.id" v-model="runOf(el).code" class="code" spellcheck="false" :aria-label="t('Code')" @blur="endRunEdit" @keydown.stop="runKey($event, el)" @click.stop />
+        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <!-- runnable: the output panel (the last kept run in the editor and exports, the live one while presenting) -->
+        <template v-if="isRun(el.meta)">
+          <pre class="code run-out" :class="{ dark: codeDarkOf(el) }" :aria-live="live ? 'polite' : null" :aria-label="t('Output')"><span v-for="(l, i) in runShown(el).out" :key="i" :class="'out-' + l.k">{{ outLine(l) }}{{ '\n' }}</span></pre>
+          <div v-if="live" class="run-bar" @click.stop @pointerdown.stop>
+            <button :disabled="runs[el.id]?.busy" :title="t('Run (⌘/Ctrl+Enter)')" @click="run(el)">▶ {{ t('Run') }}</button>
+            <template v-if="runs[el.id] && (runs[el.id].code !== el.code || runs[el.id].ran)">
+              <button :title="t('Back to the code of the slide')" @click="resetRun(el)">{{ t('Reset') }}</button>
+              <button :title="t('Save this code and output in the presentation')" @click="keepRun(el)">{{ t('Keep changes') }}</button>
+            </template>
+          </div>
+        </template>
       </template>
       <img v-else-if="el.type === 'image'" :src="deck.assets[el.asset]" :class="el.cls" :alt="el.decorative ? '' : el.alt || ''" draggable="false" :style="{ borderRadius: el.radius && !el.crop ? el.radius + 'px' : null }" />
       <div v-else-if="el.type === 'math'" class="formula" v-html="formulaHtml(el.tex)" />

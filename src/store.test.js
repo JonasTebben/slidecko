@@ -117,6 +117,13 @@ test('cleanSlides keeps only the transitions the editor offers', async () => {
   assert.deepEqual(cleanSlides([{ transition: 'fade' }, { transition: 'none' }, { transition: 'slide-right' }, { transition: '<x>' }]).map(s => s.transition), ['fade', 'none', undefined, undefined])
 })
 
+test('runnable code: output kept as capped plain lines, panel side and size validated', () => {
+  const el = S.cleanEl({ type: 'code', code: 'x', meta: '{monaco-run}', output: [{ k: 'log', t: 'a' }, { k: 'x', t: 'b' }, ...Array(300).fill({ k: 'log', t: 'c' })], outPos: 'right', outH: 9999 })
+  assert.deepEqual([el.meta, el.output[0], el.output.length, el.outPos, el.outH], ['{monaco-run}', { k: 'log', t: 'a' }, 199, 'right', 400])
+  const none = S.cleanEl({ type: 'code', code: 'x', output: [], outPos: 'top' })
+  assert.ok(!('output' in none) && !('outPos' in none) && !('outH' in none))
+})
+
 test('timer: seconds are kept within a day-sized range, a bad colour is dropped', () => {
   assert.equal(S.cleanEl({ type: 'timer', seconds: 600.4 }).seconds, 600)
   assert.equal(S.cleanEl({ type: 'timer', seconds: -5 }).seconds, 0)

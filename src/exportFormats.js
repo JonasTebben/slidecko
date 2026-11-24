@@ -1,7 +1,7 @@
 import { toPng, toJpeg, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import { W, H, readDataUrl, deckFile } from './store.js'
-import { lang } from './i18n.js'
+import { lang, t } from './i18n.js'
 import { morphPairs, playMorph } from './morph.js'
 import { usesFamily } from './fonts.js'
 
@@ -232,6 +232,51 @@ for (const f of document.querySelectorAll('.picker-face')) {
   })
   f.addEventListener('dblclick', () => { left = []; f.replaceChildren(...label) })
 }
+// runnable code: Run executes it in a sandboxed iframe (opaque origin, own CSP, no network), as in the editor
+const runnerSrc = document.getElementById('slides-builder-runner'), runCb = {}
+let runBox = null, runReady = null, runSeq = 0
+function runner() {
+  return runReady || (runReady = new Promise(ok => {
+    addEventListener('message', e => {
+      if (!runBox || e.source !== runBox.contentWindow || !e.data) return
+      if (e.data.k === 'ready') return ok()
+      if (runCb[e.data.run]) runCb[e.data.run](e.data)
+    })
+    runBox = document.createElement('iframe')
+    runBox.setAttribute('sandbox', 'allow-scripts')
+    runBox.hidden = true
+    runBox.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \\'none\\'; script-src \\'unsafe-inline\\' \\'unsafe-eval\\'; worker-src blob:; connect-src \\'none\\'"><script>' + runnerSrc.textContent + '<\\/script>'
+    document.body.append(runBox)
+  }))
+}
+if (runnerSrc) for (const pre of document.querySelectorAll('pre[data-run]')) {
+  const out = pre.parentElement.querySelector('.run-out'), bar = document.createElement('div'), b = document.createElement('button')
+  bar.className = 'run-bar'
+  b.textContent = '▶ ' + runnerSrc.dataset.run
+  bar.append(b)
+  pre.parentElement.append(bar)
+  const add = (k, text) => {
+    if (out.childNodes.length >= 200) return
+    const s = document.createElement('span')
+    s.className = 'out-' + k
+    s.textContent = (k === 'result' ? '← ' : k === 'error' ? '✖ ' : k === 'warn' ? '⚠ ' : '') + String(text).slice(0, 2000) + '\\n'
+    out.append(s)
+  }
+  b.addEventListener('click', async e => {
+    e.stopPropagation()
+    b.disabled = true
+    await runner()
+    const id = ++runSeq
+    out.replaceChildren()
+    runCb[id] = d => {
+      if (d.k !== 'end' && d.k !== 'timeout') return add(d.k, d.t)
+      delete runCb[id]
+      b.disabled = false
+      if (d.k === 'timeout') add('error', runnerSrc.dataset.stopped)
+    }
+    runBox.contentWindow.postMessage({ run: id, code: pre.dataset.run }, '*')
+  })
+}
 document.querySelector('.deck').addEventListener('click', e => { if (!tool && !e.target.closest('a, iframe, video')) step(1) })
 let x0 = null
 addEventListener('touchstart', e => { x0 = e.touches[0].clientX }, { passive: true })
@@ -313,6 +358,8 @@ export async function htmlDeck(root, title, list, files) {
   const ext = d => ({ 'svg+xml': 'svg', jpeg: 'jpg', 'x-icon': 'ico' })[d.match(/^data:(?:image|font)\/([\w.+-]+)/)?.[1]] || d.match(/^data:(?:image|font)\/(\w+)/)?.[1] || 'bin'
   if (files) for (const [id, d] of Object.entries(data.assets)) { files[`images/${id}.${ext(d)}`] = d; data.assets[id] = `images/${id}.${ext(d)}` }
   const project = JSON.stringify(data)
+  // runnable code blocks: the runner (public/runner.js) rides along and runs in a sandboxed srcdoc iframe
+  const runner = root.querySelector('pre[data-run]') ? await fetch('runner.js').then(r => (r.ok ? r.text() : ''), () => '') : ''
   const slides = [...root.querySelectorAll('.slide')].map(n => {
     const c = n.cloneNode(true)
     c.classList.remove('on')
@@ -348,7 +395,7 @@ ${slides}
 <div class="inks" hidden>${['#e5202a', '#facc15', '#16a34a', '#2563eb', '#ffffff'].map(c => `<button data-color="${c}" style="background:${c}" aria-label="Pen colour ${c}" aria-pressed="${c === '#e5202a'}"></button>`).join('')}${[3, 6, 12].map(w => `<button class="w" data-width="${w}" aria-label="Line width ${w}" aria-pressed="${w === 6}"><i style="height:${w / 2 + 1}px"></i></button>`).join('')}</div>
 <div class="laser" hidden></div>
 <script type="application/json" id="slides-builder-project">${project.replace(/</g, '\\u003c')}</script>
-<script>${viewerJs()}</script>
+${runner ? `<script type="text/plain" id="slides-builder-runner" data-run="${esc(t('Run'))}" data-stopped="${esc(t('Stopped after 3 seconds (endless loop?)'))}">${runner.replace(/<\/script/gi, '<\\/script')}</script>\n` : ''}<script>${viewerJs()}</script>
 </body>
 </html>
 `

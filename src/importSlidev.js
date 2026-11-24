@@ -9,6 +9,7 @@ import { t } from './i18n.js'
 import { listItems } from './clicks.js'
 import { iconTags, readIconStyle, getIcon } from './icons.js'
 import { loadMath, formulaHtml } from './math.js'
+import { isRun } from './run.js'
 
 // Slidev markdown -> slides of absolutely positioned elements.
 //
@@ -264,6 +265,7 @@ function measure(slide, parsed) {
     if (el.clickItems) clicks = Math.max(clicks, (el.click || clicks + 1) + listItems(el.html) - 1)
     if (box) fromBox(box, el)
     else if (el.w == null) sized(el, [r])
+    if (!box && el.type === 'code' && isRun(el.meta)) el.h += 84 // runnable: room for its output panel (80px) below the code
     elements.push(el)
   }
   return elements
