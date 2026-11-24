@@ -29,6 +29,7 @@ Run `bun test` and `bun run build` before you call a change done.
 - **Storage**: if you change what is kept in IndexedDB, localStorage or sessionStorage, update the "What the app stores" table in the README. The `slides-builder` key prefix stays (existing user data).
 - **Themes**: built-in themes must stay WCAG AA; see "Theme readability" in the README.
 - **Features**: user-visible changes go into `docs/features.md` (and the README feature list if they are major).
+- **Licences**: a new dependency goes into `NOTICE` in the same commit, with its licence and "loaded only for …" if it is lazy, plus the packages it bundles into `dist/` under a licence other than MIT.
 
 ## Things to leave alone
 
