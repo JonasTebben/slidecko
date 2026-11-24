@@ -360,7 +360,11 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .project-rename { font: inherit; font-weight: 700; margin: -3px -6px; padding: 2px 5px; border: 1px solid var(--ui-accent); border-radius: 6px; outline: none; box-shadow: 0 0 0 2px var(--ui-accent-soft); }
 .project-meta small { color: var(--ui-muted); }
 .project-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 4px 8px 8px; font-size: 12px; }
-.project-actions span { margin-right: auto; color: var(--ui-danger); }
+/* delete confirmation: the question is plain text, the answers are clearly buttons (filled red "Delete", framed "No") */
+.project-actions span { margin-right: auto; color: var(--ui-muted); }
+.project-actions .confirm-yes { background: var(--ui-danger); border: 1px solid var(--ui-danger); color: var(--ui-panel); font-weight: 600; padding: 0 10px; }
+.project-actions .confirm-yes:hover { filter: brightness(.92); }
+.project-actions .confirm-no { border: 1px solid var(--ui-line-strong); padding: 0 10px; }
 
 /* presenting */
 .presenter { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #000; cursor: default; outline: none; touch-action: pan-y; } /* no double-tap zoom (two quick taps are two slides), and a horizontal swipe is not taken over as a pan */

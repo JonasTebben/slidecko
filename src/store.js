@@ -607,6 +607,20 @@ const queue = (job, assets) => {
 }
 // closing the tab while a write is still running would lose it
 globalThis.addEventListener?.('beforeunload', e => { if (pending) e.preventDefault() })
+// after a release an open page asks for code files that are gone (new names): save, then reload once to get the
+// new ones; false when it just did (within a minute), so a real outage does not reload forever
+export function reloadForUpdate() {
+  try {
+    if (+sessionStorage.getItem('slides-builder:reloaded') > Date.now() - 60000) return false
+    sessionStorage.setItem('slides-builder:reloaded', Date.now())
+  } catch { return false }
+  flush()
+  const go = () => (pending ? setTimeout(go, 100) : location.reload())
+  go()
+  return true
+}
+// the browsers' messages for a module that could not be loaded
+export const staleChunk = e => /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(e?.message || e))
 function persist(json) {
   if (!deck.id) return
   const m = meta(), id = m.id // the job may run after a switch to another project

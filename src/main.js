@@ -5,5 +5,11 @@ import './app.css'
 import './longpress.js'
 import './scheme.js' // sets light/dark before the first paint
 import App from './App.vue'
+import { reloadForUpdate, staleChunk } from './store.js'
 
-createApp(App).mount('#app')
+const app = createApp(App)
+// a part of the app loaded later (an editor, an export) is gone after a release: reload to the new version
+addEventListener('vite:preloadError', e => { if (reloadForUpdate()) e.preventDefault() })
+addEventListener('unhandledrejection', e => { if (staleChunk(e.reason) && reloadForUpdate()) e.preventDefault() })
+app.config.errorHandler = (e, _, info) => { if (!(staleChunk(e) && reloadForUpdate())) console.error(e, info) }
+app.mount('#app')

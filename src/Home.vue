@@ -157,8 +157,8 @@ const WHY = [
           <div class="project-actions">
             <template v-if="confirmId === p.id">
               <span>{{ t('Delete permanently?') }}</span>
-              <button class="tb small danger" @click="del(p.id)">{{ t('Delete') }}</button>
-              <button class="tb small" @click="confirmId = null">{{ t('No') }}</button>
+              <button class="tb small confirm-yes" @click="del(p.id)">{{ t('Delete') }}</button>
+              <button class="tb small confirm-no" @click="confirmId = null">{{ t('No') }}</button>
             </template>
             <template v-else>
               <button class="tb icon small" :title="t('Save as file (.slides.json)')" @click="save(p)"><Icon name="download" :size="16" /></button>

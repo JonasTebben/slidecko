@@ -260,3 +260,8 @@ test('a timer keeps its design and options, nothing else', () => {
   const bad = S.cleanEl({ type: 'timer', seconds: 0, face: 'spiral', accent: 'url(x)', warn: 'yes', auto: 1 })
   assert.deepEqual([bad.face, bad.accent, bad.warn, bad.auto], [undefined, undefined, undefined, undefined])
 })
+
+test('a module missing after a release is recognised in every browser', () => {
+  for (const m of ['Failed to fetch dynamically imported module: https://x/a.js', 'Importing a module script failed.', 'error loading dynamically imported module: https://x/a.js']) assert.ok(S.staleChunk(new TypeError(m)))
+  assert.equal(S.staleChunk(new Error('x is not defined')), false)
+})
