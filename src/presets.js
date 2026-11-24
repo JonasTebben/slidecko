@@ -11,6 +11,14 @@ export const PALETTE = ['#0f172a', '#475569', '#94a3b8', '#ffffff', '#dc2626', '
 export const FILLS = ['#f1f5f9', '#e0f2fe', '#ecfdf5', '#fef9c3', '#fee2e2', '#ede9fe', ...PALETTE]
 export const SHAPE_NAMES = { rect: 'Rectangle', rounded: 'Rounded', ellipse: 'Ellipse', triangle: 'Triangle', arrow: 'Arrow', line: 'Line' }
 
+// Mermaid starter diagrams (inspector: "Start from a template"); labels translated when picked
+export const DIAGRAMS = {
+  flowchart: ['Flowchart', () => `flowchart LR\n  A[${t('Idea')}] --> B{${t('Good?')}}\n  B -->|${t('Yes')}| C[${t('Build it')}]\n  B -->|${t('No')}| D[${t('Rethink')}]\n  D --> A`],
+  sequence: ['Sequence diagram', () => `sequenceDiagram\n  ${t('Browser')}->>${t('Server')}: ${t('Request')}\n  ${t('Server')}-->>${t('Browser')}: ${t('Response')}`],
+  gantt: ['Gantt chart', () => `gantt\n  dateFormat YYYY-MM-DD\n  section ${t('Project')}\n  ${t('Plan')} :a1, 2026-01-05, 7d\n  ${t('Build')} :a2, after a1, 14d\n  ${t('Launch')} :milestone, after a2, 0d`],
+  mindmap: ['Mind map', () => `mindmap\n  root((${t('Topic')}))\n    ${t('Idea')}\n      ${t('Detail')}\n    ${t('Question')}\n    ${t('Goal')}`],
+}
+
 export const ELEMENTS = {
   text: () => T(`<p>${t('Enter text …')}</p>`, { x: 120, y: 140, w: 420, h: 30 }),
   heading: () => T(`<h2>${t('Heading')}</h2>`, { x: 120, y: 120, w: 600, h: 40 }),
@@ -30,8 +38,10 @@ export const ELEMENTS = {
   video: youtube => ({ type: 'video', youtube, x: 240, y: 120, w: 500, h: 281 }),
   // notes box for the class: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
   board: () => T(`<p><strong>${t('Ideas from the class …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
+  diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),
   timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
   picker: () => ({ type: 'picker', names: [1, 2, 3, 4].map(n => t('Group {0}', n)), fontSize: 64, x: 280, y: 190, w: 420, h: 160 }),
+  chart: () => ({ type: 'chart', kind: 'column', legend: true, categories: ['Q1', 'Q2', 'Q3', 'Q4'], series: [{ name: t('Series {0}', 1), values: [12, 19, 15, 24] }, { name: t('Series {0}', 2), values: [8, 11, 14, 17] }], x: 140, y: 100, w: 700, h: 380 }),
   quiz: () => ({ type: 'quiz', question: t('Question?'), answers: [{ text: t('Answer {0}', 1), correct: true }, { text: t('Answer {0}', 2) }, { text: t('Answer {0}', 3) }, { text: t('Answer {0}', 4) }], x: 80, y: 90, w: 800, h: 360 }),
 }
 

@@ -1,5 +1,6 @@
 // Click steps while presenting (Slidev's v-click, and v-clicks for "list items one by one").
 // Pure: used by the store, the slide view and the Slidev export.
+import { markSteps } from './marks.js'
 
 // top-level items of the lists in a text box's HTML (a nested list belongs to its item)
 export function listItems(html) {
@@ -24,6 +25,7 @@ export function clickSteps(slide) {
   for (const e of els) {
     const k = keyOf(els, e)
     if (k) n.set(k, Math.max(n.get(k) || 1, e.clickItems ? listItems(e.html) : 1))
+    for (const a of markSteps(e.html)) if (!n.has(a)) n.set(a, 1) // v-mark: drawn at its click
   }
   return [...n.keys()].sort((a, b) => a - b).flatMap(k => Array(n.get(k)).fill(k))
 }

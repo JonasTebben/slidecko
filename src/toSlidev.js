@@ -1,9 +1,13 @@
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
-import { fmGet, fmHidden, TRANSITIONS } from './parseSlidev.js'
+import { fmGet, fmHidden, TRANSITIONS, trOf } from './parseSlidev.js'
+import { parseDuration, slidevDuration } from './rehearse.js'
 import { parseRatio } from './format.js'
 import { clock } from './timer.js'
+import { chartSvg } from './chart.js'
 import { clickSteps, stepOf } from './clicks.js'
+import { MARKS, toVMark } from './marks.js'
+import { BUNDLED, bundledFaces, fontCss, usesFamily, FONT_EXT } from './fonts.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss, CENTERED } from './themes.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
@@ -35,6 +39,11 @@ turndown.addRule('clickItems', {
     return `\n\n<v-clicks at="${at}">\n\n${content.replace(/^\n+|\n+$/g, '')}\n\n</v-clicks>\n\n`
   },
 })
+// v-mark: the mark span becomes Slidev's directive again (its text stays Markdown, which Slidev renders inside inline HTML)
+turndown.addRule('vmark', {
+  filter: n => n.nodeName === 'SPAN' && MARKS.includes(n.getAttribute('data-mark')),
+  replacement: (content, n) => `<span ${toVMark({ mark: n.getAttribute('data-mark'), color: n.getAttribute('data-mark-color'), at: n.getAttribute('data-mark-at') })}${n.getAttribute('style') ? ` style="${esc(n.getAttribute('style'))}"` : ''}>${content}</span>`,
+})
 turndown.addRule('img', {
   filter: 'img',
   replacement: (_, n) => {
@@ -46,15 +55,17 @@ turndown.addRule('img', {
 
 // identity of a slide's content, ignoring element ids (they change on every load)
 const hashOf = v => { let h = 0; for (const c of JSON.stringify(v)) h = (h * 31 + c.charCodeAt(0)) | 0; return h }
-export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, ...e }) => e)])
+export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, ...e }) => e)])
 // a new slide's arrangement without its text (and heights, which grow with the text): while it stays the same,
 // the slide follows the Slidev layout and is written as plain Markdown instead of positioned boxes
-export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, html, code, h, ...e }) => e)])
+export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, html, code, h, ...e }) => e)])
 // only one column of text and code flows in Markdown the way it sits in the editor
 export const flowable = els => els.every(e => (e.type === 'text' && !e.board) || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
 // a malformed escape ("100%.png") stays as written instead of stopping the export
 export const imagePath = src => { try { src = decodeURI(src) } catch { /* keep src */ } return src.replace(/^\.?\//, '') }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+// decorative: role="presentation", because Markdown pictures without a description come with an empty alt too
+const altAttr = el => (el.decorative ? ' alt="" role="presentation"' : el.alt ? ` alt="${esc(el.alt)}"` : '')
 
 function boxStyle(el, extra = '') {
   const px = n => Math.round(n) + 'px'
@@ -69,6 +80,7 @@ function boxStyle(el, extra = '') {
   if ((el.fill || el.stroke) && el.type === 'text') s += ';padding:12px 16px;border-radius:10px'
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
+  if (el.morph) s += `;--morph:${el.morph}` // Magic move name, likewise
   if (el.board) s += ';--board:1' // editable while presenting, likewise
   if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`
   return s + extra
@@ -115,9 +127,9 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       if (el.crop) {
         // cropped: a clipping box with the picture scaled and shifted inside; data-crop brings the crop back on import
         const c = el.crop, p = v => Math.round(v * 1e4) / 100 + '%'
-        return `<div data-crop="${[c.x, c.y, c.w, c.h].join(',')}" style="${boxStyle({ ...el, fontSize: 0 })};overflow:hidden${r}"><img src="${esc(el.src)}" style="position:absolute;left:${p(-c.x / c.w)};top:${p(-c.y / c.h)};width:${p(1 / c.w)};height:${p(1 / c.h)};max-width:none;max-height:none;margin:0" /></div>`
+        return `<div data-crop="${[c.x, c.y, c.w, c.h].join(',')}" style="${boxStyle({ ...el, fontSize: 0 })};overflow:hidden${r}"><img src="${esc(el.src)}"${altAttr(el)} style="position:absolute;left:${p(-c.x / c.w)};top:${p(-c.y / c.h)};width:${p(1 / c.w)};height:${p(1 / c.h)};max-width:none;max-height:none;margin:0" /></div>`
       }
-      return `<img src="${esc(el.src)}"${el.cls ? ` class="${esc(el.cls)}"` : ''} style="${boxStyle({ ...el, fontSize: 0 })};object-fit:contain;max-width:none;max-height:none;margin:0${r}" />`
+      return `<img src="${esc(el.src)}"${altAttr(el)}${el.cls ? ` class="${esc(el.cls)}"` : ''} style="${boxStyle({ ...el, fontSize: 0 })};object-fit:contain;max-width:none;max-height:none;margin:0${r}" />`
     }
     case 'code': {
       const size = el.fontSize ? `;--slidev-code-font-size:${el.fontSize}px;--slidev-code-line-height:${Math.round(el.fontSize * 1.4)}px` : ''
@@ -131,6 +143,11 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       if (flat) return block
       return `<div${el.fill ? ` class="${codeDark(el, curTheme) ? 'code-dark' : 'code-light'}"` : ''} style="${boxStyle(el, size + look)}">\n\n${block}\n\n</div>`
     }
+    case 'diagram': { // Slidev renders ```mermaid itself; the box keeps position and size for the re-import
+      const fence = '`'.repeat(Math.max(3, ...(el.code.match(/`+/g) || []).map(t => t.length + 1)))
+      const block = `${fence}mermaid\n${el.code}\n${fence}`
+      return flat ? block : `<div style="${boxStyle(el)}">\n\n${block}\n\n</div>`
+    }
     case 'table': {
       const data = `data-table="${el.preset || 'theme'}"${el.firstCol ? ' data-firstcol' : ''}${el.compact ? ' data-compact' : ''}${el.borders ? ' data-borders' : ''}`
       return `<div ${data} style="${boxStyle(el)}">\n\n${tableMd(el)}\n\n</div>`
@@ -143,6 +160,10 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
     case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import
       return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
+    case 'chart': { // the picture as inline SVG in the theme's accent; data-chart (JSON, one line) brings the editable chart back on import
+      const { kind, categories, series, legend, values, stacked, title, min, max } = el
+      return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
+    }
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: { // text
@@ -166,6 +187,8 @@ export const layoutOf = (s, layouts = []) => layouts.find(l => l.id === s.type &
 // drawn behind every slide of the layout (placeholders are copied into new slides instead)
 export const decorations = l => l?.elements.filter(e => !e.placeholder) || []
 const SLIDEV_LAYOUTS = ['cover', 'default', 'center', 'end', 'fact', 'full', 'iframe', 'iframe-left', 'iframe-right', 'image', 'image-left', 'image-right', 'intro', 'none', 'quote', 'section', 'statement', 'two-cols', 'two-cols-header']
+// the Slidev names the deck's own layouts get on export (only decorated ones become layouts/<name>.vue); `theirs`: the project's own layout files
+export const slidevNames = (layouts, theme, theirs = []) => layoutSlugs(layouts, [...SLIDEV_LAYOUTS, ...(themeOf(theme).layouts || []).map(x => x[0]), ...theirs])
 // file names for decorated layouts, from their names; never the name of a Slidev or theme layout
 function layoutSlugs(layouts, reserved) {
   const used = new Set(reserved), out = {}
@@ -186,7 +209,7 @@ function layerHtml(el) {
   const html = el.type === 'text' ? `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">${el.html}</div>`
     : el.type === 'code' ? `<pre style="${boxStyle(el)};margin:0;overflow:hidden"><code>${esc(el.code)}</code></pre>`
       : el.type === 'table' ? `<div data-table="${el.preset || 'theme'}" style="${boxStyle(el)}">${tableMd({ ...el, fills: el.fills || [] })}</div>` // fills: always the HTML table
-        : ['image', 'shape', 'video'].includes(el.type) ? elementMd(el) : ''
+        : ['image', 'shape', 'video', 'chart'].includes(el.type) ? elementMd(el) : ''
   return '    ' + escapeMustache(html).replace(FIELD, (_, a, k, b) => a + FIELD_VUE[k] + b)
 }
 // the data rides along in a comment, so a re-import gets the editable master and layouts back
@@ -251,15 +274,20 @@ function slideMd(slide) {
 
 // the slide's own frontmatter, with `layout:` following the layout chosen in the editor and `hide:` the hidden switch
 // `transition:` follows the editor; one the editor does not offer (slide-right …) stays while the slide follows the project default
+// Magic move: Slidev gets `transition: fade` and `slidecko-transition: morph`, which brings it back on import
 function withTransition(fm, v) {
-  const cur = fmGet(fm, 'transition')
-  if (cur === v || (!v && !TRANSITIONS.includes(cur))) return fm
-  return cur ? fm.replace(/^transition:.*(\n|$)/m, v ? `transition: ${v}$1` : '').trim() : [fm, `transition: ${v}`].filter(Boolean).join('\n')
+  if (trOf(fm) === v || (!v && !TRANSITIONS.includes(trOf(fm)))) return fm
+  fm = fm?.replace(/^slidecko-transition:.*(\n|$)/m, '').trim()
+  const cur = fmGet(fm, 'transition'), to = v === 'morph' ? 'fade' : v
+  if (cur !== to) fm = cur ? fm.replace(/^transition:.*(\n|$)/m, to ? `transition: ${to}$1` : '').trim() : [fm, `transition: ${to}`].filter(Boolean).join('\n')
+  return v === 'morph' ? `${fm}\nslidecko-transition: morph` : fm
 }
 function slideFm(slide) {
   let fm = slide.fm || ''
   if (!!slide.hidden !== fmHidden(fm)) fm = [fm.replace(/^(hide|disabled):.*\n?/gm, '').trim(), slide.hidden && 'hide: true'].filter(Boolean).join('\n')
   if (!!slide.hideMaster !== (fmGet(fm, 'hideMaster') === 'true')) fm = [fm.replace(/^hideMaster:.*\n?/gm, '').trim(), slide.hideMaster && 'hideMaster: true'].filter(Boolean).join('\n')
+  // planned seconds for rehearsing: Slidev ignores the key, an import reads it back
+  if ((slide.duration || 0) !== (+fmGet(fm, 'plannedTime') || 0)) fm = [fm.replace(/^plannedTime:.*\n?/gm, '').trim(), slide.duration && `plannedTime: ${slide.duration}`].filter(Boolean).join('\n')
   fm = withTransition(fm, slide.transition)
   if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
   const rest = fm.replace(/^layout:.*\n?/m, '').trim()
@@ -274,7 +302,8 @@ export function slideToMarkdown(slide) {
 // returns { files: { path: text }, images: { path: assetId } }
 // projectFiles: the project's other files (theme, package.json …), written back unchanged
 // shapeFont: element id -> font size the editor shrank its shape text to
-export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition, master = [], layouts = [] }, projectFiles = {}, { shapeFont = {} } = {}) {
+// fonts: what the project files need from the app, zip path -> 'fonts/…' (a bundled file) or an asset id (an uploaded font)
+export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition, duration, master = [], layouts = [], fonts: ownFonts = {} }, projectFiles = {}, { shapeFont = {}, assets = {} } = {}) {
   entry ||= 'slides.md'
   const dir = entry.split('/').slice(0, -1).join('/')
   // a theme that exists as a Slidev theme package (JBT) is named in the headmatter and package.json, the others become a generated style.css
@@ -302,7 +331,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   for (const p of Object.keys(files)) if (/^(global-(top|bottom)|layouts\/[\w-]+)\.vue$/.test(p.slice(root.length)) && files[p].startsWith('<!-- slidecko-')) delete files[p]
   if (master.length) files[root + 'global-top.vue'] = masterVue(master)
   const theirs = Object.keys(files).map(p => p.slice(root.length).match(/^layouts\/([\w-]+)\.vue$/)?.[1]).filter(Boolean) // the project's own layouts stay
-  const slug = layoutSlugs(layouts, [...SLIDEV_LAYOUTS, ...(themeOf(theme).layouts || []).map(x => x[0]), ...theirs])
+  const slug = slidevNames(layouts, theme, theirs)
   for (const l of layouts) if (slug[l.id]) files[`${root}layouts/${slug[l.id]}.vue`] = layoutVue(l)
   // slides on a decorated layout name its file; the others keep their Slidev layout, so unchanged slides stay byte for byte
   const onLayout = s => { const k = slug[layoutOf(s, layouts)?.id]; return k ? { ...s, layout: k } : s }
@@ -333,11 +362,25 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   if (aspectRatio) format('aspectRatio', aspectRatio, v => Math.abs(ratio(v) - ratio(aspectRatio)) < 1e-4, Math.abs(ratio(aspectRatio) - 16 / 9) < 1e-4)
   if (canvasWidth) format('canvasWidth', canvasWidth, v => +v === +canvasWidth, +canvasWidth === 980)
   first.fm = withTransition(first.fm, head) // Slidev: the headmatter's transition applies to every slide (shortcut: slide 1 cannot have its own)
+  // the talk length is Slidev's `duration` (its presenter timer); a value that means the same stays as written
+  if ((parseDuration(fmGet(first.fm, 'duration')) || 0) !== (duration || 0)) first.fm = [first.fm.replace(/^duration:.*\n?/m, '').trim(), duration && `duration: ${slidevDuration(duration)}`].filter(Boolean).join('\n')
   write(entry, entrySlides)
   if (!own) files['style.css'] = slidevThemeCss(theme) + (projectFiles['style.css'] ? '\n' + projectFiles['style.css'] : '') // the project's own rules stay
   // project-wide font sizes: Slidev loads style.css from the project root for every slide
   const typoRules = typoCss('.slidev-layout', typo, l => `.${l}`)
   if (typoRules) files['style.css'] = `${files['style.css'] || projectFiles['style.css'] || ''}\n/* font sizes for all slides (Slidecko) */\n${typoRules}`.trimStart()
+  // fonts the slides or the theme name come along in public/fonts/ (Slidev serves public/ at /), so the project needs no network;
+  // the block of an earlier export (style.css imported with the project) is replaced, not repeated
+  if (files['style.css']) files['style.css'] = files['style.css'].replace(/\n?\/\* fonts \(Slidecko\) \*\/[\s\S]*?\/\* end of fonts \*\/\n?/g, '')
+  const text = Object.values(files).join('\n'), fonts = {}, src = {}
+  const bundled = Object.keys(BUNDLED).filter(k => usesFamily(text, BUNDLED[k][0]))
+  for (const k of bundled) for (const f of [...bundledFaces(k).map(x => x[0]), `${k}/OFL.txt`]) fonts['public/fonts/' + f] = 'fonts/' + f
+  for (const [id, name] of Object.entries(ownFonts)) {
+    if (!usesFamily(text, name) || !assets[id]) continue
+    src[id] = `/fonts/${id}.${FONT_EXT[assets[id].slice(5, assets[id].indexOf(';'))] || 'woff2'}`
+    fonts['public' + src[id]] = id
+  }
+  if (Object.keys(fonts).length) files['style.css'] = `${files['style.css'] || ''}\n/* fonts (Slidecko) */\n${fontCss(bundled, ownFonts, src, '/fonts/')}\n/* end of fonts */\n`.trimStart()
   files['package.json'] ||= JSON.stringify({ name: 'slides', private: true, type: 'module', scripts: { dev: 'slidev --open', build: 'slidev build', export: 'slidev export' }, dependencies: { '@slidev/cli': '^52.11.3', '@slidev/theme-default': 'latest' } }, null, 2) + '\n'
   // the theme package must be installable; an imported package.json that already lists it stays byte for byte
   if (own && fmGet(first.fm, 'theme') === own) {
@@ -355,5 +398,5 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
       if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id
     }
   }
-  return { files, images }
+  return { files, images, fonts }
 }

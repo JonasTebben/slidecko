@@ -2,6 +2,8 @@ import { toPng, toJpeg, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import { W, H, readDataUrl, deckFile } from './store.js'
 import { lang } from './i18n.js'
+import { morphPairs, playMorph } from './morph.js'
+import { usesFamily } from './fonts.js'
 
 // Exports that reuse the rendered slides (root: one .slide per slide at 1:1) as they are:
 // pictures of each slide and a self-contained HTML presentation. Both look exactly like the editor.
@@ -12,7 +14,7 @@ const AT_ORIGIN = { position: 'relative', left: '0', top: '0', margin: '0', tran
 export async function slideImages(root, scale = 2, progress = () => {}, jpeg = false) {
   const nodes = [...root.querySelectorAll('.slide')]
   if (!nodes.length) return []
-  const fontEmbedCSS = await getFontEmbedCSS(nodes[0]) // once for all slides instead of per slide
+  const fontEmbedCSS = await getFontEmbedCSS(root) // once for all slides instead of per slide; root: the fonts of every slide, not only the first's
   const out = []
   for (const [i, node] of nodes.entries()) {
     const o = { width: W, height: H, pixelRatio: scale, style: AT_ORIGIN, fontEmbedCSS, filter: n => !n.classList?.contains('yt-consent') }
@@ -134,6 +136,7 @@ function fit() {
 // as when presenting in the editor: the earlier slide's transition (Slidev's rule), reversed when going back
 const still = matchMedia('(prefers-reduced-motion: reduce)')
 const BACK = { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }
+const morphPairs = ${morphPairs}, playMorph = ${playMorph}
 const settle = s => s.classList.remove('moving', ...[...s.classList].filter(c => c.startsWith('tr-')))
 for (const s of slides) s.addEventListener('animationend', e => { if (e.target === s) settle(s) })
 // click steps (Slidev v-click): elements and list items with data-click (their step) appear one step at a time, as when presenting in the editor
@@ -152,7 +155,8 @@ function go(n, back) {
   if (n !== i) clearInk()
   slides.forEach(settle)
   const name = (project.slides[Math.min(i, n)] || {}).transition || project.transition || 'none'
-  if (n !== i && name !== 'none' && !still.matches) {
+  const from = name === 'morph' && n !== i && slides[i], pairs = from && !still.matches ? morphPairs(project.slides[i]?.elements, project.slides[n]?.elements) : []
+  if (n !== i && name !== 'none' && name !== 'morph' && !still.matches) {
     const tr = 'tr-' + (n < i ? BACK[name] || name : name)
     slides[i].classList.add('moving', tr + '-leave-active')
     slides[n].classList.add('moving', tr + '-enter-active')
@@ -160,6 +164,7 @@ function go(n, back) {
   i = n
   k = back ? stepsOf(slides[i]).length : 0
   reveal()
+  if (from) playMorph(from, slides[i], pairs)
   slides.forEach((s, j) => s.classList.toggle('on', j === i))
   no.textContent = (i + 1) + ' / ' + slides.length
   history.replaceState(null, '', '#' + (i + 1))
@@ -302,11 +307,10 @@ export async function htmlDeck(root, title, list, files) {
   const used = new Set([...root.querySelectorAll('.slide')].flatMap(n => [...n.classList].filter(c => c.startsWith('theme-'))))
   const usedRe = new RegExp(`\\.(${[...used].join('|') || '-'})(?![\\w-])`)
   const keep = t => !/\.theme-[\w-]/.test(t) || usedRe.test(t)
-  const rules = [...document.styleSheets].map(s => { try { return [...s.cssRules].map(r => r.cssText).filter(keep).join('\n') } catch { return '' } }).join('\n')
-  const css = await inlineUrls(rules, files)
+  const rules = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules].map(r => r.cssText).filter(keep) } catch { return [] } })
   // every image is stored once, in the project JSON; the slides point to it (data-a) and the viewer fills src in
   const data = JSON.parse(deckFile(list)), byData = new Map(Object.entries(data.assets).map(([id, d]) => [d, id]))
-  const ext = d => ({ 'svg+xml': 'svg', jpeg: 'jpg', 'x-icon': 'ico' })[d.match(/^data:image\/([\w.+-]+)/)?.[1]] || d.match(/^data:image\/(\w+)/)?.[1] || 'bin'
+  const ext = d => ({ 'svg+xml': 'svg', jpeg: 'jpg', 'x-icon': 'ico' })[d.match(/^data:(?:image|font)\/([\w.+-]+)/)?.[1]] || d.match(/^data:(?:image|font)\/(\w+)/)?.[1] || 'bin'
   if (files) for (const [id, d] of Object.entries(data.assets)) { files[`images/${id}.${ext(d)}`] = d; data.assets[id] = `images/${id}.${ext(d)}` }
   const project = JSON.stringify(data)
   const slides = [...root.querySelectorAll('.slide')].map(n => {
@@ -320,6 +324,9 @@ export async function htmlDeck(root, title, list, files) {
     for (const el of c.querySelectorAll('[contenteditable]')) el.removeAttribute('contenteditable')
     return c.outerHTML
   }).join('\n')
+  // only the fonts the slides or their themes name are embedded (all bundled and project fonts are declared)
+  const named = rules.filter(r => !r.startsWith('@font-face')).join('\n') + slides
+  const css = await inlineUrls(rules.filter(r => !r.startsWith('@font-face') || usesFamily(named, r.match(/font-family:\s*["']?([^;"']+)/)?.[1])).join('\n'), files)
   const html = `<!doctype html>
 <html lang="${lang.value}">
 <head>

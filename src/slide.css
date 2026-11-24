@@ -97,6 +97,12 @@
 .slide .el.locked.selected { outline-style: dashed !important; cursor: default; }
 /* appears on click: not revealed yet while presenting, but keeps its place */
 .slide .el[data-unshown], .slide .el li[data-unshown] { visibility: hidden; }
+/* v-mark: hand-drawn marks over the text; a mark with a click step draws itself along its strokes (the HTML
+   presentation toggles .unshown), with reduced motion it just appears */
+.slide .el > svg.marks { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.slide .marks path { stroke-dasharray: 1 1; stroke-dashoffset: 0; transition: stroke-dashoffset .5s ease-out; }
+.slide .marks :is([data-unshown], .unshown) path { stroke-dashoffset: 1; opacity: 0; transition: none; }
+@media (prefers-reduced-motion: reduce) { .slide .marks path { transition: none; } }
 .slide .el.code pre.code, .slide .el.code textarea.code { margin: 0; width: 100%; height: 100%; }
 .slide .el.code textarea.code { display: block; border: 0; background: #fff; resize: none; outline: none; font: inherit; font-family: var(--mono); font-size: var(--code-size); line-height: var(--code-line); }
 /* image classes from Slidev keep their look (rounded, border, shadow), the box decides the size */
@@ -111,6 +117,8 @@
 /* cropped picture (el.crop): scaled and shifted by --crop-*, clip-path cuts it to the box */
 .slide .el.image.cropped img { position: absolute !important; left: var(--crop-l) !important; top: var(--crop-t) !important; width: var(--crop-w); height: var(--crop-h); object-fit: fill; clip-path: var(--crop-clip); }
 .slide .el.shape svg { width: 100%; height: 100%; overflow: visible; }
+.slide .el.diagram img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.slide .el.diagram .diagram-empty { display: flex; align-items: center; justify-content: center; height: 100%; margin: 0; border: 2px dashed currentColor; border-radius: 8px; opacity: 0.6; }
 .slide .el.video .video { position: relative; width: 100%; height: 100%; background: #000 center / cover no-repeat; border-radius: 6px; overflow: hidden; }
 .slide .el.video iframe { width: 100%; height: 100%; border: 0; }
 .slide .el.video .play { position: absolute; inset: 0; margin: auto; width: 64px; height: 44px; border-radius: 12px; background: #e00; }
@@ -146,6 +154,7 @@
 .slide .el.video .yt-consent small { font-weight: 400; font-size: 11px; color: #555; }
 .slide .el.table .tbl-wrap { position: relative; width: 100%; height: 100%; }
 .slide .el.shape .shape-box { width: 100%; height: 100%; }
+.slide .el.chart .chart-box, .slide .el.chart .chart-box > svg { display: block; width: 100%; height: 100%; }
 .slide .el.table table { height: 100%; table-layout: fixed; }
 .slide .el.table :is(td, th) { overflow-wrap: break-word; vertical-align: middle; }
 .slide .el.table :is(td, th):focus { outline: 2px solid #6366f1; outline-offset: -2px; }

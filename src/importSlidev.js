@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent, clickOf, fmGet } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, clickOf, fmGet, codeEl } from './parseSlidev.js'
 import { imagePath, readLayers } from './toSlidev.js'
 import { uid, clean, readDataUrl } from './store.js'
 import { parseRatio, formatSize } from './format.js'
@@ -28,7 +28,7 @@ const savedBox = el => el.tagName === 'DIV' && el.style.position === 'absolute' 
 const isImageOnly = el => el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG' && !hasText(el)
 // <v-clicks> around lists only (written by toSlidev): the text box's "list items one by one"
 const itemClicks = el => el?.tagName === 'V-CLICKS' && [...el.attributes].every(a => a.name === 'at') && [...el.children].every(c => /^[OU]L$/.test(c.tagName))
-const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.table || el.dataset.callout
+const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -95,7 +95,7 @@ export async function importSlidev(path, files, theme) {
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
-      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true' })
+      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true', duration: +fmGet(s.fm, 'plannedTime') || undefined })
     }
   } finally {
     host.remove()
@@ -144,6 +144,7 @@ function measure(slide, parsed) {
     if (box.style.getPropertyValue('--locked')) el.locked = true
     if (box.style.getPropertyValue('--group')) el.group = box.style.getPropertyValue('--group').trim()
     if (box.style.getPropertyValue('--board')) el.board = true
+    if (box.style.getPropertyValue('--morph')) el.morph = box.style.getPropertyValue('--morph').trim()
     // shadow written by toSlidev: drop-shadow(… 0px Ypx BLURpx), recognised by its blur
     const blur = box.style.filter.match(/drop-shadow\(.*?([\d.]+)px\)?\s*\)?$/)?.[1]
     if (blur) el.shadow = Object.keys(SHADOWS).find(k => SHADOWS[k].blur === +blur)
@@ -188,17 +189,25 @@ function measure(slide, parsed) {
       let q = {}
       try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }
       Object.assign(el, { type: 'quiz', question: q?.question, answers: q?.answers })
+    } else if (n.dataset.chart) {
+      let d = {}
+      try { d = JSON.parse(n.dataset.chart) } catch { /* broken data: an empty chart, cleanEl checks the rest */ }
+      const { kind, categories, series, legend, values, stacked, title, min, max } = d || {}
+      Object.assign(el, { type: 'chart', kind, categories, series, legend, values, stacked, title, min, max })
     } else if (img) {
       if (!img.dataset.asset) continue
-      Object.assign(el, { type: 'image', asset: img.dataset.asset, src: img.dataset.src, ...(img.getAttribute('class') && { cls: img.getAttribute('class') }) })
+      Object.assign(el, { type: 'image', asset: img.dataset.asset, src: img.dataset.src, ...(img.getAttribute('class') && { cls: img.getAttribute('class') }),
+        ...(img.getAttribute('role') === 'presentation' ? { decorative: true } : img.getAttribute('alt')?.trim() && { alt: img.getAttribute('alt') }) })
       const crop = box?.dataset.crop?.split(',').map(Number) // written by toSlidev for cropped pictures
       if (crop?.length === 4) el.crop = { x: crop[0], y: crop[1], w: crop[2], h: crop[3] }
       if (!box) sized(el, [rect(img)])
     } else if (n.tagName === 'PRE') {
       const code = n.querySelector('code')
-      Object.assign(el, { type: 'code', code: (code || n).textContent.replace(/\n$/, ''), lang: code?.className.match(/language-(\S+)/)?.[1] || 'plaintext' })
-      if (codeMeta[codeIndex]) el.meta = codeMeta[codeIndex]
+      Object.assign(el, codeEl((code || n).textContent.replace(/\n$/, ''), code?.className.match(/language-(\S+)/)?.[1]))
+      if (codeMeta[codeIndex] && el.type === 'code') el.meta = codeMeta[codeIndex]
       codeIndex++
+      // a diagram measured as its source text: at least a usable height for the picture
+      if (el.type === 'diagram' && !box) { sized(el, [r]); el.h = Math.max(el.h, Math.min(320, slide.clientHeight - el.y - 20)) }
       // own background, opacity and corners (written by toSlidev as Slidev's code variables)
       const bg = box?.style.getPropertyValue('--slidev-code-background').trim(), rad = box?.style.getPropertyValue('--slidev-code-radius')
       if (bg) Object.assign(el, unmix(bg))

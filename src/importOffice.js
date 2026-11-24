@@ -15,6 +15,9 @@ const xml = s => new DOMParser().parseFromString(s, 'application/xml')
 const kids = (n, name) => [...(n?.children || [])].filter(c => !name || c.localName === name)
 const kid = (n, ...path) => path.reduce((a, p) => a && kids(a, p)[0], n)
 const all = (n, name) => (n ? [...n.getElementsByTagNameNS('*', name)] : [])
+// a picture's alt text: PowerPoint's descr (or its "decorative" mark), OpenDocument's svg:desc
+const altOf = n => all(n, 'decorative')[0]?.getAttribute('val') === '1' ? { decorative: true }
+  : (a => (a ? { alt: a } : {}))((all(n, 'cNvPr')[0]?.getAttribute('descr') ?? kid(n, 'desc')?.textContent ?? '').trim())
 const r1 = n => Math.round(n * 10) / 10
 // relative zip path, e.g. ("ppt/slides/slide1.xml", "../media/a.png") -> ppt/media/a.png
 const resolve = (from, to) => (to.startsWith('/') ? to.slice(1) : decodeURI(new URL(to, 'http://x/' + from).pathname.slice(1)))
@@ -510,8 +513,8 @@ export async function importPptx(file) {
           const key = JSON.stringify([img.asset, crop, turn, box.w, box.h]) // a layout band on every slide -> one asset
           const asset = (zipCache.get(assets)[key] ??= uid())
           assets[asset] = r.svg
-          out.push({ type: 'image', x: Math.round(box.x + (box.w - r.w) / 2), y: Math.round(box.y + (box.h - r.h) / 2), w: Math.round(r.w), h: Math.round(r.h), asset, src: img.src.replace(/^(\/images\/)[^-]+/, '$1' + asset).replace(/\.\w+$/, '.svg') })
-        } else if (img) out.push({ type: 'image', ...box, ...img })
+          out.push({ type: 'image', x: Math.round(box.x + (box.w - r.w) / 2), y: Math.round(box.y + (box.h - r.h) / 2), w: Math.round(r.w), h: Math.round(r.h), asset, src: img.src.replace(/^(\/images\/)[^-]+/, '$1' + asset).replace(/\.\w+$/, '.svg'), ...altOf(n) })
+        } else if (img) out.push({ type: 'image', ...box, ...img, ...altOf(n) })
         continue
       }
       const tbl = all(n, 'tbl')[0]
@@ -728,7 +731,7 @@ export async function importOdp(file) {
       if (img && !tbl) { // tables carry a fallback picture
         const href = at(img, 'xlink:href')
         const im = href && !/^[a-z]+:/i.test(href) && await zipImage(zip, href.replace(/^\.\//, ''), assets)
-        if (im) out.push({ type: 'image', ...box, ...im })
+        if (im) out.push({ type: 'image', ...box, ...im, ...altOf(n) })
         continue
       }
       if (tbl) {

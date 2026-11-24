@@ -2,10 +2,11 @@ import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
 import { toJpeg } from 'html-to-image'
 import { OdpDoc } from './exportOdp.js'
-import { onePPr, numberFont } from './pptxFix.js'
+import { onePPr, numberFont, decorative, DECORATIVE } from './pptxFix.js'
 import { W, H, deck } from './store.js'
 import { SHADOWS } from './themes.js'
 import { t } from './i18n.js'
+import { pathPoints, markColor } from './marks.js'
 
 // Builds the PPTX from the rendered slides (root contains one .slide per slide at 1:1), so
 // colours, fonts and sizes come from the theme CSS instead of a second theme definition.
@@ -94,6 +95,7 @@ function runs(root, pre, top = root.getBoundingClientRect().top, left = root.get
       // links stay clickable
       ...(/^(https?|mailto):/.test(n.parentElement.closest('a[href]')?.href) && { hyperlink: { url: n.parentElement.closest('a[href]').href } }),
       ...decoration(n.parentElement, root),
+      ...(!pre && highlightOf(n.parentElement)),
     }
     const lb = block || root
     if (!para.has(lb)) {
@@ -295,6 +297,26 @@ function decoration(el, root) {
   }
   return d
 }
+// v-mark: a highlight without a click step is the text's own highlight (a:highlight); the others are drawn as shapes
+const cssHex = (c, n) => { ctx.fillStyle = '#000'; ctx.fillStyle = c.startsWith('var(') ? getComputedStyle(n).getPropertyValue('--accent').trim() || '#000' : c; return ctx.fillStyle.replace('#', '').toUpperCase() }
+const nativeMark = m => !odp && m?.getAttribute('data-mark') === 'highlight' && !m.hasAttribute('data-mark-at')
+const highlightOf = n => { const m = n.closest('[data-mark]'); return nativeMark(m) ? { highlight: cssHex(markColor(m.getAttribute('data-mark-color')), m) } : null }
+// every stroke of a mark as a freeform line over the text, where the editor drew it (static: no click animation)
+function markShapes(slide, el) {
+  for (const g of el.querySelectorAll(':scope > svg.marks > g')) {
+    if (!odp && g.dataset.type === 'highlight' && !g.dataset.click) continue // written as a:highlight
+    for (const p of g.querySelectorAll('path')) {
+      const pts = pathPoints(p.getAttribute('d')), cs = getComputedStyle(p), c = rgba(cs.stroke)
+      if (pts.length < 2 || !c) continue
+      const x0 = Math.min(...pts.map(q => q[0])), y0 = Math.min(...pts.map(q => q[1])), op = (+cs.strokeOpacity || 1) * c.a
+      slide.addShape('custGeom', {
+        x: (el.offsetLeft + x0) * IN, y: (el.offsetTop + y0) * IN, w: Math.max(0.5, Math.max(...pts.map(q => q[0])) - x0) * IN, h: Math.max(0.5, Math.max(...pts.map(q => q[1])) - y0) * IN,
+        points: pts.map(([x, y], i) => ({ x: (x - x0) * IN, y: (y - y0) * IN, ...(!i && { moveTo: true }) })),
+        fill: { type: 'none' }, line: { color: c.hex, width: Math.max(0.25, parseFloat(cs.strokeWidth) * PT), ...(op < 1 && { transparency: Math.round((1 - op) * 100) }) },
+      })
+    }
+  }
+}
 // the nearest opaque background below an element (white over images and the like)
 function behind(el) {
   for (; el; el = el.parentElement) { const c = rgba(getComputedStyle(el).backgroundColor); if (c?.a >= 1) return c.hex }
@@ -327,6 +349,44 @@ function croppedImage(img, c) {
   return /^data:image\/jpeg/.test(img.src) ? cv.toDataURL('image/jpeg', 0.92) : cv.toDataURL('image/png')
 }
 
+// a chart as PowerPoint's own (editable data); colours, text colour and font as rendered
+function nativeChart(pptx, svg, m, bg) {
+  const cs = getComputedStyle(svg), ink = hex(cs.color) || '000000', font = fontName(cs.fontFamily), size = Math.round((m.fontSize || 16) * 0.85 * PT * 10) / 10
+  const pie = m.kind === 'pie' || m.kind === 'donut'
+  const colorOf = i => { const n = svg.querySelector(`[data-s="${i}"]`), s = n && getComputedStyle(n); return (s && (hex(s.fill) || hex(s.stroke))) || '888888' }
+  const data = (pie ? m.series.slice(0, 1) : m.series).map(s => ({ name: s.name, labels: m.categories, values: s.values }))
+  const text = k => ({ [k + 'Color']: ink, [k + 'FontFace']: font, [k + 'FontSize']: size })
+  return [pie ? (m.kind === 'donut' ? pptx.ChartType.doughnut : pptx.ChartType.pie) : m.kind === 'line' ? pptx.ChartType.line : pptx.ChartType.bar, data, {
+    chartColors: (pie ? m.categories : m.series).map((_, i) => colorOf(i)),
+    showLegend: !!m.legend, legendPos: 'b', ...text('legend'),
+    showValue: !!m.values, ...text('dataLabel'), dataLabelFormatCode: 'General', valAxisLabelFormatCode: 'General', ...(pie && { showPercent: false, dataLabelPosition: 'outEnd' }), ...(m.kind === 'donut' && { holeSize: 55 }),
+    ...(m.title && { showTitle: true, title: m.title, titleColor: ink, titleFontFace: font, titleFontSize: Math.round(size * 1.47 * 10) / 10 }),
+    ...(!pie && {
+      barDir: m.kind === 'bar' ? 'bar' : 'col', barGrouping: m.stacked ? 'stacked' : 'clustered',
+      catAxisOrientation: m.kind === 'bar' ? 'maxMin' : 'minMax', // horizontal bars: the first category on top, as in the editor
+      ...text('catAxisLabel'), ...text('valAxisLabel'), valGridLine: { color: mix({ hex: ink, a: 0.2 }, bg), size: 0.75 }, catGridLine: { style: 'none' },
+      ...(m.min != null && { valAxisMinVal: m.min }), ...(m.max != null && { valAxisMaxVal: m.max }),
+      ...(m.kind === 'line' && { lineSize: 2.25, lineDataSymbol: 'circle', lineDataSymbolSize: 6 }),
+    }),
+  }]
+}
+// the chart's SVG as a PNG (ODP): its text colour and font written in, as a picture loses the page's CSS
+async function svgImage(svg, w, h) {
+  const c = svg.cloneNode(true), cs = getComputedStyle(svg)
+  c.setAttribute('width', w)
+  c.setAttribute('height', h)
+  c.style.color = cs.color
+  c.style.fontFamily = cs.fontFamily
+  const img = new Image()
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(c))
+  try { await img.decode() } catch { return null }
+  const cv = document.createElement('canvas')
+  cv.width = Math.max(1, w * 2)
+  cv.height = Math.max(1, h * 2)
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+  return cv.toDataURL('image/png')
+}
+
 // one table cell -> pptxgenjs cell with the rendered fill, font and borders
 function cell(td) {
   const cs = getComputedStyle(td)
@@ -348,11 +408,15 @@ function cell(td) {
 }
 
 // root: one .slide per slide at 1:1; slides: their data (for shape kinds)
+// alt text of a picture; decorative ones get a name that decorative() in pptxFix.js turns into PowerPoint's mark
+const altOf = m => (m.decorative ? { altText: '', objectName: DECORATIVE } : m.alt ? { altText: m.alt } : {})
 // format: 'pptx' | 'odp' (same layout pass, other writer); images: data URLs of the rendered
 // slides – then every slide is one picture (exactly as in the editor, text not editable)
+let odp = false // OpenDocument: no text highlight, so marks are always shapes
 let google = false // Google Slides variant (see runs())
 export async function exportPptx(root, name = deck.title, slides = [], { format = 'pptx', images, forGoogle = false } = {}) {
   google = forGoogle
+  odp = format === 'odp'
   IN = 10 / W
   PT = 720 / W
   const pptx = format === 'odp' ? new OdpDoc() : new PptxGenJS()
@@ -387,13 +451,13 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
     if (!masterName) slide.background = { color }
     for (const el of node.querySelectorAll('.el')) {
       const m = model.get(el.dataset.el) || {}
-      const type = ['image', 'code', 'table', 'shape', 'video'].find(t => el.classList.contains(t)) || 'text'
+      const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points
       const sh = SHADOWS[m.shadow] && { shadow: { type: 'outer', angle: 90, blur: SHADOWS[m.shadow].blur * PT, offset: SHADOWS[m.shadow].y * PT, color: '000000', opacity: SHADOWS[m.shadow].a } }
       if (type === 'image' && !el.querySelector('img')?.naturalWidth) continue // broken picture: nothing to export
       if (type === 'image' && m.crop) {
         // cropped: the visible part as its own picture, filling the box
-        slide.addImage({ data: croppedImage(el.querySelector('img'), m.crop), x: el.offsetLeft * IN, y: el.offsetTop * IN, w: el.offsetWidth * IN, h: el.offsetHeight * IN, ...sh })
+        slide.addImage({ data: croppedImage(el.querySelector('img'), m.crop), x: el.offsetLeft * IN, y: el.offsetTop * IN, w: el.offsetWidth * IN, h: el.offsetHeight * IN, ...sh, ...altOf(m) })
       } else if (type === 'image') {
         const img = el.querySelector('img'), is = getComputedStyle(img)
         // the picture sits inside the img's padding and border (classes like p-4, border), object-fit: contain done by hand
@@ -404,7 +468,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         const k = Math.min(cw / (img.naturalWidth || cw), ch / (img.naturalHeight || ch))
         const w = (img.naturalWidth || cw) * k, h = (img.naturalHeight || ch) * k
         const data = pptxImage(img)
-        if (data) slide.addImage({ data, x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh })
+        if (data) slide.addImage({ data, x: (cx + (cw - w) / 2) * IN, y: (cy + (ch - h) / 2) * IN, w: w * IN, h: h * IN, ...sh, ...altOf(m) })
       } else if (type === 'table') {
         const table = el.querySelector('table')
         const rows = [...table.rows].map(tr => [...tr.cells].map(cell))
@@ -432,6 +496,11 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
           const ta = getComputedStyle(st.firstElementChild || st).textAlign
           if (text.length) slide.addText(text, { ...area, valign: 'middle', align: ['left', 'right', 'justify'].includes(ta) ? ta : 'center', margin: 0, fit: 'none', wrap: true })
         }
+      } else if (type === 'chart') {
+        const svg = el.querySelector('svg')
+        if (format === 'odp' || !m.series?.length || !m.categories?.length) { const data = svg && await svgImage(svg, el.offsetWidth, el.offsetHeight); if (data) slide.addImage({ data, ...box(el), ...sh }); continue }
+        const [kind, data, opts] = nativeChart(pptx, svg, m, color)
+        slide.addChart(kind, data, { ...opts, ...box(el) })
       } else if (type === 'video') {
         const link = `https://www.youtube.com/watch?v=${m.youtube}`
         slide.addText([{ text: '▶  ' + t('Watch the YouTube video'), options: { hyperlink: { url: link }, color: 'FFFFFF', bold: true, fontSize: 16 } }],
@@ -487,6 +556,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         // logos etc. inside the text: placed where the browser laid them out
         if (!pre) for (const img of content.querySelectorAll('img')) { const data = img.offsetWidth && pptxImage(img); if (data) slide.addImage({ data, ...rel(img, node) }) }
       }
+      markShapes(slide, el)
     }
     const no = node.querySelector('.pageno')
     if (no && getComputedStyle(no).display !== 'none') {
@@ -501,14 +571,16 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
 // rejects the file, so they are dropped everywhere
 // Slidev plays the earlier slide's transition between two slides; PowerPoint plays it as the next slide's entrance
 const PPT_TRANSITION = { fade: '<p:fade/>', 'slide-left': '<p:push dir="l"/>', 'slide-up': '<p:push dir="u"/>' }
+// Magic move is PowerPoint's Morph (2016 and later pair the shapes themselves), older versions fade, as PowerPoint writes it
+const MORPH = '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" Requires="p159"><p:transition spd="slow"><p159:morph option="byObject"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="slow"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>'
 async function insets(buf, slides) {
   const zip = await JSZip.loadAsync(buf)
   for (const path of Object.keys(zip.files).filter(p => p.endsWith('.xml'))) {
     const xml = (await zip.file(path).async('string')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
     if (!/^ppt\/slides\/slide\d+\.xml$/.test(path)) { zip.file(path, xml); continue }
-    const before = slides[+path.match(/\d+/)[0] - 2], tr = before && PPT_TRANSITION[before.transition || deck.transition]
-    zip.file(path, numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>')))
-      .replace('</p:clrMapOvr>', m => m + (tr ? `<p:transition spd="med">${tr}</p:transition>` : '')))
+    const before = slides[+path.match(/\d+/)[0] - 2], name = before && (before.transition || deck.transition), tr = name === 'morph' ? MORPH : PPT_TRANSITION[name] && `<p:transition spd="med">${PPT_TRANSITION[name]}</p:transition>`
+    zip.file(path, decorative(numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>')))
+      .replace('</p:clrMapOvr>', m => m + (tr || ''))))
   }
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
 }

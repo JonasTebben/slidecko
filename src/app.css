@@ -124,6 +124,7 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .handle.nw { left: 0; top: 0; cursor: nwse-resize; }
 /* click step of an element that appears on click (editor only), same screen size at any zoom */
 .click-badge { position: absolute; z-index: 2; right: 0; top: 0; min-width: calc(18px / var(--s, 1)); padding: 0 calc(4px / var(--s, 1)); border-radius: calc(9px / var(--s, 1)); background: #2f6fed; color: #fff; font: 600 calc(11px / var(--s, 1)) / calc(18px / var(--s, 1)) system-ui, sans-serif; text-align: center; pointer-events: none; transform: translate(40%, -40%); }
+.click-badge.mark-badge { right: auto; background: #7c3aed; transform: translate(-60%, -70%); } /* a mark's click step, at its start */
 .handle.n { left: 50%; top: 0; cursor: ns-resize; }
 .handle.ne { left: 100%; top: 0; cursor: nesw-resize; }
 .handle.e { left: 100%; top: 50%; cursor: ew-resize; }
@@ -169,6 +170,9 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .inspector .hint { margin: 0; font-size: 11.5px; color: var(--ui-muted); }
 .inspector .hint-box { margin: 0; padding: 10px 12px; font-size: 12px; color: var(--ui-muted); background: var(--ui-bg); border-radius: var(--ui-radius); line-height: 1.55; }
 .inspector .notes { width: 100%; min-height: 110px; resize: vertical; }
+.inspector .diagram-code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; tab-size: 2; }
+.inspector .diagram-error { margin: 0; font-size: 12px; }
+.inspector .diagram-error small { display: block; margin-top: 4px; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .notes-wrap { position: relative; }
 .inspector .notes-wrap .notes { position: relative; display: block; background: transparent; }
 .text-mirror { position: absolute; inset: 0; overflow: hidden; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: var(--ui-panel); color: transparent; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
@@ -413,6 +417,26 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .pv-jump:empty { display: none; }
 .pv-blank ~ .pv-progress { display: none; }
 .pv-progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--ui-accent); transition: width 0.2s; }
+/* rehearsal: clocks above the next slide (dark presenter view), result table in a dialog */
+.rh { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; padding: 12px 14px; background: #1c1f24; border-radius: 10px; font-variant-numeric: tabular-nums; }
+.rh-clock small { display: block; color: #9aa0a6; font-size: 12px; }
+.rh-clock b { font-size: 30px; font-weight: 600; line-height: 1.2; }
+.rh-clock.near b { color: #fbbf24; } .rh-clock.over b, .rh-pace.over { color: #f87171; } .rh-pace.ok { color: #4ade80; }
+.rh-pace { grid-column: 1 / -1; margin: 0; font-size: 14px; color: #9aa0a6; }
+.rh-btns { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.rh-btns .tb { gap: 6px; color: #e8eaed; background: #ffffff14; }
+.rh-btns .tb:hover { background: #ffffff26; }
+.rh-scroll { overflow-x: auto; max-height: 55vh; }
+.rh-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.rh-table :is(th, td) { padding: 5px 8px; border-bottom: 1px solid var(--ui-line); text-align: right; white-space: nowrap; }
+.rh-table th[scope='row'], .rh-table thead th:first-child { text-align: left; max-width: 220px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.rh-table thead th { position: sticky; top: 0; background: var(--ui-panel); color: var(--ui-muted); font-weight: 500; }
+.rh-over { color: var(--ui-danger); font-weight: 600; } .rh-under { color: var(--ui-accent); }
+.rh-chart { position: relative; width: 30%; min-width: 90px; }
+.rh-chart i { display: block; height: 10px; border-radius: 3px; background: var(--ui-accent); }
+.rh-chart i.rh-over { background: var(--ui-danger); }
+.rh-chart .rh-mark { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; border-radius: 0; background: var(--ui-fg); }
+@media (max-width: 520px) { .rh-chart { min-width: 50px; } .rh-table :is(th, td) { padding: 5px 4px; } .rh-table th[scope='row'] { max-width: 90px; } }
 
 /* all slides at 1:1: off-screen as the PPTX source, and the only thing that prints */
 .output { position: fixed; left: -99999px; top: 0; }
@@ -767,3 +791,11 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 .tour-actions span { flex: 1; }
 .tour-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--ui-accent-line); border-radius: var(--ui-radius); background: var(--ui-accent-soft); }
 .tour-prompt b { margin-right: auto; }
+
+/* v-mark menu (Inspector) */
+.mark-menu { min-width: 200px; max-width: 260px; }
+.mark-menu .swatches { padding: 0 10px; }
+.mark-steps { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 4px; }
+.mark-steps .mi { flex: 0 0 auto; width: auto; min-width: 32px; justify-content: center; border: 1px solid var(--ui-line); }
+.mark-steps .mi.on { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent); }
+.mark-hint { margin: 4px 10px; font-size: 12px; color: var(--ui-muted); }

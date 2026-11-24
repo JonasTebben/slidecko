@@ -2,11 +2,15 @@ import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { slideHash, layoutOf, decorations, readLayers } from './toSlidev.js'
 import { TRANSITIONS } from './parseSlidev.js'
-import { THEMES, fontStack, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from './themes.js'
+import { THEMES, FONTS, fontStack, setOwnFonts, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from './themes.js'
 import { SLIDE_PRESETS } from './presets.js'
 import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
 import { clickSteps } from './clicks.js'
+import { vmarkToData, checkMark } from './marks.js'
+import { cleanRehearsals, validDuration } from './rehearse.js'
+import { CHART_KINDS } from './chart.js'
+import { cleanFonts, fontType, fontLabel, FONT_MAX } from './fonts.js'
 
 // Logical slide size (Slidev's canvas). All element coordinates are in these units; editor,
 // thumbnails, print and PPTX only scale them. Live bindings: read them at call time; templates use format.
@@ -36,7 +40,7 @@ export function setFormat(aspectRatio = '16/9', canvasWidth = 980) {
 // assets: { id: dataURL } – kept out of the slides so undo snapshots and duplicates stay small.
 // files: other files of the Slidev project (theme/, package.json, global components …) as text or
 // data URL, written back unchanged on export so the project keeps working.
-export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, transition: 'none', entry: 'slides.md', slides: [], master: [], layouts: [], assets: {}, files: {} })
+export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: DEFAULT_THEME, aspectRatio: '16/9', canvasWidth: 980, transition: 'none', duration: 0, rehearsals: [], entry: 'slides.md', slides: [], master: [], layouts: [], assets: {}, files: {}, fonts: {} })
 // master: elements on every slide; layouts (slide types): { id, name, layout: its Slidev layout, elements } where
 // placeholder elements are copied into a new slide and the others are drawn behind every slide using it
 // sel: selected element ids (last = primary); editing: id of the element being typed in
@@ -46,7 +50,15 @@ export const library = reactive({ list: [] }) // [{ id, title, theme, slides, de
 export const uid = () => Math.random().toString(36).slice(2, 10)
 // Slidev's click animations are kept in the markup so they survive a round trip
 // <style> is dropped: its rules would apply to the whole app, not just the box (remote url() in style attributes stays)
-export const clean = html => DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'v-click'], FORBID_TAGS: ['style'] })
+// Slidev's v-mark (attribute names with dots, dropped by DOMPurify) becomes data-mark*, whose values are checked;
+// a bare or "+1" v-mark takes the click after the previous mark of the same HTML (a whole slide on import)
+// shortcut: v-click elements between marks do not count for that, enough for decks that number their marks
+let markLast = 0
+DOMPurify.addHook?.('beforeSanitizeAttributes', n => { if (n.attributes?.length) markLast = vmarkToData(n, markLast) })
+DOMPurify.addHook?.('afterSanitizeAttributes', n => { if (n.hasAttribute?.('data-mark') || n.hasAttribute?.('data-mark-at') || n.hasAttribute?.('data-mark-color')) checkMark(n) })
+export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'v-click'], FORBID_TAGS: ['style'] }))
+// a rendered diagram (Mermaid SVG, labels may be HTML in foreignObject) -> sanitized <body> holding it
+export const cleanSvg = svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true, html: true }, ADD_TAGS: ['foreignObject'], RETURN_DOM: true })
 
 // --- decks (Foliensätze) ---
 export const fileOf = s => s.file || deck.entry
@@ -108,6 +120,8 @@ export function cleanEl(e) {
   if (e.placeholder === true) base.placeholder = true // in a layout: copied into new slides instead of drawn behind them
   if (/^[\w-]{1,20}$/.test(e.group)) base.group = e.group // elements sharing it are selected and moved together
   if (Object.hasOwn(SHADOWS, e.shadow)) base.shadow = e.shadow
+  if (/^[\w-]{1,40}$/.test(e.morph)) base.morph = e.morph // Magic move name: pairs it with the element of that name on the next slide
+  if (/^[\w-]{1,20}$/.test(e.mid)) base.mid = e.mid // kept by a duplicated slide's copy, so Magic move pairs the two
   if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
   switch (e.type) {
     case 'text': return {
@@ -126,6 +140,8 @@ export function cleanEl(e) {
     case 'image': return deck.assets[e.asset] ? {
       ...base, asset: e.asset, src: str(e.src) || '/images/image.png', ...(str(e.cls) && { cls: e.cls.replace(/[^\w\s:.\-[\]%/]/g, '') }),
       ...(e.radius && { radius: num(e.radius, 0, 500) }), ...(cleanCrop(e.crop) && { crop: cleanCrop(e.crop) }),
+      // alt text for screen readers and exports; decorative: screen readers skip it (empty alt)
+      ...(str(e.alt)?.trim() && { alt: e.alt.trim().slice(0, 2000) }), ...(e.decorative === true && { decorative: true }),
     } : null
     case 'table': {
       const rows = (Array.isArray(e.rows) ? e.rows : []).filter(Array.isArray).map(r => r.map(c => clean(c)))
@@ -151,6 +167,8 @@ export function cleanEl(e) {
       // text inside the shape (centred), with its own colour
       ...(e.shape !== 'line' && str(e.html)?.trim() && { html: clean(e.html) }), ...(color(e.color) && { color: color(e.color) }), ...(ALIGN.includes(e.align) && { align: e.align }),
     }
+    // Mermaid source, rendered (and sanitized) by diagram.js; capped so a pasted file cannot stall the renderer
+    case 'diagram': return { ...base, code: (str(e.code) || '').slice(0, 20000) }
     case 'video': return /^[\w-]{6,20}$/.test(e.youtube) ? { ...base, youtube: e.youtube } : null
     // countdown length in seconds (0: counts up), started by a click while presenting
     case 'timer': return { ...base, seconds: Math.round(num(e.seconds, 0, 359999)), ...(color(e.color) && { color: color(e.color) }) }
@@ -165,6 +183,19 @@ export function cleanEl(e) {
       const answers = (Array.isArray(e.answers) ? e.answers : []).filter(a => a && typeof a === 'object').slice(0, 6).map(a => ({ text: line(a.text, 200), ...(a.correct === true && { correct: true }) }))
       while (answers.length < 2) answers.push({ text: '' })
       return { ...base, question: line(e.question, 300), answers }
+    }
+    // chart data from files or the clipboard: finite numbers, short plain-text labels, at most 100 categories and 20 series
+    case 'chart': {
+      const line = (v, n) => (str(v) ?? (typeof v === 'number' ? String(v) : '')).replace(/\s+/g, ' ').trim().slice(0, n)
+      const categories = (Array.isArray(e.categories) ? e.categories : []).slice(0, 100).map(c => line(c, 100))
+      const series = (Array.isArray(e.series) ? e.series : []).filter(s => s && typeof s === 'object').slice(0, 20).map(s => ({
+        name: line(s.name, 100), values: categories.map((_, j) => (Number.isFinite(+s.values?.[j]) && s.values[j] !== null ? Math.min(1e12, Math.max(-1e12, +s.values[j])) : 0)), ...(color(s.color) && { color: color(s.color) }),
+      }))
+      const lim = v => (v != null && v !== '' && Number.isFinite(+v) ? +v : undefined)
+      return {
+        ...base, kind: Object.hasOwn(CHART_KINDS, e.kind) ? e.kind : 'column', categories, series, legend: e.legend !== false, ...(e.values === true && { values: true }),
+        ...(e.stacked === true && { stacked: true }), ...(line(e.title, 200) && { title: line(e.title, 200) }), ...(lim(e.min) != null && { min: lim(e.min) }), ...(lim(e.max) != null && { max: lim(e.max) }),
+      }
     }
   }
   return null
@@ -182,6 +213,7 @@ function cleanSlide(s) {
     gap: Number.isInteger(s.gap) && s.gap >= 0 && s.gap < 20 ? s.gap : undefined,
     ...(s.hidden === true && { hidden: true }), // skipped when presenting and exporting
     ...(s.hideMaster === true && { hideMaster: true }), // the master's elements are not drawn on it
+    ...(validDuration(s.duration) && { duration: Math.round(s.duration) }), // planned seconds for rehearsing
     type: /^[\w-]{1,40}$/.test(str(s.type) ?? '') ? s.type : undefined, // its project layout (see layoutOf)
     elements: (Array.isArray(s.elements) ? s.elements : []).map(cleanEl).filter(Boolean),
   }
@@ -250,7 +282,8 @@ export function stepMove(slides, i, k, d) {
 export function loadDeck(d) {
   if (!Array.isArray(d?.slides)) throw new Error(t('Not a valid project file'))
   if (d.styles) mergeTextStyles(d.styles)
-  for (const [k, v] of Object.entries(d.assets || {})) if (/^data:image\//.test(v)) deck.assets[k] = v
+  for (const [k, v] of Object.entries(d.assets || {})) if (/^data:(image|font)\//.test(v)) deck.assets[k] = v
+  deck.fonts = cleanFonts(d.fonts, deck.assets) // before the slides: their font references are checked against it
   if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && safePath(k)).map(([k, v]) => [safePath(k), v]))
   deck.title = String(d.title || t('Presentation')).slice(0, 200)
   deck.source = typeof d.source === 'string' ? d.source.slice(0, 200) : '' // Slidev folder it was imported from
@@ -260,6 +293,8 @@ export function loadDeck(d) {
   deck.theme = validThemeId(d.theme) ? d.theme : DEFAULT_THEME
   setFormat(d.aspectRatio, d.canvasWidth)
   deck.transition = TRANSITIONS.includes(d.transition) ? d.transition : 'none'
+  deck.duration = validDuration(d.duration) ? Math.round(d.duration) : 0 // planned talk length in seconds
+  deck.rehearsals = cleanRehearsals(d.rehearsals)
   // project-wide type sizes in px (text, title, code); anything else is dropped
   // (from: the theme whose sizes were kept on a theme switch; line/liLine are unitless ratios)
   deck.typo = Object.fromEntries(Object.entries(d.typo || {}).filter(([k, v]) => k === 'from' ? validThemeId(v)
@@ -281,8 +316,8 @@ export function newSlide(layout = 'default', elements) {
   }
 }
 
-// slides plus the master and the layouts: their images count as used too
-const withLayers = d => [...d.slides, { elements: d.master || [] }, ...(d.layouts || [])]
+// slides plus the master and the layouts: their images count as used too, and so do the project's fonts
+const withLayers = d => [...d.slides, { elements: d.master || [] }, ...(d.layouts || []), { elements: Object.keys(d.fonts || {}).map(asset => ({ asset })) }]
 const assetIds = slides => {
   const used = new Set()
   for (const s of slides) for (const e of s.elements || []) {
@@ -325,12 +360,12 @@ export function mergeTextStyles(list) {
   const add = cleanStyles(list).filter(p => !have.has(p.name))
   if (add.length) saveTextStyles([...textStyles.list, ...add])
 }
-const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, entry: deck.entry, slides: deck.slides, master: deck.master, layouts: deck.layouts })
+const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, duration: deck.duration, rehearsals: deck.rehearsals, entry: deck.entry, slides: deck.slides, master: deck.master, layouts: deck.layouts, fonts: deck.fonts })
 export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
 export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
 
-const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
+const MIME = { woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const readDataUrl = blob => new Promise((res, rej) => {
   // files from folder picks sometimes come without a type (svg, webp, …): take it from the extension
   const type = !blob.type && MIME[blob.name?.split('.').pop().toLowerCase()]
@@ -356,6 +391,21 @@ export async function storeImage(file) {
   if (deck.slides.some(s => s.elements.some(e => e.src === path))) path = path.replace(/([^/]+)$/, id + '-$1')
   return { id, path, size }
 }
+// stores an uploaded font in the project (checked: font file, at most FONT_MAX); returns its FONTS key
+export async function storeFont(file) {
+  if (file.size > FONT_MAX) throw new Error(t('{0}: font files can be at most 5 MB', file.name))
+  const bytes = new Uint8Array(await file.arrayBuffer()), type = fontType(bytes)
+  const bad = () => new Error(t('{0}: not a font file (.woff2, .woff, .ttf or .otf)', file.name))
+  if (!type) throw bad()
+  await new FontFace('check', bytes).load().catch(() => { throw bad() }) // the right first bytes, but a broken file
+  const id = uid()
+  deck.assets[id] = await readDataUrl(new Blob([bytes], { type }))
+  deck.fonts = { ...deck.fonts, [id]: fontLabel(file.name, Object.values(FONTS).map(f => f[0])) }
+  return id
+}
+export const removeFont = id => { const { [id]: _, ...rest } = deck.fonts; deck.fonts = rest }
+// FONTS lists the open project's fonts; sync: loadDeck checks the slides' font references right after setting them
+watch(() => deck.fonts, setOwnFonts, { flush: 'sync' })
 
 // --- undo/redo: snapshots of everything except assets ---
 const history = []
@@ -397,7 +447,7 @@ export function undo(step = -1) {
   const before = deck.slides[i], after = d.slides[i]
   const prev = new Map(before?.id === after?.id ? before.elements.map(e => [e.id, JSON.stringify(e)]) : [])
   const sel = changed && prev.size ? after.elements.filter(e => JSON.stringify(e) !== prev.get(e.id)).map(e => e.id) : []
-  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'entry', 'slides', 'master', 'layouts']) if (k in d) deck[k] = d[k]
+  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'duration', 'rehearsals', 'entry', 'slides', 'master', 'layouts', 'fonts']) if (k in d) deck[k] = d[k]
   if (ui.master && ui.master !== 'master' && !deck.layouts.some(l => l.id === ui.master)) ui.master = 'master' // the layout being edited is gone
   setFormat(d.aspectRatio, d.canvasWidth)
   Object.assign(ui, { slide: i, sel, editing: null })
@@ -671,7 +721,7 @@ export async function restore(session = {}) {
   if (!deck.id || session.home) ui.home = true
 
   // only marks the change: serializing the deck on every drag frame would be too slow (flush does it)
-  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.entry, deck.slides, deck.master, deck.layouts], () => {
+  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.duration, deck.rehearsals, deck.entry, deck.slides, deck.master, deck.layouts, deck.fonts], () => {
     if (quiet) return
     clearTimeout(timer)
     due = true

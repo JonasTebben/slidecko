@@ -239,13 +239,16 @@ export function cellKey(e, el) {
   if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); ui.editing = null }
 }
 
+// copied cells as text (Excel, Sheets, Numbers: tab-separated; CSV-like: semicolons) -> rows of strings
+export const textGrid = text => text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(l => l.split(l.includes('\t') ? '\t' : /;(?=(?:[^"]*"[^"]*")*[^"]*$)/))
+
 // pasting: a grid (tab- or semicolon-separated text, or an HTML table) fills the table from the cursor and grows it as
 // needed; formatted text goes into the cell as it is
 export function cellPaste(e, el) {
   e.preventDefault()
   const text = e.clipboardData.getData('text/plain'), html = e.clipboardData.getData('text/html')
   const esc = s => s.replace(/^"|"$/g, '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  const plain = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(l => l.split(l.includes('\t') ? '\t' : /;(?=(?:[^"]*"[^"]*")*[^"]*$)/))
+  const plain = textGrid(text)
   const rich = html ? pasteTable(html) || [[{ html: pasteHtml(html, true) }]] : null
   // a table in the HTML; formatted text without one is one cell (Word paragraphs become line breaks), unless its
   // plain text is tab-separated (a grid from an app that copies no table); else the text's grid

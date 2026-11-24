@@ -12,19 +12,25 @@ import { tour, begin } from './tour.js'
 const Tour = defineAsyncComponent(() => import('./Tour.vue')) // loaded only when someone takes the tour
 import { tutorial, openTutorial } from './tutorial.js'
 const MarkdownTutorial = defineAsyncComponent(() => import('./MarkdownTutorial.vue')) // loaded on first open
+const A11yPanel = defineAsyncComponent(() => import('./A11yPanel.vue'))
+import { checkDeck } from './a11yCheck.js'
 import { t, lang } from './i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps } from './store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay } from './store.js'
 import { parseRatio } from './format.js'
 import { slidePoint, arrowHead } from './draw.js'
 import { toggleSolution, resetQuiz } from './quiz.js'
+import { BUNDLED, fontCss } from './fonts.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './themes.js'
 import { PALETTE, FILLS } from './presets.js'
 import { shapeSvg } from './toSlidev.js'
 import { applyUno } from './uno.js'
+import { morphSlides } from './morph.js'
 import * as A from './actions.js'
 import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells } from './tableOps.js'
 import { toggleMarked, codeOpts, withLines, highlight } from './hl.js'
 import { find, replace, ranges, pattern } from './search.js'
+import * as R from './rehearse.js'
+import { clock } from './timer.js'
 import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, parseViewHash } from './session.js'
 
 const { slide, selection, primary } = A
@@ -50,6 +56,16 @@ const restoreSnap = at => A.run(async () => { await restoreSnapshot(at); snapDia
 const deleteSnap = at => ask(t('Delete the snapshot from {0}?', snapTime(at)), () => A.run(async () => { await deleteSnapshot(at); await reloadSnaps() }), t('Delete'), false)
 // returnValue keeps the last button pressed: cleared, so Esc (no button) never repeats a previous OK
 const openDlg = d => { d.returnValue = ''; d.showModal() }
+
+// accessibility check: runs only while its panel is open, 250 ms after the last edit (not on every drag frame)
+const a11yOpen = ref(false), a11yFound = ref([])
+const a11yOn = computed(() => a11yFound.value.reduce((n, f) => ({ ...n, [f.slide]: (n[f.slide] || 0) + 1 }), {}))
+let a11yTimer
+watch(() => a11yOpen.value && !ui.home && [deck.slides, deck.master, deck.layouts, deck.theme, deck.typo, deck.canvasWidth, deck.aspectRatio], on => {
+  clearTimeout(a11yTimer)
+  if (!on) return (a11yFound.value = [])
+  a11yTimer = setTimeout(() => { a11yFound.value = checkDeck(deck, { underlay }) }, a11yFound.value.length ? 250 : 0)
+}, { deep: true })
 
 const collapsed = ref(new Set()) // decks folded in the slide list
 // sidebars folded away (wide screens only: the phone layout stacks them and ignores this)
@@ -219,6 +235,9 @@ const thumbStyle = computed(() => ({ transform: `scale(${THUMB.value})` }))
 // (rebuilt when own themes change)
 const themeRules = document.head.appendChild(document.createElement('style'))
 watchEffect(() => { themeRules.textContent = editorCss() })
+// bundled and project fonts: declared only, a file loads when text uses it
+const fontRules = document.head.appendChild(document.createElement('style'))
+watchEffect(() => { fontRules.textContent = fontCss(Object.keys(BUNDLED), deck.fonts, deck.assets) })
 // --- own themes: editor, import ---
 const themeEditor = ref()
 const themeName = id => (THEMES[id]?.custom ? THEMES[id].name : t(themeOf(id).name))
@@ -639,6 +658,9 @@ const transition = ref('none')
 watch(() => ui.slide, (n, o) => {
   const name = deck.slides[Math.min(n, o)]?.transition || deck.transition
   transition.value = n < o ? { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }[name] || name : name
+  // Magic move: the old slide is still on screen here; it is replaced at once and its elements fly over to the new one
+  const from = name === 'morph' && presenter.value?.querySelector('.pv-slide .slide')
+  if (from) nextTick(() => morphSlides(from, presenter.value?.querySelector('.pv-slide .slide'), deck.slides[o], deck.slides[n]))
 })
 const resetTimer = () => { started.value = Date.now(); now.value = started.value }
 // every presenting key, shown with ? or H and the keyboard button (one list, so help and handler stay in step)
@@ -651,6 +673,7 @@ const PRESENT_KEYS = [
 const keysHelp = ref(false)
 function presentKey(e) {
   if (e.target.closest?.('.el.board')) return // typing into a notes box (Esc first ends the typing there)
+  if ((e.key === ' ' || e.key === 'Enter') && e.target.closest?.('button')) return // a focused button is pressed, the slide stays
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey
   if (plain && /^[0-9]$/.test(e.key)) {
     jump.value += e.key
@@ -665,7 +688,7 @@ function presentKey(e) {
     blank.value = blank.value === want ? null : want
     return e.preventDefault()
   }
-  if (plain && k === 'r') { resetTimer(); return e.preventDefault() }
+  if (plain && k === 'r') { rehearsal.value ? rhRestart() : resetTimer(); return e.preventDefault() }
   if (plain && k === 'q') { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id); return e.preventDefault() }
   if (plain && (k === 'l' || k === 'd' || k === 'a')) { setTool({ l: 'laser', d: 'pen', a: 'arrow' }[k]); return e.preventDefault() }
   if (plain && (k === 'e' || k === 'c')) { strokes.value = []; return e.preventDefault() }
@@ -706,6 +729,51 @@ function presentClick(e) {
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
+// --- rehearsal: presenter view against the clock (rehearse.js); the result is kept with the project ---
+const rehearsal = ref(null), rhDialog = ref(), rhResult = ref(null)
+const rhPlan = computed(() => R.plan(deck.slides, deck.duration))
+const sumOf = list => list.reduce((a, b) => a + (b || 0), 0)
+const rhTotal = computed(() => (rehearsal.value ? Math.floor(R.total(rehearsal.value, now.value) / 1000) : 0))
+const rhSlide = computed(() => (rehearsal.value ? Math.floor(R.onSlide(rehearsal.value, now.value) / 1000) : 0))
+const rhPace = computed(() => R.pace(rhPlan.value, ui.slide, rhTotal.value))
+const rhState = computed(() => R.status(rhSlide.value, rhPlan.value[ui.slide]))
+const tick = () => (now.value = Date.now())
+async function rehearse() {
+  presenterView.value = true
+  await present(0)
+  rehearsal.value = R.start(ui.slide, tick())
+}
+watch(() => ui.slide, i => { if (rehearsal.value) R.visit(rehearsal.value, i, tick()) })
+const rhPause = () => { const r = rehearsal.value; r.since == null ? R.resume(r, tick()) : R.pause(r, tick()) }
+const rhRestart = () => { presentGo(deck.slides[0]?.hidden ? nextShown(deck.slides, 0, 1) : 0); rehearsal.value = R.start(ui.slide, tick()) }
+// Esc, the end button or leaving full screen: the run is kept and its summary shown
+watch(presenting, v => {
+  const r = rehearsal.value
+  if (v || !r) return
+  rehearsal.value = null
+  R.pause(r, Date.now())
+  if (!r.ms.some(Boolean)) return
+  const rec = R.record(r, rhPlan.value, Date.now())
+  rhResult.value = { rec, prev: deck.rehearsals[0] }
+  deck.rehearsals = R.addRehearsal(deck.rehearsals, rec)
+  nextTick(() => openDlg(rhDialog.value))
+})
+const slideName = s => { const e = s?.elements.find(e => e.title && e.html); return e ? new DOMParser().parseFromString(e.html, 'text/html').body.textContent.trim() : '' }
+const rhSum = computed(() => { const x = rhResult.value; return x && { time: sumOf(x.rec.times), plan: sumOf(x.rec.planned), prev: x.prev && sumOf(x.prev.times) } })
+const rhRows = computed(() => {
+  const x = rhResult.value
+  if (!x) return []
+  const rows = x.rec.times.map((time, i) => ({ i, name: slideName(deck.slides[i]), time, plan: x.rec.planned[i], prev: x.prev?.times[i] })).filter(r => r.time != null || r.plan)
+  const max = Math.max(1, ...rows.map(r => Math.max(r.time || 0, r.plan || 0)))
+  return rows.map(r => ({ ...r, bar: ((r.time || 0) / max) * 100 + '%', mark: r.plan && (r.plan / max) * 100 + '%', diff: r.plan && r.time != null ? r.time - r.plan : null }))
+})
+const signed = d => (d > 0 ? '+' : d < 0 ? '−' : '±') + clock(Math.abs(d))
+function rhUseTimes() {
+  rhResult.value.rec.times.forEach((v, i) => { if (v > 0 && deck.slides[i]) deck.slides[i].duration = v })
+  A.toast(t('The rehearsed times are now the planned times.'))
+}
+const rhAgain = () => { rhDialog.value.close(); rehearse() }
+
 // --- command palette ---
 // [label, action, shortcut]: shortcuts are spelled 'mod+shift+alt+key' (mod = ⌘ on Mac, Strg elsewhere);
 // the same list drives the command palette, its hints and the keyboard handling
@@ -729,16 +797,17 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
   [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
+  [t('Rehearse the talk (time each slide)'), () => rehearse()],
   [t('Show/hide slide list'), () => (panels.slides = !panels.slides), 'alt+b'], [t('Show/hide properties'), () => (panels.props = !panels.props), 'alt+e'],
   [t('Undo'), () => undo(), 'mod+z'], [t('Redo'), redo, 'mod+shift+z'],
   [t('Zoom in'), () => zoomBy(1.25), 'mod+='], [t('Zoom out'), () => zoomBy(1 / 1.25), 'mod+-'], [t('Zoom to 100 %'), () => setZoom(1), 'shift+0'],
   [t('Fit slide to window'), () => setZoom(null), 'mod+0'], [t('Zoom to fit'), () => setZoom(null), 'shift+1'],
-  [t('Find'), () => openFind(), 'mod+f'], [t('Replace'), () => openFind(true), 'mod+alt+f'],
+  [t('Find'), () => openFind(), 'mod+f'], [t('Replace'), () => openFind(true), 'mod+alt+f'], [t('Check accessibility …'), () => { a11yOpen.value = true }],
   [t('Select all'), A.selectAll, 'mod+a'], [t('Copy formatting'), A.copyLook, 'mod+alt+c'], [t('Paste formatting'), () => A.pasteLook(), 'mod+alt+v'], [t('Duplicate'), () => (selection.value.length ? A.duplicate() : A.duplicateSlide()), 'mod+d'],
   [t('Bring forward'), () => A.order('forward'), 'mod+arrowup'], [t('Send backward'), () => A.order('backward'), 'mod+arrowdown'],
   [t('Bring to front'), () => A.order('front'), 'mod+shift+arrowup'], [t('Send to back'), () => A.order('back'), 'mod+shift+arrowdown'],
@@ -994,6 +1063,8 @@ function onClipboard(e) {
             <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
             <hr />
             <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ keyLabel('y') }}</kbd></button>
+            <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
+            <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
             <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
             <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
@@ -1020,6 +1091,7 @@ function onClipboard(e) {
             <button class="mi" @click="present()"><Icon name="play" />{{ t('Present') }}<kbd>P</kbd></button>
             <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Present from beginning') }}<kbd>⇧P</kbd></button>
             <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Presenter view') }}<kbd>{{ keyLabel('alt+p') }}</kbd></button>
+            <button class="mi" @click="rehearse()"><Icon name="timer" />{{ t('Rehearse the talk') }}</button>
             <hr />
             <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
             <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
@@ -1030,6 +1102,7 @@ function onClipboard(e) {
             <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ keyLabel('alt+e') }}</kbd></button>
             <hr />
             <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
+            <button class="mi" :aria-pressed="a11yOpen" @click="a11yOpen = !a11yOpen"><Icon name="eye" />{{ t('Check accessibility …') }}</button>
           </Menu>
         </div>
       </div>
@@ -1069,6 +1142,8 @@ function onClipboard(e) {
           <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
           <hr />
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
+          <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
           <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
           <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
           <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
@@ -1177,6 +1252,7 @@ function onClipboard(e) {
                   @click="ui.slide = g.start + j" @dblclick="present(g.start + j)" @contextmenu="onThumbContext($event, g.start + j)" @dragstart="dragStart($event, g.start + j)">
                   <SlideView :slide="s" :index="g.start + j" :style="thumbStyle" inert aria-hidden="true" />
                   <span v-if="s.hidden" class="hidden-badge" :title="t('Hidden: skipped when presenting and exporting')"><Icon name="eyeOff" :size="14" /></span>
+                  <span v-if="a11yOn[g.start + j]" class="a11y-count" :title="t('{0} issues', a11yOn[g.start + j])">{{ a11yOn[g.start + j] }}</span>
                   <span v-if="findOpen && hitsOn[g.start + j]" class="find-badge" :title="t('{0} matches', hitsOn[g.start + j])">{{ hitsOn[g.start + j] }}</span>
                 </button>
                 <div class="thumb-actions" role="group" :aria-label="t('Slide {0}', g.start + j + 1)">
@@ -1425,6 +1501,7 @@ function onClipboard(e) {
       <button class="sheet-toggle" :aria-expanded="sheet" @click="sheet = !sheet"><Icon name="layout" :size="16" />{{ t('Properties') }}<Icon name="chevron" :size="16" class="sec-chev" /></button>
       <Inspector data-tour="inspector" @link="openLink" @markdown="openMarkdown('slide')" />
     </main>
+    <A11yPanel v-if="a11yOpen && !ui.home" :findings="a11yFound" @close="a11yOpen = false" />
     <AppFooter />
   </div>
 
@@ -1536,6 +1613,30 @@ function onClipboard(e) {
       </form>
     </dialog>
 
+    <dialog ref="rhDialog" class="wide">
+      <form v-if="rhResult" method="dialog">
+        <h2>{{ t('Rehearsal result') }}</h2>
+        <p>{{ t('Total {0}', clock(rhSum.time)) }}<template v-if="rhSum.plan"> · {{ t('planned {0}', clock(rhSum.plan)) }} · <b :class="rhSum.time > rhSum.plan ? 'rh-over' : 'rh-under'">{{ signed(rhSum.time - rhSum.plan) }}</b></template><template v-if="rhResult.prev"> · {{ t('last time {0}', clock(rhSum.prev)) }}</template></p>
+        <div class="rh-scroll">
+          <table class="rh-table">
+            <thead><tr><th scope="col">{{ t('Slide') }}</th><th scope="col">{{ t('Actual') }}</th><th scope="col">{{ t('Planned') }}</th><th scope="col">{{ t('Difference') }}</th><th v-if="rhResult.prev" scope="col">{{ t('Last time') }}</th><th scope="col">{{ t('Chart') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="r in rhRows" :key="r.i">
+                <th scope="row">{{ r.i + 1 }}<span v-if="r.name">. {{ r.name }}</span></th>
+                <td>{{ r.time == null ? '–' : clock(r.time) }}</td>
+                <td>{{ r.plan ? clock(r.plan) : '–' }}</td>
+                <td :class="r.diff > 0 ? 'rh-over' : r.diff != null && 'rh-under'">{{ r.diff == null ? '' : signed(r.diff) }}</td>
+                <td v-if="rhResult.prev">{{ r.prev == null ? '–' : clock(r.prev) }}</td>
+                <!-- the numbers are in the cells before; the bar is for the eye -->
+                <td class="rh-chart" aria-hidden="true"><i :class="{ 'rh-over': r.diff > 0 }" :style="{ width: r.bar }" /><i v-if="r.mark" class="rh-mark" :style="{ left: r.mark }" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <menu><button type="button" @click="rhUseTimes">{{ t('Use these times as planned times') }}</button><button type="button" @click="rhAgain">{{ t('Rehearse again') }}</button><button class="primary" value="">{{ t('Close') }}</button></menu>
+      </form>
+    </dialog>
+
     <dialog ref="confirmDialog" @close="confirmDialog.returnValue === 'ok' && confirmAction?.()">
       <form method="dialog">
         <h2>{{ t('Are you sure?') }}</h2>
@@ -1558,7 +1659,7 @@ function onClipboard(e) {
   <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
     @pointerdown="swipeDown" @pointermove="e => { swipeMove(e); if (tool === 'laser') laser = [e.clientX, e.clientY] }" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
-      <Transition :name="'tr-' + transition" :css="transition !== 'none'">
+      <Transition :name="'tr-' + transition" :css="transition !== 'none' && transition !== 'morph'">
         <div :key="ui.slide" class="pv-slide"><SlideView :slide="slide" :index="ui.slide" live :step="clickStep" :style="{ transform: `scale(${presentScale})` }" /></div>
       </Transition>
       <!-- [[x, y], …].join(' ') is SVG's "x,y x,y" -->
@@ -1568,6 +1669,17 @@ function onClipboard(e) {
       </svg>
     </div>
     <aside v-if="presenterView" class="pv-side">
+      <section v-if="rehearsal" class="rh" :aria-label="t('Rehearsal')">
+        <div class="rh-clock"><small>{{ t('Total') }}</small><b>{{ clock(rhTotal) }}</b><small v-if="sumOf(rhPlan)">{{ t('of {0}', clock(sumOf(rhPlan))) }}</small></div>
+        <div class="rh-clock" :class="rhState"><small>{{ t('This slide') }}</small><b>{{ clock(rhSlide) }}</b><small v-if="rhPlan[ui.slide]">{{ t('of {0}', clock(rhPlan[ui.slide])) }}</small></div>
+        <!-- only the state is announced, not every second -->
+        <p class="rh-pace" :class="rehearsal.since == null ? '' : rhPace > 0 ? 'over' : rhPace != null && 'ok'"><span role="status">{{ rehearsal.since == null ? t('Paused') : rhPace == null ? t('No planned times') : rhPace > 0 ? t('Behind plan') : t('On track') }}</span> <span v-if="rehearsal.since != null && rhPace > 0">{{ signed(rhPace) }}</span></p>
+        <div class="rh-btns">
+          <button class="tb small" :aria-pressed="rehearsal.since == null" @click="rhPause"><Icon :name="rehearsal.since == null ? 'play' : 'pause'" :size="16" />{{ rehearsal.since == null ? t('Resume') : t('Pause') }}</button>
+          <button class="tb small" :title="t('Restart') + ' (R)'" @click="rhRestart"><Icon name="undo" :size="16" />{{ t('Restart') }}</button>
+          <button class="tb small" :title="t('End rehearsal') + ' (Esc)'" @click="stopPresenting"><Icon name="x" :size="16" />{{ t('End rehearsal') }}</button>
+        </div>
+      </section>
       <div class="pv-next">
         <small>{{ t('Next slide') }}</small>
         <div v-if="upNext.slide !== ui.slide || upNext.step !== clickStep" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[upNext.slide]" :index="upNext.slide" :step="upNext.step" :style="{ transform: 'scale(0.3)' }" /></div>
@@ -1591,7 +1703,8 @@ function onClipboard(e) {
     <div class="pv-bar">
       <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
       <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
-      <button v-if="presenterView" class="tb small pv-timer" :title="t('Reset timer') + ' (R)'" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
+      <span v-if="rehearsal" class="pv-timer">⏱ {{ clock(rhTotal) }}</span>
+      <button v-else-if="presenterView" class="tb small pv-timer" :title="t('Reset timer') + ' (R)'" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
       <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="t('Laser pointer') + ' (L)'" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="t('Pen') + ' (D)'" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="t('Arrow') + ' (A)'" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>

@@ -1,8 +1,9 @@
 <script setup>
 import { gapSnaps, nearestGap } from './spacing.js'
-import { computed, nextTick, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, nextTick, ref, watch, onBeforeUnmount, onMounted, onUpdated } from 'vue'
 import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, markItems, underlay } from './store.js'
-import { themeStyle, fontStack, codeDark, shadowCss } from './themes.js'
+import { themeStyle, fontStack, codeDark, shadowCss, themeOf } from './themes.js'
+import { chartSvg } from './chart.js'
 import { hlLines, codeOpts } from './hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from './actions.js'
 import { shapeSvg, fillFields } from './toSlidev.js'
@@ -13,7 +14,9 @@ import { t } from './i18n.js'
 import { longPressFired } from './longpress.js'
 import { clock, shown, done, running, toggle, reset } from './timer.js'
 import * as picker from './picker.js'
+import { diagramSrc } from './diagram.js'
 import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
+import { measureMark } from './marks.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
@@ -264,7 +267,7 @@ function backgroundDown(e) {
 // --- editing in place ---
 async function edit(e, el) {
   if (props.editable && el.type === 'image') return startCrop(el)
-  if (!props.editable || ['image', 'video', 'timer', 'quiz', 'picker'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
+  if (!props.editable || ['image', 'video', 'timer', 'quiz', 'picker', 'chart', 'diagram'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
   const box = e.currentTarget, cell = e.target.closest?.('[data-r]')
   ui.sel = [el.id]
   ui.editing = el.id
@@ -423,11 +426,30 @@ watch(() => props.slide.elements.map(e => e.type === 'text' && (e.fill || e.stro
     if (c && c.offsetHeight > el.h + 1) el.h = Math.ceil(c.offsetHeight)
   })
 })
+// v-mark: hand-drawn marks over spans of text, measured where the browser laid the text out (so they follow
+// reflow); recomputed after every render, while typing, after a mark change ("marks" event) and when fonts load
+const marks = ref({})
+function layoutMarks() {
+  const r = root.value, out = {}
+  if (!r?.isConnected) return
+  const k = r.getBoundingClientRect().width / W || 1
+  for (const n of r.querySelectorAll('[data-el]')) {
+    const spans = n.querySelectorAll('[data-mark]')
+    if (!spans.length) continue
+    const b = n.getBoundingClientRect(), list = [...spans].map((s, i) => measureMark(s, i, b, k)).filter(Boolean)
+    if (list.length) out[n.dataset.el] = list
+  }
+  if (JSON.stringify(out) !== JSON.stringify(marks.value)) marks.value = out
+}
+onMounted(() => { layoutMarks(); document.fonts?.addEventListener('loadingdone', layoutMarks); document.fonts?.ready.then(layoutMarks) })
+onUpdated(layoutMarks)
+onBeforeUnmount(() => document.fonts?.removeEventListener('loadingdone', layoutMarks))
+const markShown = m => props.step == null || !m.at || revealed({ click: m.at }, steps.value, props.step)
 const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
 </script>
 
 <template>
-  <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown">
+  <div ref="root" class="slide" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="themeStyle(theme || deck.theme)" @pointerdown.self="backgroundDown" @marks="layoutMarks">
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
       :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
@@ -436,20 +458,25 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
-      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker' }[el.type]) : null"
+      :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
         v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="items(el, fields(resolveImgs(el.html)))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
-        @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event)" @paste.prevent="pasteText"
+        @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); layoutMarks()" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"
       />
       <template v-else-if="el.type === 'code'">
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
         <pre v-else class="code" :class="{ dark: codeDarkOf(el) }"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(el.code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
       </template>
-      <img v-else-if="el.type === 'image'" :src="deck.assets[el.asset]" :class="el.cls" alt="" draggable="false" :style="{ borderRadius: el.radius && !el.crop ? el.radius + 'px' : null }" />
+      <img v-else-if="el.type === 'image'" :src="deck.assets[el.asset]" :class="el.cls" :alt="el.decorative ? '' : el.alt || ''" draggable="false" :style="{ borderRadius: el.radius && !el.crop ? el.radius + 'px' : null }" />
+      <template v-else-if="el.type === 'diagram'">
+        <img v-if="diagramSrc(el, theme || deck.theme)" :src="diagramSrc(el, theme || deck.theme)" :alt="t('Diagram')" draggable="false" />
+        <p v-else class="diagram-empty">{{ t('Diagram') }}</p>
+      </template>
       <TableEl v-else-if="el.type === 'table'" :el="el" :editing="editable && ui.editing === el.id" :selected="editable && ui.sel.length === 1 && ui.sel[0] === el.id" :scale="scale" />
       <template v-else-if="el.type === 'shape'">
         <div class="shape-box" v-html="shapeSvg(el)" />
@@ -459,7 +486,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
           <div
             class="content" v-html="fields(resolveImgs(el.html || ''))"
             :contenteditable="editable && ui.editing === el.id"
-            @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); shrinkShapeText($event.currentTarget.parentElement)" @paste.prevent="pasteText"
+            @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); shrinkShapeText($event.currentTarget.parentElement); layoutMarks()" @paste.prevent="pasteText"
           />
         </div>
       </template>
@@ -485,6 +512,14 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         </div>
         <button v-if="live" class="quiz-reveal" @pointerdown.prevent @click="toggleSolution(el.id)">{{ quiz.shown[el.id] ? t('Hide') : t('Reveal') }}</button>
       </div>
+      <!-- the series' first colour is the theme's accent -->
+      <div v-else-if="el.type === 'chart'" class="chart-box" role="img" :aria-label="el.title || t('Chart')" v-html="chartSvg(el, themeOf(theme || deck.theme).vars?.accent)" />
+      <svg v-if="marks[el.id]" class="marks" :width="el.w" :height="el.h" aria-hidden="true">
+        <g v-for="(m, i) in marks[el.id]" :key="i" :data-type="m.mark" :data-click="(m.at && steps.indexOf(m.at) + 1) || null" :data-unshown="!markShown(m) || null" :style="{ stroke: m.color }">
+          <path v-for="(p, j) in m.paths" :key="j" :d="p.d" pathLength="1" :stroke-width="p.w" :stroke-opacity="p.o" :style="{ transitionDelay: j * 80 + 'ms' }" />
+        </g>
+      </svg>
+      <template v-if="editable && marks[el.id] && !decor(el)"><span v-for="(m, i) in marks[el.id].filter(m => m.at)" :key="'m' + i" class="click-badge mark-badge" :style="{ left: m.x + 'px', top: m.y + 'px' }" :title="t('Drawn on click {0}', m.at)">{{ m.at }}</span></template>
       <span v-if="editable && el.click && !decor(el)" class="click-badge" :title="t('Appears on click {0}', el.click)">{{ el.click }}</span>
       <template v-if="editable && ui.sel.length === 1 && ui.sel[0] === el.id && ui.editing !== el.id && !el.locked">
         <template v-if="ui.crop === el.id"><i v-for="h in handlesOf(el)" :key="h" class="handle crop-handle" :class="h" @pointerdown.stop="cropDrag($event, el, h)" /></template>

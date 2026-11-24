@@ -20,11 +20,13 @@ bun test         # parser, export and server tests
 
 - **Import** Slidev projects (a folder with `slides.md`, `src:` includes, images, theme), PowerPoint (`.pptx`/`.potx`, also from Google Slides and Keynote), OpenDocument (`.odp`/`.otp`), PDF (one image slide per page, text in the notes), Slidecko's own HTML exports and images.
 - **Export** to Slidev (`.zip`), PDF (vector, selectable text), PowerPoint (editable, plus a Google Slides variant and an image-only "exact" variant), OpenDocument, a single-file or zipped HTML presentation, and PNG images.
-- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, shapes, YouTube videos, and timers, random pickers ("who's next?") and quizzes you use while presenting, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
+- **Edit** text, headings, lists, quotes, callouts, code with syntax highlighting, images, tables, charts (column, bar, line, pie; data pasted from a spreadsheet), shapes, Mermaid diagrams, YouTube videos, and timers, random pickers ("who's next?") and quizzes you use while presenting, with snapping guides, multi-selection, format painter, alignment, undo/redo, a version history (automatic snapshots) and a command palette (⌘K).
 - **Master and layouts**: elements on every slide (logo, footer, slide number), editable slide layouts with placeholders and decorations, also in every export.
+- **Fonts**: seven included open-source fonts and your own font files (`.woff2`, `.woff`, `.ttf`, `.otf`), stored with the project and embedded in HTML, image and Slidev exports; served from the app itself, never from a font CDN.
 - **Themes**: 13 built-in themes and a theme editor (colours, fonts, own CSS) whose themes can be exported and imported as `.theme.json`.
 - **Markdown**: insert slides from Slidev Markdown (e.g. written by an AI) or edit one slide as Markdown; a hands-on Markdown tutorial teaches the syntax in a few minutes.
-- **Present** in full screen or with a presenter view (notes, next slide, timer); elements can appear step by step on click (Slidev's `v-click`).
+- **Present** in full screen or with a presenter view (notes, next slide, timer), and **rehearse** the talk against planned times per slide; elements can appear step by step on click (Slidev's `v-click`) and words get hand-drawn marks (`v-mark`: circle, underline, highlight …) drawn on a click; Magic move slides elements that two slides share from one place, size and colour to the next.
+- **Accessibility check** for the presentation: alt text, contrast (WCAG AA), font size, slide titles, reading order, table headers, link texts, with one-click fixes.
 - **Phone and tablet** layout, long press for context menus, light/dark mode, English and German interface, accessible controls (4.5:1 contrast, named controls, reduced motion).
 
 The full behaviour is described in [docs/features.md](docs/features.md).
@@ -38,13 +40,16 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 | `src/importSlidev.js` | renders each slide like Slidev does and measures its elements |
 | `src/importOffice.js` | PowerPoint and OpenDocument import |
 | `src/toSlidev.js` | slides → Slidev project files |
+| `src/marks.js` | hand-drawn marks (`v-mark`): directive parsing and writing, seeded strokes |
 | `src/exportPptx.js` | PPTX and ODP from the rendered slides (one layout pass) |
 | `src/pptxFix.js` | schema fixes for the slide XML pptxgenjs writes |
 | `src/exportOdp.js` | OpenDocument writer with the pptxgenjs interface |
 | `src/exportFormats.js` | images, exact PPTX, HTML presentation, print preparation |
+| `src/fonts.js`, `src/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
 | `src/themes.js`, `src/slide.css` | themes, table and callout styles (shared by the editor and the Slidev export) |
 | `src/ThemeEditor.vue`, `src/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
 | `src/store.js`, `src/actions.js` | project state, persistence, commands |
+| `src/diagram.js` | Mermaid diagrams: rendering (Mermaid loaded on first use), sanitizing, cache per code and theme |
 | `src/session.js` | view state in the URL hash and per-tab state for reloads |
 | `src/i18n.js`, `src/locales/` | interface translations |
 | `src/scheme.js` | light/dark mode |
@@ -77,7 +82,7 @@ The app sets no cookies, has no tracking and uploads nothing. Imports are read a
 
 | Where | What | How long |
 |---|---|---|
-| IndexedDB `slides-builder` | projects (slides, master and layouts, images, project files), project list, snapshots (version history: up to 20 per project with the images they use) | until the project or the site data is deleted |
+| IndexedDB `slides-builder` | projects (slides, master and layouts, images, uploaded fonts, project files, planned times and the last 5 rehearsals), project list, snapshots (version history: up to 20 per project with the images they use) | until the project or the site data is deleted |
 | localStorage `slides-builder:*` | last project (`last`), language (`lang`), light/dark (`scheme`), export format (`export`), keep font sizes (`keep-sizes`), own text styles (`text-presets`), imported themes (`themes`), search options (`find`), folded sidebars (`panels`), tour offered on the start page (`tour`) | permanent |
 | sessionStorage `slides-builder:session` | the tab's view (selection, folded decks, scroll position), search term, YouTube consent | until the tab is closed |
 
@@ -107,8 +112,9 @@ If you run Slidecko publicly, you are responsible for your own legal notice and 
 ## Known limitations
 
 - `v-click` steps show as the fully revealed slide (like Slidev's PDF export).
-- Vue components other than `<Youtube>`, and Mermaid diagrams, stay in the Markdown but are not rendered in the editor.
+- Vue components other than `<Youtube>` stay in the Markdown but are not rendered in the editor.
 - Editable PPTX/ODP: line breaks match the editor, so they stay as soft breaks if the text is reworded later. Text shadows are missing. `system-ui` is written as Helvetica Neue (Mac) or Segoe UI (Windows). Use the "exact" export for identical looks.
+- PPTX/ODP cannot embed fonts: included and uploaded fonts are written by name and must be installed where the file is opened.
 - Keynote has no open file format and opens the PPTX. Google Slides imports the PPTX; use the "Google Slides" variant. Code fonts are written as Courier New there.
 
 ## License

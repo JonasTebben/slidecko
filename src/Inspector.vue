@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { listAt } from './lists.js'
 import Icon from './Icon.vue'
 import Menu from './Menu.vue'
 import Sec from './InspectorSection.vue'
-import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches } from './store.js'
+import ChartPanel from './ChartPanel.vue'
+import FontOptions from './FontOptions.vue'
+import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont } from './store.js'
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from './themes.js'
 import { LANGS, codeOpts, withLines } from './hl.js'
 import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup } from './actions.js'
@@ -13,7 +15,11 @@ import * as table from './tableOps.js'
 import { clock, parseClock } from './timer.js'
 import { LETTERS } from './quiz.js'
 import { t } from './i18n.js'
-import { PALETTE, FILLS, SHAPE_NAMES } from './presets.js'
+import { morphSlides } from './morph.js'
+import { PALETTE, FILLS, SHAPE_NAMES, DIAGRAMS } from './presets.js'
+import { diagram } from './diagram.js'
+import { MARKS, MARK_NAMES, MARK_COLORS, markAt, setMark, markSteps } from './marks.js'
+import { themeOf } from './themes.js'
 
 const emit = defineEmits(['link', 'markdown'])
 const el = computed(() => (selection.value.length === 1 ? primary.value : null))
@@ -32,7 +38,17 @@ const setBorder = mode => { const b = border.value; tbl(table.toggleBorder, mode
 const onSelection = () => { listKind.value = listAt(getSelection().anchorNode) }
 onMounted(() => document.addEventListener('selectionchange', onSelection))
 onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelection))
-const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-up': 'Slide up' } // Slidev's names (store.js keeps only these)
+const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-up': 'Slide up', morph: 'Magic move' } // Slidev's names and Slidecko's morph (store.js keeps only these)
+// plays Magic move on the canvas, from this slide into the next (the copy keeps the old slide's look once the canvas shows the next one)
+async function previewMorph() {
+  const i = ui.slide
+  ui.sel = []; ui.editing = null
+  await nextTick()
+  const from = document.querySelector('.frame > .slide')?.cloneNode(true)
+  ui.slide = i + 1
+  await nextTick()
+  morphSlides(from, document.querySelector('.frame > .slide'), deck.slides[i], deck.slides[i + 1])
+}
 // the project's layouts; "Edit layouts …" opens the slide's one in the master and layouts mode
 const slideLayout = computed(() => layoutOf(slide.value, deck.layouts))
 function pickLayout(e) {
@@ -106,6 +122,21 @@ function openPop(m, e, keep) {
   m.openAt(r.left, r.bottom + 6, !!keep)
 }
 const styleMenu = ref(), colorMenu = ref(), cellMenu = ref()
+// v-mark: the menu shows the mark at the caret, or what the next one gets; a type marks the selected words
+const markMenu = ref(), mk = reactive({ mark: null, color: undefined, at: undefined, hint: false })
+function openMark(e) {
+  const m = markAt()
+  Object.assign(mk, { hint: false, mark: m?.getAttribute('data-mark') || null, ...(m && { color: m.getAttribute('data-mark-color') || undefined, at: m.getAttribute('data-mark-at') || undefined }) })
+  openPop(markMenu.value, e, true)
+}
+function pickMark(k, v) {
+  mk[k] = v
+  if (k === 'mark') mk.hint = !setMark({ mark: v, color: mk.color, at: mk.at })
+  else if (markAt()) setMark({ [k]: v })
+}
+const unmark = () => { setMark(null); mk.mark = null }
+// click steps to choose from: the slide's numbers and the next one
+const markClicks = computed(() => Array.from({ length: Math.min(99, Math.max(0, ...slide.value.elements.flatMap(e => [e.click || 0, ...markSteps(e.html)])) + 1) }, (_, i) => String(i + 1)))
 const num = (key, v) => { const n = Math.round(+v); if (Number.isFinite(n)) el.value[key] = key === 'w' || key === 'h' ? Math.max(8, n) : n }
 const tbl = (fn, ...a) => run(() => fn(el.value, ...a))
 const ytId = v => v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{6,20})/)?.[1] || (/^[\w-]{6,20}$/.test(v) ? v : null)
@@ -136,9 +167,26 @@ const tri = k => selection.value.every(e => e[k]) || (selection.value.some(e => 
 function setAll(els, k, v) {
   for (const e of els) { e[k] = v; if (k === 'fill' && !v) delete e.fillAlpha; if (k === 'font' || k === 'fontSize') fitHeight(e) }
 }
+// font select: '+' asks for a font file, which then becomes the font of els
+const fontFile = ref()
+let fontFor = []
+function chooseFont(e, els) {
+  if (e.target.value !== '+') return setAll(els, 'font', e.target.value || undefined)
+  e.target.value = same('font', els) ?? ''
+  fontFor = els
+  fontFile.value.click()
+}
+const uploadFont = file => file && run(async () => setAll(fontFor, 'font', await storeFont(file)))
 // appear on click: switched on, an element gets a step after the slide's last one
 const nextClick = () => Math.min(99, Math.max(0, ...slide.value.elements.map(e => e.click || 0)) + 1)
 const clickNum = v => Math.min(99, Math.max(1, Math.round(+v) || 1))
+// planned time of a slide or the whole talk; empty or 0 clears it (the deck keeps 0, a slide drops the key)
+function setTime(obj, e) {
+  const v = parseClock(e.target.value || 0)
+  if (v === 0) obj === deck ? (deck.duration = 0) : delete obj.duration
+  else if (v && v <= 86400) obj.duration = v // unreadable: the field shows the old value again
+  e.target.value = obj.duration ? clock(obj.duration) : ''
+}
 const notesRows = computed(() => Math.min(14, Math.max(4, (slide.value.notes || '').split('\n').length + 1)))
 // longer help lives in the collapsed Tips section at the end
 const TIPS = {
@@ -150,13 +198,20 @@ const TIPS = {
   timer: 'While presenting: a click starts or pauses it, a double click sets it back.',
   picker: 'While presenting: a click draws a name, nobody twice until everyone was drawn; a double click starts over.',
   quiz: 'While presenting: a click marks an answer, “Reveal” (or Q) shows the solution.',
+  diagram: 'Mermaid syntax (mermaid.js.org): flowchart, sequence, class, state, gantt, pie, mind map and more. In Slidev it is rendered by Slidev itself.',
   video: 'Plays while presenting; in Slidev as a <Youtube> component.',
+  chart: 'Copy cells in Excel, Sheets or Numbers and paste them into the top-left cell of the data: the first row names the series, the first column the categories.',
 }
+// Mermaid code: rendered a moment after typing stops (one render, one undo step, not one per key)
+const dia = computed(() => el.value?.type === 'diagram' && diagram(el.value.code, deck.theme))
+let diaTimer
+const setDiagram = (target, code, ms = 300) => { clearTimeout(diaTimer); diaTimer = setTimeout(() => { target.code = cleanEl({ type: 'diagram', code }).code }, ms) }
 const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.shape === 'line') && TIPS[el.value.type])
 </script>
 
 <template>
   <aside class="inspector" :aria-label="t('Properties')">
+    <input ref="fontFile" type="file" accept=".woff2,.woff,.ttf,.otf" hidden @change="uploadFont($event.target.files[0]); $event.target.value = ''" />
     <!-- several elements -->
     <template v-if="selection.length > 1">
       <Sec id="multi" icon="selectAll" :title="t('{0} elements', selection.length)">
@@ -188,7 +243,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       </Sec>
       <Sec v-if="texts.length" id="text" icon="text" :title="`${t('Text')} (${texts.length} ${texts.length === 1 ? t('Text box') : t('Text boxes')})`">
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="same('font') ?? ''" @change="setAll(texts, 'font', $event.target.value || undefined)"><option value="">{{ same('font') === null ? t('Mixed') : t('Theme') }}</option><option v-for="(f, k) in FONTS" :key="k" :value="k" :style="{ fontFamily: f[1] }">{{ f[0] }}</option></select>
+          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="same('font') ?? ''" @change="chooseFont($event, texts)"><option value="">{{ same('font') === null ? t('Mixed') : t('Theme') }}</option><FontOptions upload /></select>
           <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="same('fontSize') ?? ''" @change="setAll(texts, 'fontSize', +$event.target.value || undefined)"><option value="">{{ same('fontSize') === null ? t('Mixed') : t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </div>
         <div class="seg-row">
@@ -259,7 +314,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </Menu>
         </div>
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="el.font || ''" :style="{ fontFamily: fontStack(el.font) || null }" @change="el.font = $event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Theme') }}</option><option v-for="(f, k) in FONTS" :key="k" :value="k" :style="{ fontFamily: f[1] }">{{ f[0] }}</option></select>
+          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="el.font || ''" :style="{ fontFamily: fontStack(el.font) || null }" @change="chooseFont($event, [el])"><option value="">{{ t('Theme') }}</option><FontOptions upload /></select>
+          <button v-if="FONTS[el.font]?.[2] === 'own'" class="ib" :aria-label="t('Remove font {0} from the project', FONTS[el.font][0])" :title="t('Remove font {0} from the project', FONTS[el.font][0])" @click="removeFont(el.font)"><Icon name="trash" /></button>
           <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </div>
         <div class="seg-row" @mousedown.prevent>
@@ -273,6 +329,25 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <span class="seg" role="group" :title="typing ? null : t('Double-click into the text to format words.')">
             <button class="ib" :disabled="!typing" :aria-label="t('Link')" :title="t('Link (⌘K)')" @click="emit('link')"><Icon name="link" /></button>
             <button class="ib" :disabled="!typing" :aria-label="t('Inline code')" :title="t('Inline code')" @click="format('insertHTML', `<code>${getSelection().toString().replace(/</g, '&lt;') || 'code'}</code>`)"><Icon name="code" /></button>
+            <button class="ib" :disabled="!typing" :aria-label="t('Mark')" :title="t('Hand-drawn mark (circle, underline …), optionally drawn on click')" @pointerdown="armPop" @click="openMark($event)"><Icon name="pen" /></button>
+            <Menu ref="markMenu">
+              <div data-keep class="mark-menu">
+                <h4 class="mh">{{ t('Mark') }}</h4>
+                <button v-for="m in MARKS" :key="m" class="mi" :class="{ on: mk.mark === m }" :aria-pressed="mk.mark === m" @click="pickMark('mark', m)"><Icon name="check" :style="{ visibility: mk.mark === m ? null : 'hidden' }" />{{ t(MARK_NAMES[m]) }}</button>
+                <p v-if="mk.hint" class="mark-hint" role="status">{{ t('Select a few words in one paragraph first.') }}</p>
+                <h4 class="mh">{{ t('Color') }}</h4>
+                <div class="swatches pop-sw">
+                  <button class="sw" :class="{ on: !mk.color }" :style="{ background: themeOf(deck.theme).vars?.accent }" :title="t('Theme accent')" :aria-label="t('Theme accent')" :aria-pressed="!mk.color" @click="pickMark('color', undefined)" />
+                  <button v-for="(c, n) in MARK_COLORS" :key="n" class="sw" :class="{ on: mk.color === n }" :style="{ background: c }" :title="n" :aria-label="n" :aria-pressed="mk.color === n" @click="pickMark('color', n)" />
+                </div>
+                <h4 class="mh">{{ t('Drawn on click') }}</h4>
+                <div class="mark-steps">
+                  <button class="mi" :class="{ on: !mk.at }" :aria-pressed="!mk.at" @click="pickMark('at', undefined)">{{ t('Always') }}</button>
+                  <button v-for="n in markClicks" :key="n" class="mi" :class="{ on: mk.at === n }" :aria-pressed="mk.at === n" @click="pickMark('at', n)">{{ n }}</button>
+                </div>
+                <button v-if="mk.mark" class="mi" @click="unmark"><Icon name="trash" />{{ t('Remove mark') }}</button>
+              </div>
+            </Menu>
           </span>
           <span class="chip fc" :style="chip(el.color, 'currentColor')">
             <button class="ib" :aria-label="typing ? t('Selection color') : t('Text color')" :title="typing ? t('Selection color') : t('Text color')" @pointerdown="armPop" @click="openPop(colorMenu, $event, typing)"><Icon name="fontColor" /></button>
@@ -438,6 +513,10 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button v-if="el.crop" class="ib wide" @click="resetCrop(el)"><Icon name="undo" /> {{ t('Remove crop') }}</button>
         </div>
         <label class="slider" :title="t('Corners')"><Icon name="radius" :size="16" /><input type="range" min="0" max="80" :aria-label="t('Corners')" :value="el.radius || 0" @input="el.radius = +$event.target.value || undefined" /><output>{{ el.radius || 0 }} px</output></label>
+        <label class="field">{{ t('Alt text') }}
+          <textarea rows="2" :value="el.decorative ? '' : el.alt || ''" :disabled="el.decorative" :placeholder="t('What the picture shows, for screen readers')" @input="el.alt = $event.target.value || undefined" />
+        </label>
+        <label class="check"><input type="checkbox" :checked="!!el.decorative" @change="el.decorative = $event.target.checked || undefined" /> {{ t('Decorative (screen readers skip it)') }}</label>
       </Sec>
 
       <template v-else-if="el.type === 'shape'">
@@ -518,6 +597,16 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </label>
       </Sec>
 
+      <Sec v-else-if="el.type === 'chart'" id="chart" icon="chart" :title="t('Chart')"><ChartPanel :el="el" /></Sec>
+      <Sec v-else-if="el.type === 'diagram'" id="diagram" icon="diagram" :title="t('Diagram')">
+        <select :aria-label="t('Start from a template')" @change="setDiagram(el, DIAGRAMS[$event.target.value][1](), 0); $event.target.value = ''">
+          <option value="">{{ t('Start from a template …') }}</option><option v-for="(d, k) in DIAGRAMS" :key="k" :value="k">{{ t(d[0]) }}</option>
+        </select>
+        <label class="field">{{ t('Mermaid code') }}
+          <textarea :key="el.id" class="diagram-code" :value="el.code" rows="10" maxlength="20000" spellcheck="false" autocapitalize="off" @input="setDiagram(el, $event.target.value)" /></label>
+        <p v-if="dia?.error" class="error diagram-error" role="alert">{{ t('The code has an error; the slide shows the last working diagram.') }} <small>{{ dia.error }}</small></p>
+      </Sec>
+
       <Sec v-else-if="el.type === 'video'" id="video" icon="video" :title="t('Video')">
         <label class="field">{{ t('YouTube link or ID') }} <input :value="el.youtube" @change="setVideo($event.target.value)" /></label>
       </Sec>
@@ -549,6 +638,10 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <input v-if="el.click" type="number" class="click-num" min="1" max="99" :aria-label="t('Click order')" :title="t('Click order')" :value="el.click" @change="el.click = clickNum($event.target.value)" />
         </div>
         <label v-if="el.type === 'text' && /<(ul|ol)\b/.test(el.html)" class="check" :title="t('While presenting, the list items appear one per click, from the box’s click step on')"><input type="checkbox" :checked="!!el.clickItems" @change="el.clickItems = $event.target.checked || undefined" /> {{ t('List items one by one') }}</label>
+        <!-- empty: Magic move pairs it automatically (same text, picture or shape) -->
+        <label class="field" :title="t('Magic move pairs elements with the same name on this slide and the next one')">{{ t('Magic move name') }}
+          <input :value="el.morph || ''" :placeholder="t('automatic')" maxlength="40" @change="el.morph = $event.target.value.trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '') || undefined" />
+        </label>
       </Sec>
       <section class="actions">
         <button v-if="['text', 'shape', 'code', 'image'].includes(el.type)" class="ib" :class="{ on: ui.painting }" :aria-pressed="!!ui.painting" :aria-label="t('Copy formatting')" :title="t('Copy formatting: then click an element (⌘⌥C / ⌘⌥V)')" @click="paint"><Icon name="brush" /></button>
@@ -574,6 +667,13 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="field">{{ t('Default transition (all slides)') }}
           <select v-model="deck.transition"><option v-for="(n, k) in TRANSITIONS" :key="k" :value="k">{{ t(n) }}</option></select>
         </label>
+        <button v-if="(slide.transition || deck.transition) === 'morph' && deck.slides[ui.slide + 1]" class="ib wide" :title="t('Plays Magic move from this slide into the next one')" @click="previewMorph"><Icon name="play" /> {{ t('Preview transition') }}</button>
+        <!-- rehearsing compares against these; the talk length is shared by the slides without their own time -->
+        <h4 class="sub-head">{{ t('Planned time') }}</h4>
+        <label class="field">{{ t('This slide (minutes or m:ss)') }}
+          <input :value="slide.duration ? clock(slide.duration) : ''" inputmode="numeric" :placeholder="t('e.g. 1:30')" @change="setTime(slide, $event)" /></label>
+        <label class="field">{{ t('Whole talk (minutes or m:ss)') }}
+          <input :value="deck.duration ? clock(deck.duration) : ''" inputmode="numeric" :placeholder="t('e.g. 20')" @change="setTime(deck, $event)" /></label>
         <div class="btn-row">
           <button class="ib" :aria-label="t('Duplicate slide')" :title="t('Duplicate slide (⌘⇧D)')" @click="duplicateSlide()"><Icon name="copy" /></button>
           <button class="ib danger" :aria-label="t('Delete slide')" :title="t('Delete slide (⌘⇧⌫)')" @click="deleteSlide()"><Icon name="trash" /></button>

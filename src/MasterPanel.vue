@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import SlideView from './SlideView.vue'
 import { deck, ui, format } from './store.js'
 import { themeLayouts } from './themes.js'
-import { FIELDS } from './toSlidev.js'
+import { FIELDS, slidevNames } from './toSlidev.js'
 import * as A from './actions.js'
 import { t } from './i18n.js'
 
@@ -15,6 +15,8 @@ const cur = computed(() => deck.layouts.find(l => l.id === ui.master))
 const used = id => deck.slides.filter(s => s.type === id).length
 // the theme's layouts; a layout keeps a Slidev layout the theme does not know
 const bases = computed(() => { const l = themeLayouts(deck.theme); return cur.value && !l.some(x => x[0] === cur.value.layout) ? [...l, [cur.value.layout, cur.value.layout]] : l })
+// shortcut: ignores layout files an imported Slidev project brings, which can shift a name by a suffix on export
+const slug = computed(() => cur.value && slidevNames(deck.layouts, deck.theme)[cur.value.id])
 const sel = A.selection
 const isPlaceholder = computed(() => sel.value.length > 0 && sel.value.every(e => e.placeholder))
 const setPlaceholder = on => { for (const e of sel.value) if (on) e.placeholder = true; else delete e.placeholder }
@@ -34,9 +36,10 @@ function remove(l) {
     <div class="ms-props">
       <template v-if="cur">
         <label>{{ t('Name') }}<input v-model="cur.name" maxlength="60" /></label>
-        <label>{{ t('Slidev layout') }}
+        <label>{{ t('Based on Slidev layout') }}
           <select :value="cur.layout" @change="A.setLayoutBase(cur, $event.target.value)"><option v-for="[id, n] in bases" :key="id" :value="id">{{ t(n) }}</option></select>
         </label>
+        <p class="hint">{{ slug ? t('In Slidev it becomes its own layout: layout: {0} (layouts/{0}.vue).', slug) : t('In Slidev: layout: {0}. Draw an element that is not a placeholder, and it becomes its own Slidev layout.', cur.layout) }}</p>
         <label class="check"><input type="checkbox" :checked="isPlaceholder" :disabled="!sel.length" @change="setPlaceholder($event.target.checked)" />{{ t('Placeholder: copied into new slides') }}</label>
         <p class="hint">{{ t('Other elements are drawn behind every slide with this layout. Used by {0} slides.', used(cur.id)) }}</p>
         <div class="ms-row">

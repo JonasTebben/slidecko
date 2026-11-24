@@ -3,9 +3,10 @@
 import { ref, reactive, computed, watch } from 'vue'
 import SlideView from './SlideView.vue'
 import { t } from './i18n.js'
-import { THEMES, FONTS, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf, containedCss } from './themes.js'
+import { THEMES, DRAFT, setDraft, saveTheme, deleteTheme, newThemeId, themeFile, isBuiltin, themeOf, containedCss } from './themes.js'
 import { download } from './actions.js'
 import CodeEditor from './CodeEditor.vue'
+import FontOptions from './FontOptions.vue'
 
 const emit = defineEmits(['saved', 'deleted'])
 const dlg = ref()
@@ -83,10 +84,10 @@ const PREVIEWS = computed(() => [
             </span>
           </label>
           <label class="te-row">{{ t('Font') }}
-            <select v-model="draft.vars.font"><option :value="undefined">{{ t('Default') }}</option><option v-for="(f, k) in FONTS" :key="k" :value="f[1]">{{ t(f[0]) }}</option></select>
+            <select v-model="draft.vars.font"><option :value="undefined">{{ t('Default') }}</option><FontOptions stacks /></select>
           </label>
           <label class="te-row">{{ t('Heading font') }}
-            <select v-model="draft.vars['heading-font']"><option :value="undefined">{{ t('same as text') }}</option><option v-for="(f, k) in FONTS" :key="k" :value="f[1]">{{ t(f[0]) }}</option></select>
+            <select v-model="draft.vars['heading-font']"><option :value="undefined">{{ t('same as text') }}</option><FontOptions stacks /></select>
           </label>
           <label class="te-row">{{ t('Heading weight') }}
             <select v-model="draft.vars['heading-weight']"><option :value="undefined">{{ t('Default') }}</option><option v-for="w in WEIGHTS" :key="w" :value="w">{{ w }}</option></select>

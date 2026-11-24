@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { parseSlidev, headFormat } from './parseSlidev.js'
-import { toSlidev, slideToMarkdown, imagePath, flowHash } from './toSlidev.js'
+import { toSlidev, slideToMarkdown, imagePath, flowHash, slidevNames } from './toSlidev.js'
 
 const box = { x: 0, y: 0, w: 400, h: 100 }
 
@@ -42,6 +42,17 @@ test('transitions: project default in the headmatter, own ones in the slide fron
   const plain = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', slides: [{ layout: 'default', fm: 'transition: slide-right', elements: [hi] }, { layout: 'default', elements: [hi] }] }, {}).files['slides.md']
   assert.deepEqual(parseSlidev(plain).map(s => s.transition), ['slide-right', undefined])
   assert.equal(headFormat(plain).transition, undefined)
+})
+
+test('Magic move: Slidev gets a fade plus a marker that brings it back, an unchanged slide stays as written', () => {
+  const hi = { id: 'h', type: 'text', ...box, html: '<p>Hi</p>' }
+  const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'morph', slides: [{ layout: 'default', elements: [hi] }, { layout: 'default', transition: 'morph', elements: [{ ...hi, morph: 'logo' }] }, { layout: 'default', transition: 'fade', fm: 'transition: fade\nslidecko-transition: morph', elements: [hi] }] }, {}).files['slides.md']
+  assert.match(md, /transition: fade\nslidecko-transition: morph/)
+  assert.equal(headFormat(md).transition, 'morph')
+  assert.deepEqual(parseSlidev(md).map(s => s.transition), ['morph', 'morph', 'fade'])
+  assert.match(md, /--morph:logo/)
+  const s = { layout: 'default', fm: 'transition: fade\nslidecko-transition: morph', transition: 'morph', elements: [hi] }
+  assert.equal(slideToMarkdown(s).split('---')[1].trim(), s.fm)
 })
 
 test('a new slide in its preset arrangement is plain Markdown until it is moved', async () => {
@@ -166,4 +177,23 @@ test('Slidev export: the master is global-top.vue, a decorated layout layouts/<n
   assert.equal(back.master[0].html, field.html)
   const brand = back.layouts.find(l => l.slug === 'brand-cover')
   assert.deepEqual([brand.id, brand.name, brand.layout, brand.elements.length], ['brand', 'Brand cover', 'cover', 2])
+})
+
+test('slidevNames: only decorated layouts get a name, clear of Slidev and theme layouts', () => {
+  const bar = { id: 'b', type: 'shape', shape: 'rect', x: 0, y: 0, w: 10, h: 10 }
+  const names = slidevNames([{ id: 'a', name: 'Cover', layout: 'cover', elements: [bar] }, { id: 'p', name: 'Plain', layout: 'default', elements: [] }, { id: 'c', name: 'Mein Brand', layout: 'default', elements: [bar] }], 'hell')
+  expect(names).toEqual({ a: 'cover-layout', c: 'mein-brand' })
+})
+
+test('planned times: per slide in the frontmatter, the talk length as Slidev duration, read back', () => {
+  const hi = { id: 'a', type: 'text', ...box, html: '<p>Hi</p>' }
+  const slides = [{ layout: 'default', elements: [hi] }, { layout: 'default', duration: 90, elements: [hi] }, { layout: 'default', fm: 'plannedTime: 30', elements: [hi] }]
+  const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', duration: 1200, slides }, {}).files['slides.md']
+  assert.equal(headFormat(md).duration, 1200)
+  assert.match(md, /^duration: 20min$/m)
+  assert.deepEqual(parseSlidev(md).map(s => s.fm?.match(/plannedTime: (\d+)/)?.[1]), [undefined, '90', undefined]) // slide 3's time was removed
+  // values that mean the same stay as written
+  const fm = 'theme: default\ntitle: T\nduration: 1200s\nplannedTime: 45'
+  const again = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', duration: 1200, slides: [{ layout: 'default', fm, duration: 45, elements: [hi] }] }, {}).files['slides.md']
+  assert.ok(again.startsWith(`---\n${fm}\n---`))
 })

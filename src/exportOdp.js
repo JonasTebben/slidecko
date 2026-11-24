@@ -102,16 +102,18 @@ class OdpSlide {
     this.notes = ''
   }
   addNotes(t) { this.notes = t }
-  addImage(o) { this.items.push(`<draw:frame draw:style-name="${this.doc.style('graphic', `<style:graphic-properties draw:stroke="none" draw:fill="none" ${shadow(o)}/>`, 'gr')}" svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"><draw:image xlink:href="${this.doc.image(o.data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`) }
+  addImage(o) { this.items.push(`<draw:frame draw:style-name="${this.doc.style('graphic', `<style:graphic-properties draw:stroke="none" draw:fill="none" ${shadow(o)}/>`, 'gr')}" svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"><draw:image xlink:href="${this.doc.image(o.data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>${o.altText ? `<svg:desc>${esc(o.altText)}</svg:desc>` : ''}</draw:frame>`) }
 
   addShape(kind, o) {
     const d = this.doc
-    const stroke = o.line && o.line.type !== 'none' && o.line.color ? `draw:stroke="solid" svg:stroke-color="${color(o.line.color)}" svg:stroke-width="${pt(o.line.width || 1)}"` : 'draw:stroke="none"'
+    const stroke = o.line && o.line.type !== 'none' && o.line.color ? `draw:stroke="solid" svg:stroke-color="${color(o.line.color)}" svg:stroke-width="${pt(o.line.width || 1)}"${o.line.transparency ? ` svg:stroke-opacity="${100 - o.line.transparency}%"` : ''}${kind === 'custGeom' ? ' draw:stroke-linejoin="round" svg:stroke-linecap="round"' : ''}` : 'draw:stroke="none"'
     const st = d.style('graphic', `<style:graphic-properties ${stroke} ${kind === 'line' ? 'draw:fill="none"' : d.fill(o.fill)} ${shadow(o)}/>`, 'gr')
     const pos = `svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"`
     const poly = pts => `<draw:polygon draw:style-name="${st}" ${pos} svg:viewBox="0 0 1000 1000" draw:points="${pts}"/>`
     if (kind === 'line') this.items.push(`<draw:line draw:style-name="${st}" svg:x1="${inch(o.x)}" svg:y1="${inch(o.y)}" svg:x2="${inch(o.x + o.w)}" svg:y2="${inch(o.y + o.h)}"/>`)
     else if (kind === 'ellipse') this.items.push(`<draw:ellipse draw:style-name="${st}" ${pos}/>`)
+    // freeform (pptxgenjs points in inches from the shape's corner; moveTo starts a new stroke): a path in 1/1000 in
+    else if (kind === 'custGeom') this.items.push(`<draw:path draw:style-name="${st}" ${pos} svg:viewBox="0 0 ${Math.round(o.w * 1000) || 1} ${Math.round(o.h * 1000) || 1}" svg:d="${o.points.map((q, i) => `${!i || q.moveTo ? 'M' : 'L'}${Math.round(q.x * 1000)} ${Math.round(q.y * 1000)}`).join(' ')}"/>`)
     else if (kind === 'triangle') this.items.push(poly('500,0 1000,1000 0,1000'))
     else if (kind === 'rightArrow') this.items.push(poly('0,250 620,250 620,0 1000,500 620,1000 620,750 0,750'))
     else this.items.push(`<draw:rect draw:style-name="${st}" ${pos}${o.rectRadius ? ` draw:corner-radius="${inch(o.rectRadius)}"` : ''}/>`)

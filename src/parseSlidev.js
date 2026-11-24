@@ -1,4 +1,5 @@
 import { marked } from 'marked'
+import { parseDuration } from './rehearse.js'
 
 // Slidev markdown -> [{ layout, blocks, fm, md, file, notes }]. Pure (no DOM); positions are
 // assigned later in importSlidev.js. fm/md/file are the slide's raw source, kept so that
@@ -12,7 +13,9 @@ export const COVER = ['cover', 'intro', 'quiz', 'section', 'statement', 'fact', 
 export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'))?.[1].trim().replace(/^['"]|['"]$/g, '')
 // Slidev hides a slide with `hide: true` (alias `disabled: true`)
 // slide transitions the editor offers (Slidev's built-in names); 'none' turns the project's default off for one slide
-export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up']
+export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up', 'morph']
+// Magic move (Slidecko's own) is written as `transition: fade` plus this key, which Slidev ignores
+export const trOf = fm => (fmGet(fm, 'slidecko-transition') === 'morph' ? 'morph' : fmGet(fm, 'transition'))
 // Slidev's v-click value -> click step: "2" is that step, an empty one (or "+1") the step after the last one
 export const clickOf = (v, last) => (/^\d+$/.test(v) ? +v : last + (+v || 1))
 export const fmHidden =fm => fmGet(fm, 'hide') === 'true' || fmGet(fm, 'disabled') === 'true'
@@ -25,8 +28,9 @@ export const stripNonContent = md => md.replace(/(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*
 export function headFormat(md) {
   const fm = splitSlides(md).find(s => s.fm || s.body.some(l => l.trim()))?.fm // a leading `---` opens the headmatter
   const ar = fmGet(fm, 'aspectRatio')?.replace(/\s+/g, '').replace(':', '/'), cw = +fmGet(fm, 'canvasWidth')
-  const tr = fmGet(fm, 'transition') // the project's default transition
-  return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }), ...(TRANSITIONS.includes(tr) && { transition: tr }) }
+  const tr = trOf(fm) // the project's default transition
+  const dur = parseDuration(fmGet(fm, 'duration')) // the planned talk length
+  return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }), ...(TRANSITIONS.includes(tr) && { transition: tr }), ...(dur && { duration: dur }) }
 }
 
 function splitSlides(md) {
@@ -64,6 +68,9 @@ function boxOf(attrs) {
   if (px('font-size')) box.fontSize = px('font-size')
   return box
 }
+
+// a fenced block: ```mermaid becomes a diagram, everything else a code block
+export const codeEl = (code, lang) => (lang === 'mermaid' ? { type: 'diagram', code } : { type: 'code', code, lang: lang || 'plaintext' })
 
 function parseBody(body) {
   const tokens = marked.lexer(body)
@@ -145,6 +152,6 @@ export function parseSlidev(md, read = () => undefined, path = '', seen = [path]
     // Slidev: the last comment of a slide is its speaker notes; comments are never content
     // (?!<!--): only the last comment, not everything from an earlier one up to it
     const notes = md.match(/<!--((?:(?!<!--)[\s\S])*?)-->\s*$/)?.[1].trim() || ''
-    return [{ layout: fmGet(s.fm, 'layout') || 'default', transition: fmGet(s.fm, 'transition'), blocks: parseBody(stripNonContent(md)), fm: s.fm, md, file: path, notes, gap, ...(fmHidden(s.fm) && { hidden: true }) }]
+    return [{ layout: fmGet(s.fm, 'layout') || 'default', transition: trOf(s.fm), blocks: parseBody(stripNonContent(md)), fm: s.fm, md, file: path, notes, gap, ...(fmHidden(s.fm) && { hidden: true }) }]
   })
 }

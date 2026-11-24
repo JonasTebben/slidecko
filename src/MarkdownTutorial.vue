@@ -1,5 +1,5 @@
 <script setup>
-// Hands-on Markdown tutorial: type on the left, the real slides appear on the right. Opened via openTutorial() (tutorial.js)
+// Hands-on Markdown tutorial: type Markdown, the real slides appear beside it (below it on phones). Opened via openTutorial() (tutorial.js)
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import Icon from './Icon.vue'
 import SlideView from './SlideView.vue'
@@ -27,13 +27,16 @@ const unlocked = computed(() => { const i = LESSONS.findIndex((_, k) => !done.va
 watch(solved, v => { if (v) done.value = new Set(done.value).add(at.value) }, { immediate: true })
 const go = i => { at.value = i; hint.value = false; nextTick(() => area.value?.focus()) }
 const next = () => { if (solved.value) go(at.value + 1) }
-const solve = () => { texts.value[at.value] = t(lesson.value.solution) } // a shown solution is not timed
+let solveShown = false
+const solve = () => { solveShown = true; texts.value[at.value] = t(lesson.value.solution); nextTick(() => { solveShown = false }) } // a shown solution is not timed
 
 // stopwatch of the challenge: from the first key press until it is solved
 const start = ref(null), stop = ref(null), now = ref(Date.now())
 const tick = setInterval(() => { now.value = Date.now() }, 250)
 onBeforeUnmount(() => clearInterval(tick))
 const onInput = () => { if (lesson.value?.challenge) start.value ??= Date.now() }
+// also from the text itself: phone keyboards (autocorrect, dictation, composition) do not always send an input event first
+watch(text, v => { if (v && lesson.value?.challenge && !solveShown) onInput() })
 watch(solved, v => { if (v && lesson.value.challenge && start.value) stop.value ??= Date.now() })
 const seconds = computed(() => (start.value ? Math.floor(((stop.value || now.value) - start.value) / 1000) : 0))
 
@@ -84,7 +87,7 @@ const onKey = e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.prev
 
     <section v-if="intro" class="tut-intro">
       <h3>{{ t('Slides in minutes, with a few signs') }}</h3>
-      <p>{{ t('Learn the Markdown that Slidev and Slidecko understand by doing it: 10 short tasks, each in a few seconds. You type on the left, the real slides appear on the right.') }}</p>
+      <p>{{ t('Learn the Markdown that Slidev and Slidecko understand by doing it: 10 short tasks, each in a few seconds. You type Markdown, and the real slides appear while you type.') }}</p>
       <menu><button class="primary" autofocus @click="intro = false; go(0)">{{ t('Start') }}</button></menu>
     </section>
 
@@ -108,7 +111,9 @@ const onKey = e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.prev
       <div class="tut-lesson">
         <h3>{{ at + 1 }}. {{ t(lesson.title) }}</h3>
         <p>{{ t(lesson.text) }}</p>
-        <p class="tut-task"><b>{{ t('Task:') }}</b> {{ t(lesson.task) }}</p>
+        <p class="tut-task"><b>{{ t('Task:') }}</b> {{ t(lesson.task) }}
+          <!-- right above the editor: on phones the keyboard covers the footer while typing -->
+          <span v-if="lesson.challenge" class="tut-clock" role="timer" :aria-label="t('Stopwatch')">⏱ {{ seconds }} s</span></p>
         <p v-if="hint" class="tut-hint">{{ t(lesson.hint) }}</p>
       </div>
       <div class="tut-work">
@@ -125,7 +130,6 @@ const onKey = e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.prev
         </div>
       </div>
       <footer class="tut-foot">
-        <span v-if="lesson.challenge" class="tut-clock" role="timer" :aria-label="t('Stopwatch')">⏱ {{ seconds }} s</span>
         <span class="tut-result" role="status">
           <template v-if="solved"><Icon name="check" /> {{ lesson.challenge && stop ? t('Done – in {0} seconds!', seconds) : t('Well done!') }}</template>
         </span>
@@ -164,7 +168,7 @@ dialog.tutorial .md-editor { height: min(50vh, 460px); height: min(50svh, 460px)
 .tut-foot menu { margin: 0 0 0 auto; }
 .tut-result { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 .tut-result svg { color: var(--ui-accent); }
-.tut-clock { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tut-clock { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--ui-line-strong); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .tut-stats { display: flex; align-items: center; gap: 16px; margin: 12px 0; }
 .tut-stats > div { display: flex; flex-direction: column; padding: 12px 16px; border: 1px solid var(--ui-line); border-radius: 10px; }
 .tut-stats small { color: var(--ui-muted); }

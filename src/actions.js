@@ -8,6 +8,7 @@ import { THEMES } from './themes.js'
 import { t, lang } from './i18n.js'
 import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf } from './toSlidev.js'
 import { withSolutions } from './quiz.js'
+import { diagramsReady } from './diagram.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
 const loadZip = async () => (await import('jszip')).default
 const importPptx = async (...a) => (await import('./importOffice.js')).importPptx(...a)
@@ -246,7 +247,7 @@ export function addSlide(l = deck.layouts.find(x => x.id === 'content') || deck.
 export function duplicateSlide(i = ui.slide) {
   if (ui.master) return
   const copy = { ...JSON.parse(JSON.stringify(deck.slides[i])), id: uid() }
-  copy.elements = copy.elements.map(e => ({ ...e, id: uid() }))
+  copy.elements = copy.elements.map((e, j) => ({ ...e, id: uid(), mid: (deck.slides[i].elements[j].mid ||= uid()) })) // mid: Magic move pairs original and copy
   deck.slides.splice(i + 1, 0, copy)
   ui.slide = i + 1
 }
@@ -412,7 +413,7 @@ export const importProject = (files, entry, replace) => run(async () => {
   if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition // the headmatter's transition is the project default, not slide 1's own
   const slideFiles = new Set([entry, ...r.slides.map(s => s.file)])
   const source = files[0]?.webkitRelativePath?.split('/')[0] || ''
-  await createProject({ title: source || entry.replace(/\.md$/, ''), source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
+  await createProject({ title: source || entry.replace(/\.md$/, ''), source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
   toast(await importReport(r), 8000)
 })
 // presentations from other programs, one new project each: .pptx, .odp, .pdf, .html (own export), images (one slide each)
@@ -587,8 +588,11 @@ async function renderOutput(file, all, solutions) {
   if (!slides.length) throw new Error(t('All slides are hidden'))
   exportSlides.value = slides
   await nextTick()
+  await diagramsReady() // Mermaid renders asynchronously: the pictures first, then their <img>s
+  await nextTick()
   const out = document.querySelector('.output')
   await Promise.all([...out.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
+  void out.offsetHeight // a layout first: it starts loading the web fonts the slides use, which fonts.ready then waits for
   await document.fonts.ready
   return out
 }
@@ -639,8 +643,10 @@ export const slidev = () => run(async () => {
     try { for (const c of (await renderOutput(undefined, true)).querySelectorAll('[data-el] > .shape-text > .content')) if (c.style.fontSize) shapeFont[c.closest('[data-el]').dataset.el] = c.style.fontSize }
     finally { exportSlides.value = null }
   }
-  const { files, images } = toSlidev(deckData(), deck.files, { shapeFont })
+  const { files, images, fonts } = toSlidev(deckData(), deck.files, { shapeFont, assets: deck.assets })
   const zip = new (await loadZip())()
+  // bundled font files come from the app itself, uploaded ones from the project
+  for (const [path, src] of Object.entries(fonts)) zip.file(path, deck.assets[src] ? deck.assets[src].split(',')[1] : fetch(src).then(r => r.ok ? r.blob() : Promise.reject(new Error(t('Font file {0} could not be loaded', src)))), { base64: !!deck.assets[src] })
   // nothing may unzip outside the project folder: no absolute paths, no '..' segments
   const inside = p => safePath(p) === p
   for (const [path, text] of Object.entries(files)) if (inside(path) && !text.startsWith('data:')) zip.file(path, text)

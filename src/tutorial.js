@@ -83,7 +83,7 @@ export const LESSONS = [
     check: md => /\[[^\]\n]+\]\(\S+\)/.test(md),
   },
   {
-    title: 'Table', text: 'Columns are separated by |, and a line of dashes under the first row makes it the header.',
+    title: 'Table', text: 'Each row is a line, and | separates its cells. The second line is the separator row: one --- per column, also between |, for example | --- | --- | for two columns. It makes the first line the header row.',
     task: 'Add the separator line under the header row to make this a table.',
     hint: 'The second line should read | --- | --- |.',
     start: '# Prices\n\n| Item | Price |\n| Coffee | 2 € |\n| Tea | 1 € |\n',
