@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chartSvg, niceScale, pieAngles, slicePath, parseNum, toGrid, fromGrid, applyGrid, inkOn, percentOff, sliceColor } from './chart.js'
+import { chartSvg, niceScale, pieAngles, slicePath, parseNum, toGrid, fromGrid, applyGrid, inkOn, percentOff, sliceColor, seriesColor } from './chart.js'
 import { slideToMarkdown } from './toSlidev.js'
 // the store wants a browser: just enough of one
 globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
@@ -121,4 +121,14 @@ test('cleanEl keeps percent and valid slice colours, one per category', () => {
   assert.equal(c.percent, true)
   assert.deepEqual(c.catColors, ['#ff0000', null])
   assert.equal(cleanEl(chart({ catColors: [null, 'red; x'] })).catColors, undefined)
+})
+
+test('a colour preset gives series and slices their colours; single colours still win', () => {
+  const el = chart({ palette: 'safe', series: [{ name: 'a', values: [1, 2] }, { name: 'b', values: [1, 2], color: '#123456' }] })
+  assert.equal(seriesColor(el, 0, '#2563eb'), '#0072b2')
+  assert.equal(seriesColor(el, 1, '#2563eb'), '#123456')
+  assert.equal(sliceColor(el, 7, '#2563eb'), '#e69f00') // wraps around
+  assert.equal(seriesColor(chart({}), 0, '#2563eb'), '#2563eb') // no preset: the theme's accent
+  assert.equal(cleanEl(el).palette, 'safe')
+  assert.equal(cleanEl(chart({ palette: 'nope' })).palette, undefined)
 })

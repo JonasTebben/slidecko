@@ -12,7 +12,7 @@ import { vmarkToData, checkMark } from './marks.js'
 import { ICON_NAME } from './icons.js'
 import { cleanOutput } from './run.js'
 import { cleanRehearsals, validDuration } from './rehearse.js'
-import { CHART_KINDS } from './chart.js'
+import { CHART_KINDS, PALETTES } from './chart.js'
 import { cleanFonts, fontType, fontLabel, FONT_MAX } from './fonts.js'
 
 // Logical slide size (Slidev's canvas). All element coordinates are in these units; editor,
@@ -227,7 +227,7 @@ export function cleanEl(e) {
       const lim = v => (v != null && v !== '' && Number.isFinite(+v) ? +v : undefined)
       return {
         ...base, kind: Object.hasOwn(CHART_KINDS, e.kind) ? e.kind : 'column', categories, series, legend: e.legend !== false, ...(e.values === true && { values: true }),
-        ...(e.stacked === true && { stacked: true }), ...(e.percent === true && { percent: true }),
+        ...(e.stacked === true && { stacked: true }), ...(e.percent === true && { percent: true }), ...(Object.hasOwn(PALETTES, e.palette) && { palette: e.palette }),
         ...(Array.isArray(e.catColors) && e.catColors.some(color) && { catColors: categories.map((_, j) => color(e.catColors[j]) || null) }), ...(line(e.title, 200) && { title: line(e.title, 200) }), ...(lim(e.min) != null && { min: lim(e.min) }), ...(lim(e.max) != null && { max: lim(e.max) }),
       }
     }

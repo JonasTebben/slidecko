@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import Menu from './Menu.vue'
 import { deck, cleanEl } from './store.js'
 import { themeOf } from './themes.js'
-import { CHART_KINDS, toGrid, applyGrid, seriesColor, sliceColor, isPie, percentOff, fmt } from './chart.js'
+import { CHART_KINDS, PALETTES, paletteColor, toGrid, applyGrid, seriesColor, sliceColor, isPie, percentOff, fmt } from './chart.js'
 import { textGrid } from './tableOps.js'
 import { PALETTE } from './presets.js'
 import { t } from './i18n.js'
@@ -43,6 +43,13 @@ function setSlice(j, c) {
   cc[j] = c
   if (!cc.some(Boolean)) delete props.el.catColors
 }
+// a preset recolours everything: the single colours go (they can be set again afterwards)
+function setPalette(p) {
+  props.el.palette = p || undefined
+  delete props.el.catColors
+  for (const s of props.el.series) delete s.color
+}
+const strip = p => `linear-gradient(90deg, ${[0, 1, 2, 3, 4].map(i => `${paletteColor(p, i, accent.value)} ${i * 20}% ${i * 20 + 20}%`).join(', ')})`
 // values in percent that don't add up to 100: named, with their sum
 const off = computed(() => (props.el.percent ? percentOff(props.el) : []))
 const delSeries = c => { props.el.series.splice(c - 1, 1) }
@@ -57,6 +64,11 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
     <label v-if="el.kind === 'column' || el.kind === 'bar'" class="check"><input type="checkbox" :checked="!!el.stacked" @change="el.stacked = $event.target.checked || undefined" /> {{ t('Stacked') }}</label>
     <label class="check"><input type="checkbox" :checked="el.legend" @change="el.legend = $event.target.checked" /> {{ t('Legend') }}</label>
     <label class="check"><input type="checkbox" :checked="!!el.values" @change="el.values = $event.target.checked || undefined" /> {{ t('Show values') }}</label>
+    <div class="field">{{ t('Colors') }}
+      <div class="palettes" role="group" :aria-label="t('Colors')">
+        <button v-for="p in ['', ...Object.keys(PALETTES)]" :key="p" class="pal" :class="{ on: (el.palette || '') === p }" :style="{ background: strip(p) }" :title="t(p ? PALETTES[p][0] : 'Theme')" :aria-label="t(p ? PALETTES[p][0] : 'Theme')" :aria-pressed="(el.palette || '') === p" @click="setPalette(p)" />
+      </div>
+    </div>
     <label class="field">{{ t('Values as') }}
       <select :value="el.percent ? 'percent' : 'number'" @change="el.percent = $event.target.value === 'percent' || undefined"><option value="number">{{ t('Numbers') }}</option><option value="percent">{{ t('Percent (%)') }}</option></select></label>
     <div v-if="el.kind !== 'pie' && el.kind !== 'donut'" class="btn-row axis">
@@ -112,6 +124,9 @@ const num = v => (v === '' || !Number.isFinite(+v) ? undefined : +v)
 .add .ib.wide { flex: 1 1 auto; white-space: nowrap; }
 .chart-grid td.cat { display: flex; align-items: center; }
 .chart-grid td.cat .chip { flex: none; margin-left: 2px; }
+.palettes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pal { width: 44px; height: 22px; padding: 0; border: 1px solid var(--ui-line-strong); border-radius: 5px; cursor: pointer; }
+.pal.on { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .hint { margin: 4px 0 0; font-size: 12px; color: var(--ui-muted); }
 .hint.warn { color: var(--ui-danger); }
 .chart-grid th .btn-row { flex-wrap: nowrap; }

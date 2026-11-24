@@ -1236,4 +1236,12 @@ export default {
   "Slice color": "Farbe des Segments",
   "A pie chart shows the first series only.": "Ein Kreisdiagramm zeigt nur die erste Reihe.",
   "{0} adds up to {1}%, not 100%.": "{0} ergibt zusammen {1} %, nicht 100 %.",
+  // chart colour presets
+  "Colors": "Farben",
+  "Warm": "Warm",
+  "Cool": "Kühl",
+  "Earth": "Erdtöne",
+  "Blues": "Blautöne",
+  "Grays": "Grautöne",
+  "Color-blind safe": "Farbenblind-sicher",
 }

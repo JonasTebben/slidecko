@@ -4,10 +4,23 @@
 export const CHART_KINDS = { column: 'Column chart', bar: 'Bar chart', line: 'Line chart', pie: 'Pie chart', donut: 'Donut chart' }
 // series colours after the first, which is the theme's accent: PALETTE's strong colours (presets.js)
 export const SERIES_COLORS = ['#ea580c', '#16a34a', '#7c3aed', '#db2777', '#0891b2', '#f59e0b', '#dc2626', '#475569']
-export const seriesColor = (el, i, accent = '#2563eb') => el.series?.[i]?.color || (i ? SERIES_COLORS[(i - 1) % SERIES_COLORS.length] : accent)
+// colour presets (el.palette; none: the theme's accent, then SERIES_COLORS); strong enough for 3:1 on white
+export const PALETTES = {
+  warm: ['Warm', ['#b91c1c', '#ea580c', '#d97706', '#9f1239', '#c2410c', '#a16207']],
+  cool: ['Cool', ['#1d4ed8', '#0891b2', '#0d9488', '#4f46e5', '#0369a1', '#7c3aed']],
+  earth: ['Earth', ['#78350f', '#a16207', '#4d7c0f', '#166534', '#92400e', '#57534e']],
+  blues: ['Blues', ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#0369a1', '#0c4a6e']],
+  grays: ['Grays', ['#111827', '#4b5563', '#6b7280', '#374151', '#9ca3af', '#1f2937']],
+  safe: ['Color-blind safe', ['#0072b2', '#e69f00', '#009e73', '#d55e00', '#cc79a7', '#56b4e9']], // Okabe-Ito
+}
+export const paletteColor = (palette, i, accent = '#2563eb') => {
+  const p = PALETTES[palette]?.[1]
+  return p ? p[i % p.length] : i ? SERIES_COLORS[(i - 1) % SERIES_COLORS.length] : accent
+}
+export const seriesColor = (el, i, accent = '#2563eb') => el.series?.[i]?.color || paletteColor(el.palette, i, accent)
 export const isPie = el => el.kind === 'pie' || el.kind === 'donut'
 // a pie's slices are its categories: each has its own colour (catColors), in the same default order
-export const sliceColor = (el, i, accent = '#2563eb') => el.catColors?.[i] || seriesColor({}, i, accent)
+export const sliceColor = (el, i, accent = '#2563eb') => el.catColors?.[i] || paletteColor(el.palette, i, accent)
 // values in percent: which sums are not 100 (a pie: its slices; stacked bars: each category; else each series)
 export function percentOff(el) {
   const cats = el.categories || [], series = el.series || [], sum = a => Math.round(a.reduce((x, v) => x + (v || 0), 0) * 100) / 100
