@@ -331,8 +331,9 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .start-card svg { color: var(--ui-accent); }
 .start-card b { font-size: 14px; }
 .start-card small { color: var(--ui-muted); line-height: 1.45; }
-.start-card.primary { background: linear-gradient(135deg, #2f6fed, #7b4dff); border: 0; color: #fff; font-weight: 400; }
-.start-card.primary svg, .start-card.primary small { color: #fff; opacity: 0.9; }
+.start-card.primary { background: #2f6fed; border: 0; color: #fff; font-weight: 400; }
+.start-card.primary svg, .start-card.primary small { color: #fff; }
+.start-card.primary svg { opacity: 0.9; }
 .error { color: var(--ui-danger); margin-top: 12px; }
 .empty { color: var(--ui-muted); }
 .theme-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px; }
