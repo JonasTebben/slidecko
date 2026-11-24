@@ -10,6 +10,7 @@ import { importPresentations, IMPORT_ACCEPT, download, exportAllProjects } from 
 import { t, lang } from './i18n.js'
 import { TOUR_KEY, begin } from './tour.js'
 import { openTutorial } from './tutorial.js'
+import { HOME_URL } from './support.js'
 
 const emit = defineEmits(['import'])
 const error = ref('')
@@ -83,7 +84,7 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
   <main class="home" :class="{ dragging }" @dragover="over" @dragleave.self="dragging = false" @drop.prevent="onDrop">
     <div v-if="dragging" class="drop-hint" aria-hidden="true"><Icon name="upload" :size="36" /><b>{{ t('Drop to open') }}</b><small>{{ t('Slidev folder, .md, .slides.json, .pptx, .odp, .pdf, .html or images') }}</small></div>
     <header class="home-head">
-      <span class="brand"><Icon name="slides" :size="24" /> Slidecko</span>
+      <a class="brand" :href="HOME_URL"><Icon name="slides" :size="24" /> Slidecko</a>
       <button v-if="deck.id" class="tb" @click="ui.home = false"><Icon name="chevronR" />{{ t('Back to “{0}”', deck.title) }}</button>
     </header>
 
