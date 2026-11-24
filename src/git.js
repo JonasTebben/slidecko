@@ -72,3 +72,50 @@ export async function gitRepo(commits, { author = 'Slidecko <noreply@slidecko.de
   out['.git/index'] = concat(index, await sha1(index))
   return out
 }
+
+const dec = new TextDecoder()
+const unzlib = async b => new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer())
+
+// the current branch's commits, newest first (first parents), as { id, at, message, files: Map(path -> File) }.
+// files: Map(path -> Blob) of the project folder with .git/… in it. Only loose objects are read: a commit whose
+// objects sit in a pack (after git clone or git gc) ends the list, and packed says that packs exist
+export async function readGit(files, max = 50) {
+  const text = async p => (files.has(p) ? (await files.get(p).text()).trim() : null)
+  const head = await text('.git/HEAD')
+  const packed = [...files.keys()].some(p => p.startsWith('.git/objects/pack/') && p.endsWith('.pack'))
+  if (!head) return { commits: [], packed }
+  const ref = head.startsWith('ref: ') ? head.slice(5) : null
+  let id = ref ? (await text('.git/' + ref)) || (await text('.git/packed-refs'))?.split('\n').find(l => l.endsWith(' ' + ref))?.split(' ')[0] : head
+  const object = async h => {
+    const f = files.get(`.git/objects/${h.slice(0, 2)}/${h.slice(2)}`)
+    if (!f) return null
+    const raw = await unzlib(new Uint8Array(await f.arrayBuffer())), z = raw.indexOf(0)
+    return { type: dec.decode(raw.subarray(0, z)).split(' ')[0], body: raw.subarray(z + 1) }
+  }
+  // fills out with path -> File; false when an object is missing
+  const tree = async (h, prefix, out) => {
+    const b = (await object(h))?.body
+    if (!b) return false
+    for (let i = 0; i < b.length;) {
+      const sp = b.indexOf(32, i), nul = b.indexOf(0, sp)
+      const mode = dec.decode(b.subarray(i, sp)), name = dec.decode(b.subarray(sp + 1, nul)), sha = hex(b.subarray(nul + 1, nul + 21))
+      i = nul + 21
+      if (mode === '40000') { if (!(await tree(sha, prefix + name + '/', out))) return false; continue }
+      if (mode === '160000') continue // submodule: no content here
+      const blob = await object(sha)
+      if (!blob) return false
+      out.set(prefix + name, new File([blob.body], name))
+    }
+    return true
+  }
+  const commits = []
+  while (id && commits.length < max) {
+    const o = await object(id)
+    if (o?.type !== 'commit') break
+    const c = dec.decode(o.body), cut = c.indexOf('\n\n'), meta = c.slice(0, cut), files = new Map()
+    if (!(await tree(meta.match(/^tree (\w+)/m)[1], '', files))) break
+    commits.push({ id, at: +(meta.match(/^committer .* (\d+) [+-]\d{4}$/m)?.[1] || 0) * 1000, message: c.slice(cut + 2).trim(), files })
+    id = meta.match(/^parent (\w+)/m)?.[1]
+  }
+  return { commits, packed }
+}

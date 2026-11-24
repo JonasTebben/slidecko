@@ -742,8 +742,8 @@ const readSnaps = async id => { const v = await get('s:' + id); return { list: A
 // its own record and transaction: a full disk fails the snapshot, never the project save.
 // After the queued project writes, so a delete of the project cannot be undone by a late snapshot.
 // shortcut: read-modify-write, two tabs snapshotting the same project at once can drop one snapshot
-function changeSnaps(fn) {
-  const id = deck.id, mine = { ...toRaw(deck.assets) } // in memory: also images deleted since the snapshot's state
+function changeSnaps(fn, extra = {}) {
+  const id = deck.id, mine = { ...toRaw(deck.assets), ...extra } // in memory: also images deleted since the snapshot's state
   const p = saving.then(async () => {
     const v = await readSnaps(id), list = fn(v.list)
     await put('s:' + id, { list, assets: snapAssets(list, { ...v.assets, ...mine }) })
@@ -766,6 +766,8 @@ export async function snapshotsWithData() {
   const v = deck.id ? await readSnaps(deck.id) : { list: [], assets: {} }
   return { list: [...v.list].sort((a, b) => a.at - b.at), assets: v.assets }
 }
+// older versions from elsewhere (a Git history) as snapshots of the open project, with the images they use
+export const importSnapshots = (snaps, assets) => changeSnaps(list => snaps.reduce((l, s) => addSnap(l, s), list), assets)
 export const deleteSnapshot = at => changeSnaps(list => list.filter(s => s.at !== at))
 // the current state becomes a snapshot first, so a restore can itself be restored (and undone: it is a normal edit)
 export async function restoreSnapshot(at) {

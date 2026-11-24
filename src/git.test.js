@@ -34,3 +34,17 @@ test.if(!!git)('git accepts the repository', async () => {
     expect(run('show', 'HEAD~1:slides.md').stdout.toString()).toBe('# Hello\n')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('readGit reads back what gitRepo wrote, newest first', async () => {
+  const repo = await gitRepo(commits)
+  const files = new Map(Object.entries(repo).map(([p, c]) => [p, new Blob([c])]))
+  const { readGit } = await import('./git.js')
+  const { commits: back, packed } = await readGit(files)
+  expect(packed).toBe(false)
+  expect(back.map(c => [c.message, c.at])).toEqual([['Second', 1700000600000], ['First', 1700000000000]])
+  expect(await back[0].files.get('pages/ä b.md').text()).toBe('x')
+  expect(await back[1].files.get('slides.md').text()).toBe('# Hello\n')
+  expect([...new Uint8Array(await back[1].files.get('public/a.png').arrayBuffer())]).toEqual([1, 2, 3])
+  // objects missing (as in a packed repository): an empty list instead of an error
+  expect((await readGit(new Map([['.git/HEAD', new Blob(['ref: refs/heads/main\n'])], ['.git/refs/heads/main', new Blob(['ab'.repeat(20)])]]))).commits).toEqual([])
+})

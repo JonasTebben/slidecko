@@ -1,6 +1,6 @@
 import { toggleList } from './lists.js'
 import { computed, nextTick, ref } from 'vue'
-import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData } from './store.js'
+import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
 import { ELEMENTS } from './presets.js'
 import { importSlidev } from './importSlidev.js'
 import { formatSize, parseRatio } from './format.js'
@@ -437,9 +437,31 @@ export const importProject = (files, entry, replace) => run(async () => {
   if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition // the headmatter's transition is the project default, not slide 1's own
   const slideFiles = new Set([entry, ...r.slides.map(s => s.file)])
   const source = files[0]?.webkitRelativePath?.split('/')[0] || ''
-  await createProject({ title: source || entry.replace(/\.md$/, ''), source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
-  toast(await importReport(r), 8000)
+  const title = source || entry.replace(/\.md$/, '')
+  await createProject({ title, source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
+  const git = map.has('.git/HEAD') ? await gitVersions(map, entry, title, source) : ''
+  toast(await importReport(r) + git, 8000)
 })
+// a Git repository in the folder: its older commits become the project's version history (the folder itself is the current state)
+async function gitVersions(map, entry, title, source) {
+  try {
+    const { readGit } = await import('./git.js')
+    const { commits, packed } = await readGit(map, SNAP_MAX + 1)
+    const snaps = [], assets = {}
+    for (const c of commits.slice(1)) {
+      if (!c.files.has(entry)) continue // that version had no such entry file
+      toast(t('Reading version {0} of {1} …', snaps.length + 1, commits.length - 1), 0)
+      const md = await c.files.get(entry).text(), theme = detectTheme(md), v = await importSlidev(entry, c.files, theme)
+      Object.assign(assets, v.assets)
+      // Git keeps whole seconds: versions from the same second still get their own time (restore finds them by it)
+      const at = Math.min(c.at, (snaps.at(-1)?.at ?? Infinity) - 1)
+      snaps.push({ at, slides: v.slides.length, json: JSON.stringify({ title, source, theme, entry, aspectRatio: v.aspectRatio, canvasWidth: v.canvasWidth, transition: v.transition, duration: v.duration, slides: v.slides }) })
+    }
+    if (snaps.length) await importSnapshots(snaps, assets)
+    return (snaps.length ? ' · ' + t('{0} from Git in the version history', n(snaps.length, 'version', 'versions')) : '') +
+      (packed ? ' · ' + t('older Git versions are packed (after git clone or git gc) and were not read') : '')
+  } catch (e) { return ' · ' + t('Git history could not be read: {0}', e.message) }
+}
 // presentations from other programs, one new project each: .pptx, .odp, .pdf, .html (own export), images (one slide each)
 export const IMPORT_ACCEPT = '.pptx,.potx,.odp,.otp,.pdf,.html,.htm,.zip,image/*'
 // what restoreProject did with the projects of one file, as a toast
@@ -465,6 +487,18 @@ export const importPresentations = files => run(async () => {
         for (const z of saved) how.push(await restoreProject(JSON.parse(await z.async('text'))))
         ui.home = true
         restored(f.name, how)
+        continue
+      }
+      // a Slidecko / Slidev project (also the Git project export): opened like its folder, Git versions included
+      const md = zip && !page && Object.values(zip.files).find(z => /^([^/]+\/)?slides\.md$/.test(z.name) && !z.name.includes('node_modules'))
+      if (md) {
+        const root = md.name.slice(0, -'slides.md'.length), name = f.name.replace(/\.zip$/i, '').replace(/-(git|slidev)$/, '')
+        const files = await Promise.all(Object.values(zip.files).filter(z => !z.dir && z.name.startsWith(root)).map(async z => {
+          const file = new File([await z.async('uint8array')], z.name.split('/').pop())
+          Object.defineProperty(file, 'webkitRelativePath', { value: `${name}/${z.name.slice(root.length)}` }) // as from a folder pick
+          return file
+        }))
+        await importProject(files, 'slides.md')
         continue
       }
       if (zip && !page) throw new Error(t('{0}: not an HTML presentation from Slidecko (index.html missing)', f.name))

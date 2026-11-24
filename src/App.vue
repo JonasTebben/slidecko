@@ -1052,7 +1052,7 @@ function onClipboard(e) {
           <Menu :label="t('File')">
             <button class="mi" @click="ui.home = true"><Icon name="home" />{{ t('All projects') }}</button>
             <hr />
-            <label class="mi"><Icon name="folder" />{{ t('Open Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
+            <label class="mi"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
