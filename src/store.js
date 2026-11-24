@@ -189,8 +189,14 @@ export function cleanEl(e) {
     // TeX source of a formula, rendered by KaTeX (math.js, no trust: no links or pictures); capped like typed code
     case 'math': return { ...base, tex: (str(e.tex) || '').slice(0, 5000), ...(color(e.color) && { color: color(e.color) }) }
     case 'video': return /^[\w-]{6,20}$/.test(e.youtube) ? { ...base, youtube: e.youtube } : null
-    // countdown length in seconds (0: counts up), started by a click while presenting
-    case 'timer': return { ...base, seconds: Math.round(num(e.seconds, 0, 359999)), ...(color(e.color) && { color: color(e.color) }) }
+    // countdown length in seconds (0: a stopwatch), started by a click while presenting; face: ring or bar around the digits
+    // in accent (default: the theme's), fill: its background, warn: a countdown's last minute in red, auto, silent
+    case 'timer': return {
+      ...base, seconds: Math.round(num(e.seconds, 0, 359999)), ...(color(e.color) && { color: color(e.color) }),
+      ...(['ring', 'bar'].includes(e.face) && { face: e.face }), ...(color(e.accent) && { accent: color(e.accent) }),
+      ...(color(e.fill) && { fill: color(e.fill) }), ...(e.warn === true && { warn: true }),
+      ...(e.auto === true && { auto: true }), ...(e.silent === true && { silent: true }), // starts when visible; no sound at the end
+    }
     // names or groups to draw from while presenting: plain text, trimmed, at most 200 of 100 characters
     case 'picker': return {
       ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),

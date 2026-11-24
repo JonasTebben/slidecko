@@ -131,6 +131,18 @@
 .slide .el.timer .timer-face.done { animation: timer-done 1s steps(2, jump-none) infinite; }
 @keyframes timer-done { 50% { opacity: .25; } }
 .presenter .timer-face, .deck .timer-face { cursor: pointer; }
+/* timer designs: --p is the share shown (timer.js progress), --timer-accent the element's accent or the theme's */
+.slide .el.timer .timer-face { position: relative; --timer-accent: var(--accent); }
+.slide .el.timer .timer-face p { position: relative; }
+.slide .el.timer .timer-face.filled { border-radius: 12px; }
+.slide .el.timer .timer-face.ring::before { content: ''; position: absolute; top: 4%; bottom: 4%; left: 50%; aspect-ratio: 1; max-width: 96%; transform: translateX(-50%); border-radius: 50%;
+  background: conic-gradient(var(--timer-accent) calc(var(--p) * 1turn), color-mix(in srgb, var(--timer-accent) 18%, transparent) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9%), #000 calc(100% - 9% + 1px)); mask: radial-gradient(farthest-side, transparent calc(100% - 9%), #000 calc(100% - 9% + 1px)); }
+.slide .el.timer .timer-face.bar { padding-bottom: 14%; }
+.slide .el.timer .timer-face.bar::after { content: ''; position: absolute; left: 8%; right: 8%; bottom: 10%; height: max(6px, 7%); border-radius: 999px;
+  background: linear-gradient(to right, var(--timer-accent) calc(var(--p) * 100%), color-mix(in srgb, var(--timer-accent) 18%, transparent) 0); }
+/* the last minute of a countdown ("last minute in red"); the ring and bar turn red too */
+.slide .el.timer .timer-face.warn { color: #dc2626; --timer-accent: #dc2626; }
 /* table of contents (Slidev's <Toc>): nested lists of slide links; the slide it sits on is marked when asked */
 .slide .el.toc .toc { height: 100%; overflow: hidden; column-gap: 32px; }
 .slide .el.toc li { break-inside: avoid; }
@@ -140,9 +152,14 @@
 /* random picker: the drawn name large, how many are left small; a short pop-in (off with reduced motion) */
 .slide .el.picker .picker-face { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; user-select: none; }
 .slide .el.picker .picker-face p { margin: 0; }
-.slide .el.picker .picker-face .label { font-size: .5em; }
+.slide .el.picker .picker-face { border-radius: 16px; background: color-mix(in srgb, var(--accent) 9%, transparent); border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.slide .el.picker .picker-face .label { display: flex; flex-direction: column; align-items: center; gap: .12em; }
+.slide .el.picker .picker-face .label strong { font-size: .5em; }
+.slide .el.picker .picker-face .die { width: .7em; height: .7em; fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.slide .el.picker .picker-face .die circle { fill: var(--accent); stroke: none; }
 .slide .el.picker .picker-face small { font-size: .3em; font-weight: 400; opacity: .75; margin-top: .3em; }
-.slide .el.picker .picker-face .pick { animation: pick-in .3s ease-out; }
+.slide .el.picker .picker-face .pick + small { padding: .15em .7em; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); opacity: 1; }
+.slide .el.picker .picker-face .pick { animation: pick-in .4s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes pick-in { from { transform: scale(.6); opacity: 0; } }
 .presenter .picker-face, .deck .picker-face { cursor: pointer; }
 /* quiz: tiles in the theme's own colours (fg on bg stays AA); the solution in a fixed green with white text (AA) */

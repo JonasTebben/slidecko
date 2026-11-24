@@ -13,7 +13,7 @@ import { pasteHtml } from './paste.js'
 import { toggleList, undoList, typed, indent, autoList } from './lists.js'
 import { t } from './i18n.js'
 import { longPressFired } from './longpress.js'
-import { clock, shown, done, running, toggle, reset } from './timer.js'
+import { face, progress, warning, done, running, toggle, reset, autostart } from './timer.js'
 import * as picker from './picker.js'
 import { diagramSrc } from './diagram.js'
 import { withMath, formulaHtml } from './math.js'
@@ -465,6 +465,10 @@ function layoutMarks() {
   }
   if (JSON.stringify(out) !== JSON.stringify(marks.value)) marks.value = out
 }
+// presenting: timers set to start by themselves do so once they are visible (their click step reached)
+watch(() => props.live && props.step, () => {
+  if (props.live) autostart(props.slide.elements.filter(e => e.type === 'timer' && (e.click ? stepOf(props.slide, e, steps.value) : 0) <= (props.step ?? Infinity)))
+}, { immediate: true })
 onMounted(() => { layoutMarks(); document.fonts?.addEventListener('loadingdone', layoutMarks); document.fonts?.ready.then(layoutMarks) })
 onUpdated(layoutMarks)
 onBeforeUnmount(() => document.fonts?.removeEventListener('loadingdone', layoutMarks))
@@ -504,7 +508,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, '--out-h': el.outH ? el.outH + 'px' : null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
       :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
-      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram', toc: 'Table of contents', icon: 'Icon', math: 'Formula' }[el.type]) : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random draw', chart: 'Chart', diagram: 'Diagram', toc: 'Table of contents', icon: 'Icon', math: 'Formula' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
@@ -556,13 +560,15 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         <button v-if="!ui.yt" class="yt-consent" @pointerdown.stop @click.stop="ui.yt = true">{{ t('Load YouTube content') }}<small>{{ t('This sends data to Google.') }}</small></button>
       </div>
       <!-- while presenting a click starts or pauses it, a double click sets it back -->
-      <div v-else-if="el.type === 'timer'" class="content timer-face" :class="{ running: live && running(el.id), done: live && done(el) }" :data-timer="el.seconds"
-        :role="live ? 'button' : null" :aria-label="live ? t('Start or pause the timer') : null" @click="live && toggle(el)" @dblclick="live && reset(el.id)"><p>{{ clock(live ? shown(el) : el.seconds) }}</p></div>
+      <div v-else-if="el.type === 'timer'" class="content timer-face" :class="[el.face, { running: live && running(el.id), done: live && done(el), warn: warning(el, live), filled: el.fill }]"
+        :data-timer="el.seconds" :data-warn="el.warn ? 1 : null" :data-auto="el.auto ? 1 : null" :data-silent="el.silent ? 1 : null" :style="{ '--p': progress(el, live), '--timer-accent': (!warning(el, live) && el.accent) || null, background: el.fill || null }"
+        :role="live ? 'button' : null" :aria-label="live ? t(el.seconds ? 'Start or pause the timer' : 'Start or pause the stopwatch') : null" @click="live && toggle(el)" @dblclick="live && reset(el.id)"><p>{{ face(el, live) }}</p></div>
       <!-- while presenting a click draws a name (nobody twice until everyone was drawn), a double click starts over; data-left is for the HTML export -->
       <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-left="t('{0} of {1} left', '{0}', '{1}')" :role="live ? 'button' : null"
         :aria-label="live ? t('Draw a name') : null" :aria-live="live ? 'polite' : null" @click="live && picker.next(el)" @dblclick="live && picker.reset(el.id)">
         <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small>{{ t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) }}</small></template>
-        <p v-else class="label">🎲 {{ t('Random pick ({0})', el.names.length) }}</p>
+        <span v-else class="label"><svg class="die" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" /><circle cx="8.5" cy="8.5" r="1.4" /><circle cx="15.5" cy="15.5" r="1.4" /><circle cx="15.5" cy="8.5" r="1.4" /><circle cx="8.5" cy="15.5" r="1.4" /><circle cx="12" cy="12" r="1.4" /></svg>
+          <strong>{{ t('Who’s next?') }}</strong><small>{{ t('Click to draw · {0}', t(el.names.length === 1 ? '{0} name' : '{0} names', el.names.length)) }}</small></span>
       </div>
       <!-- while presenting a click on a tile marks it (the class's vote), the button shows the solution; the labels are for the HTML export -->
       <div v-else-if="el.type === 'quiz'" class="content quiz" :class="{ revealed: el.solved || (live && quiz.shown[el.id]) }" :data-reveal="t('Reveal')" :data-hide="t('Hide')">

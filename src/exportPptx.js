@@ -480,9 +480,10 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points
       const sh = SHADOWS[m.shadow] && { shadow: { type: 'outer', angle: 90, blur: SHADOWS[m.shadow].blur * PT, offset: SHADOWS[m.shadow].y * PT, color: '000000', opacity: SHADOWS[m.shadow].a } }
-      if (el.classList.contains('math') || (type === 'text' && el.querySelector('.katex'))) {
+      // a timer with a ring, bar or background and the draw card: the same picture route (their text as alt text)
+      if (el.classList.contains('math') || (type === 'text' && el.querySelector('.katex')) || (m.type === 'timer' && (m.face || m.fill)) || m.type === 'picker') {
         const data = await mathPicture(el, root)
-        if (data) slide.addImage({ data, ...box(el), ...sh, altText: m.type === 'math' ? m.tex : sourceText(m.html) })
+        if (data) slide.addImage({ data, ...box(el), ...sh, altText: m.type === 'math' ? m.tex : ['timer', 'picker'].includes(m.type) ? el.textContent.replace(/\s+/g, ' ').trim() : sourceText(m.html) })
         continue
       }
       if (type === 'image' && !el.querySelector('img')?.naturalWidth) continue // broken picture: nothing to export

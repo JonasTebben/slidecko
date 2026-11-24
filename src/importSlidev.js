@@ -218,7 +218,7 @@ function measure(slide, parsed) {
       const c = getComputedStyle(n).color // a colour class (text-red-500)
       if (el.color === 'currentColor' && c !== getComputedStyle(n.parentElement).color) el.color = c
     } else if (n.dataset.timer) {
-      Object.assign(el, { type: 'timer', seconds: +n.dataset.timer || 0 })
+      Object.assign(el, { type: 'timer', seconds: +n.dataset.timer || 0, face: n.dataset.face, accent: n.dataset.accent, fill: n.dataset.fill, warn: n.dataset.warn === '1', auto: n.dataset.auto === '1', silent: n.dataset.silent === '1' }) // cleanEl checks them
     } else if (n.dataset.picks) {
       let names = []
       try { names = JSON.parse(n.dataset.picks) } catch { /* a broken list: an empty picker, cleanEl checks the rest */ }

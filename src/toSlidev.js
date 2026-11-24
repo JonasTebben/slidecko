@@ -172,8 +172,10 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
     }
     case 'shape':
       return `<div data-shape="${el.shape}" data-fill="${el.fill}" data-stroke="${el.stroke}" data-sw="${el.strokeWidth || 0}" data-radius="${el.radius || 0}"${el.fillAlpha != null ? ` data-alpha="${el.fillAlpha}"` : ''} style="${boxStyle(el)}">${shapeSvg(el)}${el.html ? `<div class="shape-text" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;text-align:${el.align || 'center'}"><div${curShapeFont[el.id] ? ` style="font-size:${curShapeFont[el.id]}"` : ''}>${el.html}</div></div>` : ''}</div>`
-    case 'timer': // Slidev has no timer: its start value as text, data-timer brings it back on import
-      return `<div data-timer="${el.seconds}" style="${boxStyle(el)}">\n\n${clock(el.seconds)}\n\n</div>`
+    case 'timer': { // Slidev has no timer: its start value as text, the data-* attributes bring it back on import
+      const more = (el.face ? ` data-face="${el.face}"` : '') + (el.accent ? ` data-accent="${el.accent}"` : '') + (el.fill ? ` data-fill="${el.fill}"` : '') + (el.warn ? ' data-warn="1"' : '') + (el.auto ? ' data-auto="1"' : '') + (el.silent ? ' data-silent="1"' : '')
+      return `<div data-timer="${el.seconds}"${more} style="${boxStyle(el)}">\n\n${el.seconds ? clock(el.seconds) : clock(0, true)}\n\n</div>`
+    }
     case 'picker': // Slidev has no picker: the names as text, data-picks (JSON, one line) brings them back on import
       return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
     case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import

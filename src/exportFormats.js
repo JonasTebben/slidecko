@@ -147,6 +147,7 @@ const stepsOf = s => +s.dataset.steps || 0
 let k = 0
 function reveal() {
   for (const e of slides[i].querySelectorAll('[data-click], [data-until]')) e.classList.toggle('unshown', k < +(e.dataset.click || 0) || (+e.dataset.until > 0 && k >= +e.dataset.until))
+  for (const f of slides[i].querySelectorAll('.timer-face[data-auto]')) if (!f.closest('.unshown')) f.start?.() // shown: an auto timer starts
   for (const pre of slides[i].querySelectorAll('pre[data-stages]')) {
     const stage = String(pre.dataset.stages.split(' ').filter(n => +n <= k).length)
     for (const l of pre.querySelectorAll('.line[data-on]')) l.classList.toggle('dim', !l.dataset.on.split(' ').includes(stage))
@@ -196,20 +197,31 @@ addEventListener('keydown', e => {
   else return
   e.preventDefault()
 })
-// timers: a click starts or pauses, a double click sets back, a run-out countdown starts over (same as in the editor)
-const clock = sec => { sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + s : m + ':' + s }
+// timers: a click starts or pauses, a double click sets back, a run-out countdown starts over (same as in the editor, timer.js);
+// a stopwatch shows tenths, ring and bar follow --p, data-warn: the last minute in red, data-auto: starts when visible, a sound at the end unless data-silent
+const clock = (sec, tenths) => { if (tenths) { const t = Math.floor(Math.max(0, sec) * 10 + 1e-6); return clock(Math.floor(t / 10)) + '.' + (t % 10) } sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + s : m + ':' + s }
+let audio
+const chime = () => { try { audio ||= new AudioContext(); for (const k of [0, 1, 2]) { const o = audio.createOscillator(), g = audio.createGain(), at = audio.currentTime + k * 0.3; o.frequency.value = 880; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.4, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.25); o.connect(g).connect(audio.destination); o.start(at); o.stop(at + 0.26) } } catch {} }
 for (const f of document.querySelectorAll('.timer-face')) {
   const total = +f.dataset.timer || 0, p = f.querySelector('p')
-  let acc = 0, since = 0, tick = null
+  let acc = 0, since = 0, tick = null, rung = false
   const left = () => { const e = (acc + (since ? Date.now() - since : 0)) / 1000; return total ? Math.max(0, total - e) : e }
-  const draw = () => { p.textContent = clock(left()); f.classList.toggle('done', !!total && left() <= 0) }
-  const run = on => { clearInterval(tick); tick = on ? setInterval(draw, 250) : null; draw() }
+  const draw = () => {
+    const l = left()
+    p.textContent = total ? clock(l) : clock(l, true)
+    f.style.setProperty('--p', total ? l / total : (l % 60) / 60)
+    f.classList.toggle('done', !!total && l <= 0)
+    f.classList.toggle('warn', !!f.dataset.warn && !!total && l > 0 && l <= 60)
+    if (total && since && l <= 0 && !rung) { rung = true; if (!f.dataset.silent) chime() }
+  }
+  const run = on => { clearInterval(tick); tick = on ? setInterval(draw, 100) : null; draw() }
+  f.start = () => { if (!since && !acc) { since = Date.now(); run(true) } } // data-auto, once
   f.addEventListener('click', e => {
     e.stopPropagation()
-    if (total && left() <= 0) { acc = 0; since = Date.now() } else if (since) { acc += Date.now() - since; since = 0 } else since = Date.now()
+    if (total && left() <= 0) { acc = 0; since = Date.now(); rung = false } else if (since) { acc += Date.now() - since; since = 0 } else since = Date.now()
     run(!!since)
   })
-  f.addEventListener('dblclick', () => { acc = 0; since = 0; run(false) })
+  f.addEventListener('dblclick', () => { acc = 0; since = 0; rung = false; run(false) })
 }
 // quizzes: a click marks an answer, the button (or Q) shows the solution (same as in the editor)
 for (const q of document.querySelectorAll('.el > .quiz')) {

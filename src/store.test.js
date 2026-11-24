@@ -253,3 +253,10 @@ test('cleanEl: missing optional keys stay absent (not set to undefined)', () => 
   const e = S.cleanEl({ type: 'shape', shape: 'rect' })
   for (const k of ['group', 'morph', 'mid']) assert.ok(!(k in e), k)
 })
+
+test('a timer keeps its design and options, nothing else', () => {
+  const t = S.cleanEl({ type: 'timer', seconds: 120, face: 'ring', accent: '#dc2626', fill: '#fef3c7', warn: true, auto: true, silent: true })
+  assert.deepEqual([t.face, t.accent, t.fill, t.warn, t.auto, t.silent], ['ring', '#dc2626', '#fef3c7', true, true, true])
+  const bad = S.cleanEl({ type: 'timer', seconds: 0, face: 'spiral', accent: 'url(x)', warn: 'yes', auto: 1 })
+  assert.deepEqual([bad.face, bad.accent, bad.warn, bad.auto], [undefined, undefined, undefined, undefined])
+})

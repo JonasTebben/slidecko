@@ -117,6 +117,7 @@ function textColor(c) {
 }
 // colour chips show the current colour; "none" is the crossed swatch, several different ones a neutral grey
 const NONE = 'linear-gradient(135deg, #fff 45%, var(--ui-danger) 45% 55%, #fff 55%)'
+const lastCountdown = ref(600) // Stopwatch and back: the countdown keeps its length
 const chip = (c, none = NONE) => ({ '--chip': c === null ? 'var(--ui-line-strong)' : !c || c === 'none' ? none : c })
 // menus that act on the words being typed open without taking the focus (editing ends on blur), like the context menu
 let wasOpen = false
@@ -593,8 +594,37 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       </Sec>
 
       <Sec v-else-if="el.type === 'timer'" id="timer" icon="timer" :title="t('Timer')">
-        <label class="field">{{ t('Duration (minutes or m:ss, 0 counts up)') }}
-          <input :value="clock(el.seconds)" inputmode="numeric" @change="el.seconds = parseClock($event.target.value) ?? el.seconds; $event.target.value = clock(el.seconds)" /></label>
+        <div class="seg" role="group" :aria-label="t('Kind')">
+          <button class="ib grow" :class="{ on: el.seconds }" :aria-pressed="!!el.seconds" @click="el.seconds ||= lastCountdown">{{ t('Countdown') }}</button>
+          <button class="ib grow" :class="{ on: !el.seconds }" :aria-pressed="!el.seconds" @click="lastCountdown = el.seconds || lastCountdown; el.seconds = 0">{{ t('Stopwatch') }}</button>
+        </div>
+        <label v-if="el.seconds" class="field">{{ t('Duration (minutes or m:ss)') }}
+          <input :value="clock(el.seconds)" inputmode="numeric" @change="el.seconds = parseClock($event.target.value) || el.seconds; $event.target.value = clock(el.seconds)" /></label>
+        <div v-if="el.seconds" class="seg" role="group" :aria-label="t('Common durations')">
+          <button v-for="m in [1, 2, 5, 10, 15, 20]" :key="m" class="ib grow" :class="{ on: el.seconds === m * 60 }" :aria-pressed="el.seconds === m * 60" :title="t('{0} min', m)" @click="el.seconds = m * 60">{{ m }}</button>
+        </div>
+        <label class="check"><input type="checkbox" :checked="!!el.auto" @change="el.auto = $event.target.checked || undefined" /> {{ t('Starts when the slide appears') }}</label>
+        <label v-if="el.seconds" class="check"><input type="checkbox" :checked="!el.silent" @change="el.silent = !$event.target.checked || undefined" /> {{ t('Sound when the time is up') }}</label>
+        <label v-if="el.seconds" class="check"><input type="checkbox" :checked="!!el.warn" @change="el.warn = $event.target.checked || undefined" /> {{ t('Last minute in red') }}</label>
+        <div class="field">{{ t('Design') }}
+          <div class="seg" role="group" :aria-label="t('Design')">
+            <button v-for="[f, n] in [[undefined, 'Digits'], ['ring', 'Ring'], ['bar', 'Bar']]" :key="n" class="ib grow" :class="{ on: el.face === f }" :aria-pressed="el.face === f" @click="el.face = f">{{ t(n) }}</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <span v-if="el.face" class="chip" :style="chip(el.accent, 'var(--ui-accent)')"><Menu icon="brush" :label="t('Accent')" :title="t('Colour of the ring or bar')">
+            <div class="swatches pop-sw">
+              <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.accent === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.accent === c" @click="el.accent = c" />
+              <button class="sw none" :title="t('Theme color')" :aria-label="t('Theme color')" :aria-pressed="!el.accent" @click="el.accent = undefined" />
+            </div>
+          </Menu></span>
+          <span class="chip" :style="chip(el.fill)"><Menu icon="fill" :label="t('Fill')" :title="t('Background')">
+            <div class="swatches pop-sw">
+              <button v-for="c in FILLS" :key="c" class="sw" :class="{ on: el.fill === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.fill === c" @click="el.fill = c" />
+              <button class="sw none" :title="t('No background')" :aria-label="t('No background')" :aria-pressed="!el.fill" @click="el.fill = undefined" />
+            </div>
+          </Menu></span>
+        </div>
         <div class="btn-row">
           <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
           <span class="chip" :style="chip(el.color, 'currentColor')"><Menu icon="fontColor" :title="t('Text color')">
@@ -606,7 +636,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </div>
       </Sec>
 
-      <Sec v-else-if="el.type === 'picker'" id="picker" icon="dice" :title="t('Random picker')">
+      <Sec v-else-if="el.type === 'picker'" id="picker" icon="dice" :title="t('Random draw')">
         <!-- the same limits as when loading a project -->
         <label class="field">{{ t('Names or groups, one per line') }}
           <textarea :value="el.names.join('\n')" rows="8" maxlength="20000" @change="el.names = cleanEl({ type: 'picker', names: $event.target.value.split('\n') }).names" /></label>
