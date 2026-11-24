@@ -16,10 +16,12 @@ import { clock, parseClock } from './timer.js'
 import { LETTERS } from './quiz.js'
 import { t } from './i18n.js'
 import { morphSlides } from './morph.js'
-import { PALETTE, FILLS, SHAPE_NAMES, DIAGRAMS } from './presets.js'
+import { PALETTE, FILLS, SHAPE_NAMES, DIAGRAMS, FORMULAS } from './presets.js'
+import { picker as iconPicker } from './icons.js'
 import { diagram } from './diagram.js'
 import { MARKS, MARK_NAMES, MARK_COLORS, markAt, setMark, markSteps } from './marks.js'
 import { themeOf } from './themes.js'
+import { mathError, formulaHtml } from './math.js'
 
 const emit = defineEmits(['link', 'markdown'])
 const el = computed(() => (selection.value.length === 1 ? primary.value : null))
@@ -199,7 +201,9 @@ const TIPS = {
   picker: 'While presenting: a click draws a name, nobody twice until everyone was drawn; a double click starts over.',
   quiz: 'While presenting: a click marks an answer, “Reveal” (or Q) shows the solution.',
   diagram: 'Mermaid syntax (mermaid.js.org): flowchart, sequence, class, state, gantt, pie, mind map and more. In Slidev it is rendered by Slidev itself.',
+  math: 'TeX as in Slidev and LaTeX (rendered by KaTeX). In text boxes, write $…$ inside a line and $$…$$ for a centred formula; \\$ is a dollar sign.',
   video: 'Plays while presenting; in Slidev as a <Youtube> component.',
+  icon: 'Double-click to choose another icon. In Slidev it is an Iconify component like <mdi-home />.',
   chart: 'Copy cells in Excel, Sheets or Numbers and paste them into the top-left cell of the data: the first row names the series, the first column the categories.',
 }
 // Mermaid code: rendered a moment after typing stops (one render, one undo step, not one per key)
@@ -553,6 +557,24 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </Sec>
       </template>
 
+      <Sec v-else-if="el.type === 'icon'" id="icon" icon="smile" :title="t('Icon')">
+        <button class="ib wide" :title="el.icon" @click="Object.assign(iconPicker, { open: true, target: el.id })"><Icon name="search" /> {{ t('Change icon …') }}</button>
+        <div class="btn-row">
+          <span class="chip" :style="chip(el.color === 'currentColor' ? themeStyle(deck.theme)['--fg'] : el.color || themeStyle(deck.theme)['--accent'])"><Menu icon="fontColor" :title="t('Color')">
+            <div class="swatches pop-sw">
+              <button class="sw" :class="{ on: !el.color }" :style="{ background: themeStyle(deck.theme)['--accent'] }" :title="t('Theme accent')" :aria-label="t('Theme accent')" :aria-pressed="!el.color" @click="el.color = undefined" />
+              <button class="sw" :class="{ on: el.color === 'currentColor' }" :style="{ background: themeStyle(deck.theme)['--fg'] }" :title="t('Theme text color')" :aria-label="t('Theme text color')" :aria-pressed="el.color === 'currentColor'" @click="el.color = 'currentColor'" />
+              <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.color === c" @click="el.color = c" />
+            </div>
+          </Menu></span>
+          <button class="ib" :aria-label="t('Rotate 90°')" :title="t('Rotate 90°')" @click="el.rotate = ((el.rotate || 0) + 1) % 4 || undefined"><Icon name="rotate" /></button>
+          <button v-for="[f, n, lbl] in [['h', 'flipH', 'Flip horizontally'], ['v', 'flipV', 'Flip vertically']]" :key="f" class="ib" :class="{ on: el.flip?.includes(f) }" :aria-pressed="!!el.flip?.includes(f)" :aria-label="t(lbl)" :title="t(lbl)"
+            @click="el.flip = ['h', 'v'].filter(k => (k === f) !== !!el.flip?.includes(k)).join('') || undefined"><Icon :name="n" /></button>
+        </div>
+        <label class="field">{{ t('Description for screen readers (empty: decorative)') }}
+          <input :value="el.label || ''" maxlength="200" @change="el.label = $event.target.value.trim() || undefined" /></label>
+      </Sec>
+
       <Sec v-else-if="el.type === 'timer'" id="timer" icon="timer" :title="t('Timer')">
         <label class="field">{{ t('Duration (minutes or m:ss, 0 counts up)') }}
           <input :value="clock(el.seconds)" inputmode="numeric" @change="el.seconds = parseClock($event.target.value) ?? el.seconds; $event.target.value = clock(el.seconds)" /></label>
@@ -605,6 +627,25 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="field">{{ t('Mermaid code') }}
           <textarea :key="el.id" class="diagram-code" :value="el.code" rows="10" maxlength="20000" spellcheck="false" autocapitalize="off" @input="setDiagram(el, $event.target.value)" /></label>
         <p v-if="dia?.error" class="error diagram-error" role="alert">{{ t('The code has an error; the slide shows the last working diagram.') }} <small>{{ dia.error }}</small></p>
+      </Sec>
+
+      <Sec v-else-if="el.type === 'math'" id="math" icon="formula" :title="t('Formula')">
+        <select :aria-label="t('Start from a template')" @change="el.tex = FORMULAS[$event.target.value][1]; $event.target.value = ''">
+          <option value="">{{ t('Start from a template …') }}</option><option v-for="(f, k) in FORMULAS" :key="k" :value="k">{{ t(f[0]) }}</option>
+        </select>
+        <label class="field">{{ t('TeX code') }}
+          <textarea :key="el.id" class="diagram-code" :value="el.tex" rows="5" maxlength="5000" spellcheck="false" autocapitalize="off" @input="el.tex = $event.target.value" /></label>
+        <div class="math-preview" :aria-label="t('Preview')" v-html="formulaHtml(el.tex)" />
+        <p v-if="mathError(el.tex)" class="error diagram-error" role="alert">{{ t('The TeX code has an error.') }} <small>{{ mathError(el.tex) }}</small></p>
+        <div class="btn-row">
+          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96]" :key="s" :value="s">{{ s }} px</option></select>
+          <span class="chip" :style="chip(el.color, 'currentColor')"><Menu icon="fontColor" :title="t('Text color')">
+            <div class="swatches pop-sw">
+              <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.color === c" @click="el.color = c" />
+              <button class="sw none" :title="t('Theme color')" :aria-label="t('Theme color')" :aria-pressed="!el.color" @click="el.color = undefined" />
+            </div>
+          </Menu></span>
+        </div>
       </Sec>
 
       <Sec v-else-if="el.type === 'video'" id="video" icon="video" :title="t('Video')">

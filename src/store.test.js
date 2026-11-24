@@ -227,3 +227,22 @@ test('layouts: deleting one moves its slides to the default layout, keeping thei
   S.removeLayout('c', d)
   assert.equal(d.layouts.length, 1)
 })
+
+test('icon: set:name pattern, SVG body without scripts or outside links, view box, turns, flips and label', async () => {
+  const { default: DOMPurify } = await import('dompurify')
+  DOMPurify.sanitize ??= String // no DOM here: the pre-check is under test, DOMPurify's SVG profile runs in the browser
+  const body = '<path fill="currentColor" d="M0 0h24v24z"/>'
+  const ok = S.cleanEl({ type: 'icon', icon: 'mdi:home', body, view: '0 0 24 24', rotate: 2, flip: 'hv', label: '  Home ', color: 'currentColor' })
+  const { icon, view, rotate, flip, label, color } = ok
+  assert.deepEqual({ icon, body: ok.body, view, rotate, flip, label, color }, { icon: 'mdi:home', body, view: '0 0 24 24', rotate: 2, flip: 'hv', label: 'Home', color: 'currentColor' })
+  for (const icon of ['home', 'mdi:Home', 'mdi:../x', 'mdi:home"', ':home', 'mdi:']) assert.equal(S.cleanEl({ type: 'icon', icon, body }), null, icon)
+  for (const bad of ['<script>alert(1)</script>', '<path onload="x" d="M0"/>', '<a href="https://x"><path d="M0"/></a>', '<use href="https://x/y.svg#a"/>', '<path fill="url(https://x)"/>', '<foreignObject><p>x</p></foreignObject>', '<image href="x.png"/>', '<animate attributeName="href" to="javascript:alert(1)"/>', '', 42])
+    assert.equal(S.cleanEl({ type: 'icon', icon: 'mdi:home', body: bad }), null, String(bad))
+  const odd = S.cleanEl({ type: 'icon', icon: 'mdi:home', body: '<use href="#a"/>', view: '0 0 24 x', rotate: 4, flip: 'x', color: 'red;x' })
+  assert.deepEqual([odd.view, odd.rotate, odd.flip, odd.color], ['0 0 24 24', undefined, undefined, undefined])
+})
+
+test('cleanEl: missing optional keys stay absent (not set to undefined)', () => {
+  const e = S.cleanEl({ type: 'shape', shape: 'rect' })
+  for (const k of ['group', 'morph', 'mid']) assert.ok(!(k in e), k)
+})

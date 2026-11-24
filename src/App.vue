@@ -8,10 +8,16 @@ import Inspector from './Inspector.vue'
 import Home from './Home.vue'
 import ThemeEditor from './ThemeEditor.vue'
 import MasterPanel from './MasterPanel.vue'
+import Overview from './Overview.vue'
+import Recorder from './Recorder.vue'
+import { capturing } from './recording.js'
 import { tour, begin } from './tour.js'
 const Tour = defineAsyncComponent(() => import('./Tour.vue')) // loaded only when someone takes the tour
 import { tutorial, openTutorial } from './tutorial.js'
 const MarkdownTutorial = defineAsyncComponent(() => import('./MarkdownTutorial.vue')) // loaded on first open
+import { picker as iconPicker } from './icons.js'
+const IconPicker = defineAsyncComponent(() => import('./IconPicker.vue')) // loaded on first open, the icon sets on first search
+const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./A11yPanel.vue'))
 import { checkDeck } from './a11yCheck.js'
 import { t, lang } from './i18n.js'
@@ -342,7 +348,7 @@ onMounted(async () => {
   addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault() })
   addEventListener('drop', onWindowDrop)
   addEventListener('resize', fitPresenter)
-  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) presenting.value = false })
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !capturing.on) presenting.value = false })
   setInterval(() => { now.value = Date.now() }, 1000)
 })
 const stageObserver = new ResizeObserver(([e]) => { stageBox = e.contentRect; fitStage() })
@@ -605,6 +611,7 @@ async function present(from = ui.slide) {
   blank.value = null
   jump.value = ''
   tool.value = null
+  overview.value = false
   strokes.value = []
   resetQuiz()
   clickStep.value = 0
@@ -668,9 +675,12 @@ const PRESENT_KEYS = [
   ['→  Space  Enter', 'Next step or slide'], ['←  Backspace', 'Previous step or slide'], ['Home  End', 'First / last slide'],
   ['12 Enter', 'Jump to slide 12'], ['P', 'Presenter view'], ['B  W', 'Black / white screen'], ['R', 'Reset the talk timer'],
   ['Q', 'Show the quiz solution'], ['L', 'Laser pointer'], ['D', 'Draw'], ['A', 'Draw an arrow'], ['E', 'Erase the drawing'],
-  ['?  H', 'This list'], ['Esc', 'Put the tool away, then end presenting'],
+  ['O  G', 'Slide overview'], ['?  H', 'This list'], ['Esc', 'Put the tool away, then end presenting'],
 ]
 const keysHelp = ref(false)
+const overview = ref(false), recorder = ref()
+const closeOverview = async () => { overview.value = false; await nextTick(); presenter.value?.focus() } // after the modal is gone: until then the presenter is inert
+const recordTalk = async () => { await present(); recorder.value?.open() }
 function presentKey(e) {
   if (e.target.closest?.('.el.board')) return // typing into a notes box (Esc first ends the typing there)
   if ((e.key === ' ' || e.key === 'Enter') && e.target.closest?.('button')) return // a focused button is pressed, the slide stays
@@ -692,6 +702,7 @@ function presentKey(e) {
   if (plain && k === 'q') { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id); return e.preventDefault() }
   if (plain && (k === 'l' || k === 'd' || k === 'a')) { setTool({ l: 'laser', d: 'pen', a: 'arrow' }[k]); return e.preventDefault() }
   if (plain && (k === 'e' || k === 'c')) { strokes.value = []; return e.preventDefault() }
+  if (plain && (k === 'o' || k === 'g')) { overview.value = true; return e.preventDefault() } // g: Slidev's go-to, the overview takes a typed number too
   if (e.key === '?' || (plain && k === 'h')) { keysHelp.value = !keysHelp.value; return e.preventDefault() }
   if (e.key === 'Escape' && keysHelp.value) { keysHelp.value = false; return e.preventDefault() }
   if (e.key === 'Escape' && tool.value) { tool.value = null; return e.preventDefault() }
@@ -797,12 +808,12 @@ const commands = computed(() => [
   ...TABLE_PRESETS.map(([id, n], i) => [t('Insert table: {0}', t(n)), () => A.insert('table', id), i ? undefined : 'b']),
   ...CALLOUTS.map(([k, n]) => [t('Callout: {0}', t(n)), () => A.insert('callout', k)]),
   ...Object.entries(SHAPE_NAMES).map(([s, [n, key]]) => [t('Insert shape: {0}', t(n)), () => A.insert('shape', s), key]),
-  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
+  [t('Insert YouTube video'), () => { ytUrl.value = ''; openDlg(ytDialog.value) }, 'y'], [t('Insert chart'), () => A.insert('chart')], [t('Insert diagram (Mermaid)'), () => A.insert('diagram')], [t('Insert formula'), () => A.insert('math')], [t('Insert icon'), openIcons], [t('Insert timer'), () => A.insert('timer')], [t('Insert quiz'), () => A.insert('quiz')], [t('Insert random picker'), () => A.insert('picker')], [t('Notes box for the class'), () => A.insert('board')],
   [t('Hide/show slide'), () => A.toggleHidden()], [t('Edit this slide’s Markdown'), () => openMarkdown('slide'), 'm'], [t('Insert slides from Markdown (e.g. from AI)'), () => openMarkdown('new'), 'shift+m'], [t('Markdown tutorial'), () => openTutorial()],
   [t('New deck'), newDeck, 'shift+n'],
   [t('Present from current slide'), () => present(), 'p'], [t('Present from beginning'), () => present(0), 'shift+p'],
   [t('Presenter view'), () => { presenterView.value = true; present() }, 'alt+p'],
-  [t('Rehearse the talk (time each slide)'), () => rehearse()],
+  [t('Rehearse the talk (time each slide)'), () => rehearse()], [t('Record presentation …'), recordTalk],
   [t('Show/hide slide list'), () => (panels.slides = !panels.slides), 'alt+b'], [t('Show/hide properties'), () => (panels.props = !panels.props), 'alt+e'],
   [t('Undo'), () => undo(), 'mod+z'], [t('Redo'), redo, 'mod+shift+z'],
   [t('Zoom in'), () => zoomBy(1.25), 'mod+='], [t('Zoom out'), () => zoomBy(1 / 1.25), 'mod+-'], [t('Zoom to 100 %'), () => setZoom(1), 'shift+0'],
@@ -1063,8 +1074,10 @@ function onClipboard(e) {
             <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
             <hr />
             <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ keyLabel('y') }}</kbd></button>
+            <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
             <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
             <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
+            <button class="mi" @click="A.insert('math')"><Icon name="formula" />{{ t('Formula') }}</button>
             <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
             <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
@@ -1092,6 +1105,7 @@ function onClipboard(e) {
             <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Present from beginning') }}<kbd>⇧P</kbd></button>
             <button class="mi" @click="presenterView = true; present()"><Icon name="presenter" />{{ t('Presenter view') }}<kbd>{{ keyLabel('alt+p') }}</kbd></button>
             <button class="mi" @click="rehearse()"><Icon name="timer" />{{ t('Rehearse the talk') }}</button>
+            <button class="mi" @click="recordTalk"><Icon name="record" />{{ t('Record presentation …') }}</button>
             <hr />
             <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ keyLabel('mod+=') }}</kbd></button>
             <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ keyLabel('mod+-') }}</kbd></button>
@@ -1142,8 +1156,10 @@ function onClipboard(e) {
           <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
           <hr />
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
           <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
           <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
+          <button class="mi" @click="A.insert('math')"><Icon name="formula" />{{ t('Formula') }}</button>
           <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
           <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
           <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random picker') }}</button>
@@ -1509,6 +1525,7 @@ function onClipboard(e) {
 
     <Tour v-if="tour.on" />
     <MarkdownTutorial v-if="tutorial.open" />
+    <IconPicker v-if="iconPicker.open" />
     <div v-if="ui.status" class="toast" role="status">{{ ui.status }}<button class="tb icon small" :aria-label="t('Close')" @click="ui.status = ''"><Icon name="x" :size="14" /></button></div>
 
     <!-- dialogs -->
@@ -1690,6 +1707,7 @@ function onClipboard(e) {
     <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
     <div v-if="tool === 'laser' && laser" class="pv-laser" :style="{ translate: `${laser[0]}px ${laser[1]}px` }" aria-hidden="true" />
     <div class="pv-jump" aria-live="polite">{{ jump && t('Slide {0}', jump) }}</div>
+    <Overview v-if="overview" @go="i => { presentGo(i); closeOverview() }" @close="closeOverview" />
     <div v-if="keysHelp" class="pv-keys" role="dialog" :aria-label="t('Keys while presenting')" @click.stop="keysHelp = false">
       <h2>{{ t('Keys while presenting') }}</h2>
       <dl><template v-for="[k, what] in PRESENT_KEYS" :key="k"><dt><kbd v-for="x in k.split('  ')" :key="x">{{ x }}</kbd></dt><dd>{{ t(what) }}</dd></template></dl>
@@ -1708,6 +1726,8 @@ function onClipboard(e) {
       <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="t('Laser pointer') + ' (L)'" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="t('Pen') + ' (D)'" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
       <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="t('Arrow') + ' (A)'" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
+      <button class="tb icon small" :title="t('Slide overview') + ' (O)'" :aria-label="t('Slide overview')" @click.stop="overview = true"><Icon name="grid" :size="16" /></button>
+      <Recorder ref="recorder" />
       <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
       <button v-if="strokes.length" class="tb icon small" :title="t('Clear drawing') + ' (E)'" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
       <button class="tb icon small" :title="t('Presenter view (P)')" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>

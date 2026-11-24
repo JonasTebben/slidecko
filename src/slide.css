@@ -117,6 +117,9 @@
 /* cropped picture (el.crop): scaled and shifted by --crop-*, clip-path cuts it to the box */
 .slide .el.image.cropped img { position: absolute !important; left: var(--crop-l) !important; top: var(--crop-t) !important; width: var(--crop-w); height: var(--crop-h); object-fit: fill; clip-path: var(--crop-clip); }
 .slide .el.shape svg { width: 100%; height: 100%; overflow: visible; }
+.slide .el.math .formula { display: flex; align-items: center; justify-content: center; height: 100%; white-space: nowrap; }
+.slide .el.math .katex-display { margin: 0; }
+.slide .math-error { color: #dc2626; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .slide .el.diagram img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .slide .el.diagram .diagram-empty { display: flex; align-items: center; justify-content: center; height: 100%; margin: 0; border: 2px dashed currentColor; border-radius: 8px; opacity: 0.6; }
 .slide .el.video .video { position: relative; width: 100%; height: 100%; background: #000 center / cover no-repeat; border-radius: 6px; overflow: hidden; }
@@ -154,6 +157,8 @@
 .slide .el.video .yt-consent small { font-weight: 400; font-size: 11px; color: #555; }
 .slide .el.table .tbl-wrap { position: relative; width: 100%; height: 100%; }
 .slide .el.shape .shape-box { width: 100%; height: 100%; }
+.slide .el.icon { color: var(--accent); } /* no own colour: the theme's accent */
+.slide .el.icon .icon-box, .slide .el.icon svg { display: block; width: 100%; height: 100%; }
 .slide .el.chart .chart-box, .slide .el.chart .chart-box > svg { display: block; width: 100%; height: 100%; }
 .slide .el.table table { height: 100%; table-layout: fixed; }
 .slide .el.table :is(td, th) { overflow-wrap: break-word; vertical-align: middle; }

@@ -197,3 +197,16 @@ test('planned times: per slide in the frontmatter, the talk length as Slidev dur
   const again = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', duration: 1200, slides: [{ layout: 'default', fm, duration: 45, elements: [hi] }] }, {}).files['slides.md']
   assert.ok(again.startsWith(`---\n${fm}\n---`))
 })
+
+test('an icon is written as Slidev’s Iconify component in its box, and its set lands in package.json once', () => {
+  const icon = { id: 'i', type: 'icon', x: 10, y: 20, w: 64, h: 64, icon: 'mdi:home', body: '<path d="M0 0"/>', view: '0 0 24 24', color: '#dc2626' }
+  assert.match(slideToMarkdown({ layout: 'default', elements: [icon] }), /<div style="position:absolute;left:10px;top:20px;width:64px;height:64px">\n\n<mdi-home style="width:100%;height:100%;color:#dc2626" aria-hidden="true" \/>\n\n<\/div>/)
+  const two = [icon, { ...icon, id: 'j', icon: 'carbon:home' }, { ...icon, id: 'k' }]
+  const deps = JSON.parse(toSlidev({ slides: [{ layout: 'default', elements: two }] }).files['package.json']).dependencies
+  assert.equal(deps['@iconify-json/mdi'], '^1.2.0')
+  assert.equal(deps['@iconify-json/carbon'], '^1.2.0')
+  // a project's own version stays
+  const own = JSON.stringify({ dependencies: { '@iconify-json/mdi': '1.1.0' } })
+  assert.equal(JSON.parse(toSlidev({ slides: [{ layout: 'default', elements: [icon] }] }, { 'package.json': own }).files['package.json']).dependencies['@iconify-json/mdi'], '1.1.0')
+  assert.ok(!toSlidev({ slides: [{ layout: 'default', elements: [] }] }).files['package.json'].includes('iconify'))
+})

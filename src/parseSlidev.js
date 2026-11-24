@@ -1,5 +1,9 @@
 import { marked } from 'marked'
 import { parseDuration } from './rehearse.js'
+import { mathMarked } from './math.js'
+
+// $…$ and $$…$$ stay TeX source (Slidev's KaTeX notation) for every Markdown import
+marked.use(mathMarked)
 
 // Slidev markdown -> [{ layout, blocks, fm, md, file, notes }]. Pure (no DOM); positions are
 // assigned later in importSlidev.js. fm/md/file are the slide's raw source, kept so that

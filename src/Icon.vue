@@ -80,9 +80,11 @@ const P = {
   timer: 'M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 10v4l2 2M10 2h4M12 2v4',
   quiz: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8zM15 17l2 2 3-4',
   diagram: 'M3 3h7v5H3zM14 16h7v5h-7zM6.5 8v4.5a1.5 1.5 0 0 0 1.5 1.5h9.5v2',
+  formula: 'M18 5H6l6 7-6 7h12',
   dice: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01',
   arrowDraw: 'M5 19 19 5M10 5h9v9',
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M7 14h10',
+  record: 'M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z', pause: 'M9 5v14M15 5v14', stop: 'M6 6h12v12H6z',
   borderAll: G + 'M4 4h16v16H4zM4 12h16M12 4v16',
   borderOuter: G + 'M4 4h16v16H4z',
   borderInner: G + 'M4 12h16M12 4v16',
@@ -130,6 +132,11 @@ const P = {
   // A
   // B
   // C
+  // icons
+  smile: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01',
+  rotate: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5',
+  flipH: 'M12 3v18M8 7l-5 5 5 5V7zM16 7l5 5-5 5V7z',
+  flipV: 'M3 12h18M7 8l5-5 5 5H7zM7 16l5 5 5-5H7z',
 }
 </script>
 

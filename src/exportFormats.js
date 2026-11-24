@@ -326,7 +326,10 @@ export async function htmlDeck(root, title, list, files) {
   }).join('\n')
   // only the fonts the slides or their themes name are embedded (all bundled and project fonts are declared)
   const named = rules.filter(r => !r.startsWith('@font-face')).join('\n') + slides
-  const css = await inlineUrls(rules.filter(r => !r.startsWith('@font-face') || usesFamily(named, r.match(/font-family:\s*["']?([^;"']+)/)?.[1])).join('\n'), files)
+  // KaTeX names its fonts unquoted, per class: those the formulas made the browser load (all of them are there by now)
+  const math = slides.includes('class="katex'), loaded = new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/["']/g, '')))
+  const wanted = r => { const f = r.match(/font-family:\s*["']?([^;"']+)/)?.[1]; return /^KaTeX_/.test(f) ? math && loaded.has(f) : usesFamily(named, f) }
+  const css = await inlineUrls(rules.filter(r => (r.startsWith('@font-face') ? wanted(r) : math || !r.includes('.katex'))).join('\n'), files)
   const html = `<!doctype html>
 <html lang="${lang.value}">
 <head>

@@ -173,6 +173,8 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .inspector .diagram-code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; tab-size: 2; }
 .inspector .diagram-error { margin: 0; font-size: 12px; }
 .inspector .diagram-error small { display: block; margin-top: 4px; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inspector .math-preview { padding: 10px; overflow-x: auto; font-size: 15px; text-align: center; background: var(--ui-bg); border-radius: var(--ui-radius); }
+.inspector .math-preview .katex-display { margin: 0; }
 .notes-wrap { position: relative; }
 .inspector .notes-wrap .notes { position: relative; display: block; background: transparent; }
 .text-mirror { position: absolute; inset: 0; overflow: hidden; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: var(--ui-panel); color: transparent; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; }
@@ -437,6 +439,31 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .rh-chart i.rh-over { background: var(--ui-danger); }
 .rh-chart .rh-mark { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; border-radius: 0; background: var(--ui-fg); }
 @media (max-width: 520px) { .rh-chart { min-width: 50px; } .rh-table :is(th, td) { padding: 5px 4px; } .rh-table th[scope='row'] { max-width: 90px; } }
+/* O / G: the slide overview while presenting (app colours, light or dark) */
+.pv-overview[open] { display: flex; flex-direction: column; width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 14px 16px; }
+.pv-overview header { display: flex; align-items: center; gap: 4px 12px; margin-bottom: 10px; }
+.pv-overview h2 { margin: 0; }
+.pv-ov-hint { margin-right: auto; color: var(--ui-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pv-ov-grid { display: grid; gap: 12px; justify-content: center; overflow-y: auto; padding: 4px; }
+.pv-ov-grid .thumb { zoom: 1; }
+.pv-ov-grid .thumb:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 2px; }
+.pv-ov-num { position: absolute; right: 4px; bottom: 4px; padding: 0 6px; border-radius: 5px; background: #000b; color: #fff; font-size: 12px; }
+/* recording: red dot and time in the bar, the camera bubble on the slide (it is in the shared tab, so in the video) */
+.rec-time { display: inline-flex; align-items: center; gap: 6px; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff3b30; animation: rec-blink 1.2s steps(2) infinite; }
+.rec-dot.paused { background: #fbbf24; animation: none; }
+@keyframes rec-blink { 50% { opacity: 0.35; } }
+.rec-bubble { position: fixed; z-index: 1; overflow: hidden; border-radius: 50%; background: #000; box-shadow: 0 2px 14px #0009; cursor: grab; touch-action: none; }
+.rec-bubble video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.rec-dlg fieldset { display: grid; gap: 6px; margin: 0 0 14px; padding: 0; border: 0; }
+.rec-dlg legend { margin-bottom: 6px; padding: 0; font-size: 13px; font-weight: 600; }
+.rec-dlg small { color: var(--ui-muted); }
+.rec-dev { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin-bottom: 14px; }
+.rec-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.rec-row .tb { border: 1px solid var(--ui-line-strong); }
+.rec-row .tb.on { background: var(--ui-accent-soft); border-color: var(--ui-accent); }
+.rec-dlg .rec-error { color: var(--ui-danger); }
+.rec-dlg menu .primary { display: inline-flex; align-items: center; gap: 6px; }
 
 /* all slides at 1:1: off-screen as the PPTX source, and the only thing that prints */
 .output { position: fixed; left: -99999px; top: 0; }

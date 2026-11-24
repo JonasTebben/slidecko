@@ -7,6 +7,8 @@ import { CENTERED, themeStyle, fontKey, SHADOWS } from './themes.js'
 import { applyUno } from './uno.js'
 import { t } from './i18n.js'
 import { listItems } from './clicks.js'
+import { iconTags, readIconStyle, getIcon } from './icons.js'
+import { loadMath, formulaHtml } from './math.js'
 
 // Slidev markdown -> slides of absolutely positioned elements.
 //
@@ -28,7 +30,7 @@ const savedBox = el => el.tagName === 'DIV' && el.style.position === 'absolute' 
 const isImageOnly = el => el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG' && !hasText(el)
 // <v-clicks> around lists only (written by toSlidev): the text box's "list items one by one"
 const itemClicks = el => el?.tagName === 'V-CLICKS' && [...el.attributes].every(a => a.name === 'at') && [...el.children].every(c => /^[OU]L$/.test(c.tagName))
-const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout
+const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -69,7 +71,7 @@ export async function importSlidev(path, files, theme) {
   const size = formatSize(parseRatio(format.aspectRatio) || 16 / 9, format.canvasWidth || 980)
   // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML
   // sanitized: the markdown may come from a pasted text or a downloaded project (raw HTML, onerror=…)
-  const htmls = parsed.map(s => clean(marked.parse(stripNonContent(s.md))))
+  const htmls = parsed.map(s => clean(marked.parse(iconTags(stripNonContent(s.md)))))
   await applyUno(htmls.join('\n'))
 
   const host = document.body.appendChild(document.createElement('div'))
@@ -85,6 +87,10 @@ export async function importSlidev(path, files, theme) {
       host.replaceChildren(slide)
 
       for (const pre of slide.querySelectorAll('pre')) pre.classList.add('code')
+      // formulas measured as KaTeX draws them (Slidev renders them too); the source stays in data-tex
+      const formulas = slide.querySelectorAll('[data-math]')
+      if (formulas.length) await loadMath()
+      for (const f of formulas) { f.dataset.tex = f.textContent.slice(2, -2).trim(); f.innerHTML = formulaHtml(f.dataset.tex) }
       await Promise.all([...slide.querySelectorAll('img[src]')].map(async img => {
         const src = img.getAttribute('src')
         const id = await asset(src)
@@ -95,7 +101,9 @@ export async function importSlidev(path, files, theme) {
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
-      slides.push({ layout: s.layout, elements: measure(slide, s), fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true', duration: +fmGet(s.fm, 'plannedTime') || undefined })
+      // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them)
+      const elements = (await Promise.all(measure(slide, s).map(async e => (e.type !== 'icon' ? e : Object.assign(e, await getIcon(e.icon).catch(() => null)))))).filter(e => e.type !== 'icon' || e.body)
+      slides.push({ layout: s.layout, elements, fm: s.fm, md: s.md, file: s.file, notes: s.notes, gap: s.gap, hidden: s.hidden, transition: s.transition, hideMaster: fmGet(s.fm, 'hideMaster') === 'true', duration: +fmGet(s.fm, 'plannedTime') || undefined })
     }
   } finally {
     host.remove()
@@ -179,6 +187,10 @@ function measure(slide, parsed) {
       if (text?.textContent.trim()) el.html = text.innerHTML
     } else if (n.dataset.video) {
       Object.assign(el, { type: 'video', youtube: n.dataset.video })
+    } else if (n.dataset.icon) {
+      Object.assign(el, { type: 'icon', icon: n.dataset.icon, ...readIconStyle(n.style), ...(n.dataset.label && { label: n.dataset.label }) })
+      const c = getComputedStyle(n).color // a colour class (text-red-500)
+      if (el.color === 'currentColor' && c !== getComputedStyle(n.parentElement).color) el.color = c
     } else if (n.dataset.timer) {
       Object.assign(el, { type: 'timer', seconds: +n.dataset.timer || 0 })
     } else if (n.dataset.picks) {
@@ -201,6 +213,9 @@ function measure(slide, parsed) {
       const crop = box?.dataset.crop?.split(',').map(Number) // written by toSlidev for cropped pictures
       if (crop?.length === 4) el.crop = { x: crop[0], y: crop[1], w: crop[2], h: crop[3] }
       if (!box) sized(el, [rect(img)])
+    } else if (n.dataset.math) {
+      Object.assign(el, { type: 'math', tex: n.dataset.tex })
+      if (!box) sized(el, [r])
     } else if (n.tagName === 'PRE') {
       const code = n.querySelector('code')
       Object.assign(el, codeEl((code || n).textContent.replace(/\n$/, ''), code?.className.match(/language-(\S+)/)?.[1]))

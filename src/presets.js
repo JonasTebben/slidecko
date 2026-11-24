@@ -19,6 +19,15 @@ export const DIAGRAMS = {
   mindmap: ['Mind map', () => `mindmap\n  root((${t('Topic')}))\n    ${t('Idea')}\n      ${t('Detail')}\n    ${t('Question')}\n    ${t('Goal')}`],
 }
 
+// formula starters (inspector: "Start from a template"), TeX as Slidev and KaTeX read it
+export const FORMULAS = {
+  quadratic: ['Quadratic formula', 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}'],
+  sum: ['Sum', '\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}'],
+  integral: ['Integral', '\\int_{a}^{b} f(x)\\,dx = F(b) - F(a)'],
+  matrix: ['Matrix', 'A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}'],
+  euler: ['Euler’s identity', 'e^{i\\pi} + 1 = 0'],
+}
+
 export const ELEMENTS = {
   text: () => T(`<p>${t('Enter text …')}</p>`, { x: 120, y: 140, w: 420, h: 30 }),
   heading: () => T(`<h2>${t('Heading')}</h2>`, { x: 120, y: 120, w: 600, h: 40 }),
@@ -38,6 +47,7 @@ export const ELEMENTS = {
   video: youtube => ({ type: 'video', youtube, x: 240, y: 120, w: 500, h: 281 }),
   // notes box for the class: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
   board: () => T(`<p><strong>${t('Ideas from the class …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
+  math: () => ({ type: 'math', tex: FORMULAS.quadratic[1], fontSize: 40, x: 230, y: 200, w: 520, h: 130 }),
   diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),
   timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
   picker: () => ({ type: 'picker', names: [1, 2, 3, 4].map(n => t('Group {0}', n)), fontSize: 64, x: 280, y: 190, w: 420, h: 160 }),

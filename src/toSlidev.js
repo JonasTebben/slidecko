@@ -7,7 +7,9 @@ import { clock } from './timer.js'
 import { chartSvg } from './chart.js'
 import { clickSteps, stepOf } from './clicks.js'
 import { MARKS, toVMark } from './marks.js'
+import { iconTag, iconSet, ICON_SETS, ICONIFY_JSON } from './icons.js'
 import { BUNDLED, bundledFaces, fontCss, usesFamily, FONT_EXT } from './fonts.js'
+import { MATH } from './math.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss, CENTERED } from './themes.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
@@ -23,7 +25,12 @@ const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-
 turndown.use(gfm)
 // text "<" would be read as an HTML tag (List<T> breaks Slidev's Vue compile), "&lt;" as an entity; code is not escaped
 const mdEscape = turndown.escape.bind(turndown)
-turndown.escape = s => mdEscape(s).replace(/&(?=#?\w+;)/g, '&amp;').replace(/</g, '&lt;')
+// $…$ math stays as typed (Slidev reads it as TeX), and so does an escaped \$
+turndown.escape = s => {
+  const kept = []
+  const out = mdEscape(s.replace(MATH, m => `\0${kept.push(m) - 1}\0`)).replace(/&(?=#?\w+;)/g, '&amp;').replace(/</g, '&lt;')
+  return out.replace(/\0(\d+)\0/g, (_, i) => kept[i])
+}
 // markup markdown cannot express stays HTML (Slidev renders inline HTML)
 turndown.keep(node => ['V-CLICKS', 'V-CLICK', 'V-AFTER', 'MARK', 'U', 'SUB', 'SUP', 'KBD'].includes(node.nodeName) ||
   (node.nodeName === 'SPAN' && node.getAttribute('style')) || (node.nodeName === 'DIV' && node.getAttribute('data-callout')) ||
@@ -148,6 +155,10 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       const block = `${fence}mermaid\n${el.code}\n${fence}`
       return flat ? block : `<div style="${boxStyle(el)}">\n\n${block}\n\n</div>`
     }
+    case 'math': { // Slidev renders $$ blocks with KaTeX itself; the box keeps position, size and colour for the re-import
+      const block = `$$\n${el.tex.replace(/\$\$/g, '$ $')}\n$$`
+      return flat ? block : `<div style="${boxStyle(el, ';display:flex;flex-direction:column;justify-content:center')}">\n\n${block}\n\n</div>` // centred in its box, as in the editor
+    }
     case 'table': {
       const data = `data-table="${el.preset || 'theme'}"${el.firstCol ? ' data-firstcol' : ''}${el.compact ? ' data-compact' : ''}${el.borders ? ' data-borders' : ''}`
       return `<div ${data} style="${boxStyle(el)}">\n\n${tableMd(el)}\n\n</div>`
@@ -160,6 +171,8 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
     case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import
       return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
+    case 'icon': // Slidev's Iconify component in the box; its colour and turns are on the icon
+      return `<div style="${boxStyle({ ...el, color: undefined })}">\n\n${iconTag(el)}\n\n</div>`
     case 'chart': { // the picture as inline SVG in the theme's accent; data-chart (JSON, one line) brings the editable chart back on import
       const { kind, categories, series, legend, values, stacked, title, min, max } = el
       return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
@@ -209,7 +222,7 @@ function layerHtml(el) {
   const html = el.type === 'text' ? `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">${el.html}</div>`
     : el.type === 'code' ? `<pre style="${boxStyle(el)};margin:0;overflow:hidden"><code>${esc(el.code)}</code></pre>`
       : el.type === 'table' ? `<div data-table="${el.preset || 'theme'}" style="${boxStyle(el)}">${tableMd({ ...el, fills: el.fills || [] })}</div>` // fills: always the HTML table
-        : ['image', 'shape', 'video', 'chart'].includes(el.type) ? elementMd(el) : ''
+        : ['image', 'shape', 'video', 'chart', 'icon'].includes(el.type) ? elementMd(el) : ''
   return '    ' + escapeMustache(html).replace(FIELD, (_, a, k, b) => a + FIELD_VUE[k] + b)
 }
 // the data rides along in a comment, so a re-import gets the editable master and layouts back
@@ -389,6 +402,13 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
       if (!p.dependencies?.[own]) files['package.json'] = JSON.stringify({ ...p, dependencies: { ...p.dependencies, [own]: pkg } }, null, 2) + '\n'
     } catch { /* not JSON: leave the project's file alone */ }
   }
+
+  // Slidev renders icons from the @iconify-json package of their set
+  const iconSets = [...new Set([...slides, { elements: master }, ...layouts].flatMap(s => s.elements.filter(e => e.type === 'icon').map(e => iconSet(e.icon))))].filter(k => ICON_SETS[k])
+  try {
+    const p = JSON.parse(files['package.json']), missing = iconSets.filter(k => !p.dependencies?.[`@iconify-json/${k}`] && !p.devDependencies?.[`@iconify-json/${k}`])
+    if (missing.length) files['package.json'] = JSON.stringify({ ...p, dependencies: { ...p.dependencies, ...Object.fromEntries(missing.map(k => [`@iconify-json/${k}`, ICONIFY_JSON])) } }, null, 2) + '\n'
+  } catch { /* not JSON: leave the project's file alone */ }
 
   const images = {}
   for (const s of [...slides, { elements: master }, ...layouts]) for (const el of s.elements) {

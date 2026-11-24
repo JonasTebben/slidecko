@@ -11,7 +11,11 @@ Third-party software bundled in the built app (dist/), each under its own licenc
 - CodeMirror (codemirror, @codemirror/*): MIT
 - PDF.js (pdfjs-dist): Apache-2.0, Copyright Mozilla Foundation
 - Mermaid (loaded only for diagrams) and its dagre-d3-es, Cytoscape.js, KaTeX, roughjs, khroma, Day.js, lodash-es, stylis: MIT; D3: ISC
+- KaTeX (loaded only for formulas, with its woff2 fonts): MIT, Copyright Khan Academy and other contributors
 - ELK (elkjs, Mermaid's ELK layout): EPL-2.0 (dual-licensed EPL-2.0/GPL-3.0-or-later, used under EPL-2.0)
+- Icon sets in Iconify format (@iconify-json/*, each loaded only when used): Lucide: ISC, Copyright Lucide Contributors;
+  Tabler Icons: MIT, Copyright Paweł Kuna; Material Design Icons: Apache-2.0, Copyright Pictogrammers;
+  Carbon: Apache-2.0, Copyright IBM Corp.; Phosphor: MIT, Copyright Phosphor Icons
 
 Fonts in public/fonts/ (from the @fontsource-variable packages), SIL Open Font License 1.1, licence and copyright
 in each font's OFL.txt: Inter, Montserrat, Nunito, Source Serif 4, Lora, Playfair Display, Fira Code.

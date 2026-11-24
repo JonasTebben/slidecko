@@ -160,6 +160,8 @@ function looks(el, below, slide, d) {
   const bgOf = () => (own && !own.image && own[3] ? over(own, own[3] < 1 ? under() : null) : under())
   const of = (html, ctx, bg) => textRuns(html).map(r => { const l = look(r, ctx); return { ...l, paint: l.bg ? over(withAlpha(l.bg), bg) : bg } })
   if (el.type === 'text' || el.type === 'shape') return of(el.html, base, bgOf())
+  // a formula: one run in the box's size and colour (screen readers get KaTeX's MathML, no alt text needed)
+  if (el.type === 'math') return el.tex?.trim() ? [{ ...look({ stack: [] }, base), paint: bgOf() }] : []
   if (el.type === 'code') {
     if (!el.code?.trim()) return []
     // own background: the editor switches the text to a light or dark colour (SlideView codeVars)
@@ -195,8 +197,8 @@ export function slideTitle(s) {
 const VAGUE = /^(click here|click|here|this|this link|more|read more|learn more|link|details|hier|hier klicken|klicken sie hier|klick hier|mehr|weiter|weiterlesen|mehr erfahren|dies|link hier)$/i
 const vagueLinks = html => [...String(html ?? '').matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)].map(m => plainText(m[1])).filter(x => VAGUE.test(x.replace(/[.!:…»>→]+$/g, '').trim()))
 
-// what a screen reader reads: everything but plain shapes and decorative pictures
-const content = e => !(e.type === 'shape' && !e.html) && !(e.type === 'image' && e.decorative)
+// what a screen reader reads: everything but plain shapes, decorative pictures and icons without a label (decorative by default)
+const content = e => !(e.type === 'shape' && !e.html) && !(e.type === 'image' && e.decorative) && !(e.type === 'icon' && !e.label)
 // top to bottom in rows (an element starting above the middle of a row's first one joins that row), each row left to right
 export function visualOrder(els) {
   const rows = []

@@ -8,6 +8,7 @@ import { parseRatio, formatSize } from './format.js'
 import { t } from './i18n.js'
 import { clickSteps } from './clicks.js'
 import { vmarkToData, checkMark } from './marks.js'
+import { ICON_NAME } from './icons.js'
 import { cleanRehearsals, validDuration } from './rehearse.js'
 import { CHART_KINDS } from './chart.js'
 import { cleanFonts, fontType, fontLabel, FONT_MAX } from './fonts.js'
@@ -89,6 +90,11 @@ const num = (v, min = -1e4, max = 1e4) => Math.min(max, Math.max(min, Number(v) 
 const COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%/]+\)|[a-z]{3,20}|none|transparent)$/i
 const color = v => (typeof v === 'string' && COLOR.test(v.trim()) ? v.trim() : undefined)
 const ALIGN = ['left', 'center', 'right', 'justify']
+// an icon's SVG body (inside <svg>): no scripts, events, foreign content or links out of the icon, then DOMPurify's SVG profile
+// shortcut: DOMPurify drops <use>, so the few icons drawn with it (4 of ~28 000) lose that part; allow it if one matters
+const UNSAFE_SVG = /<\s*\/?\s*(script|style|foreignobject|iframe|image|a|animate\w*|set)\b|\bon\w+\s*=|javascript:|\bhref\s*=\s*(?!["']?#)|url\(\s*(?!["']?#)/i
+export const cleanIconBody = b => (typeof b === 'string' && b.length < 50000 && !UNSAFE_SVG.test(b)
+  ? String(DOMPurify.sanitize(`<svg xmlns="http://www.w3.org/2000/svg">${b}</svg>`, { USE_PROFILES: { svg: true } })).replace(/^<svg[^>]*>|<\/svg>$/g, '') || undefined : undefined)
 export const SHAPES = ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']
 
 // image crop: the visible part as fractions of the picture {x, y, w, h}; the whole picture is no crop
@@ -118,10 +124,10 @@ export function cleanEl(e) {
   if (e.fontSize) base.fontSize = num(e.fontSize, 4, 400)
   if (e.locked) base.locked = true // not moved or resized in the editor
   if (e.placeholder === true) base.placeholder = true // in a layout: copied into new slides instead of drawn behind them
-  if (/^[\w-]{1,20}$/.test(e.group)) base.group = e.group // elements sharing it are selected and moved together
+  if (/^[\w-]{1,20}$/.test(e.group ?? '')) base.group = e.group // elements sharing it are selected and moved together
   if (Object.hasOwn(SHADOWS, e.shadow)) base.shadow = e.shadow
-  if (/^[\w-]{1,40}$/.test(e.morph)) base.morph = e.morph // Magic move name: pairs it with the element of that name on the next slide
-  if (/^[\w-]{1,20}$/.test(e.mid)) base.mid = e.mid // kept by a duplicated slide's copy, so Magic move pairs the two
+  if (/^[\w-]{1,40}$/.test(e.morph ?? '')) base.morph = e.morph // Magic move name: pairs it with the element of that name on the next slide
+  if (/^[\w-]{1,20}$/.test(e.mid ?? '')) base.mid = e.mid // kept by a duplicated slide's copy, so Magic move pairs the two
   if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
   switch (e.type) {
     case 'text': return {
@@ -169,6 +175,8 @@ export function cleanEl(e) {
     }
     // Mermaid source, rendered (and sanitized) by diagram.js; capped so a pasted file cannot stall the renderer
     case 'diagram': return { ...base, code: (str(e.code) || '').slice(0, 20000) }
+    // TeX source of a formula, rendered by KaTeX (math.js, no trust: no links or pictures); capped like typed code
+    case 'math': return { ...base, tex: (str(e.tex) || '').slice(0, 5000), ...(color(e.color) && { color: color(e.color) }) }
     case 'video': return /^[\w-]{6,20}$/.test(e.youtube) ? { ...base, youtube: e.youtube } : null
     // countdown length in seconds (0: counts up), started by a click while presenting
     case 'timer': return { ...base, seconds: Math.round(num(e.seconds, 0, 359999)), ...(color(e.color) && { color: color(e.color) }) }
@@ -176,6 +184,14 @@ export function cleanEl(e) {
     case 'picker': return {
       ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),
       ...(color(e.color) && { color: color(e.color) }),
+    }
+    // an Iconify icon (set:name) with its SVG, so it still renders without the set; label: read out (none: decorative)
+    case 'icon': {
+      const body = cleanIconBody(e.body)
+      return ICON_NAME.test(e.icon) && body ? {
+        ...base, icon: e.icon, body, view: /^-?[\d.]+( -?[\d.]+){3}$/.test(e.view) ? e.view : '0 0 24 24', ...(color(e.color) && { color: color(e.color) }),
+        ...([1, 2, 3].includes(e.rotate) && { rotate: e.rotate }), ...(['h', 'v', 'hv'].includes(e.flip) && { flip: e.flip }), ...(str(e.label)?.trim() && { label: e.label.trim().slice(0, 200) }),
+      } : null
     }
     // plain text (rendered as text, never as HTML) on one line, 2–6 answers, any of them correct
     case 'quiz': {

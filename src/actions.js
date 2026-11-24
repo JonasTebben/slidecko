@@ -9,6 +9,7 @@ import { t, lang } from './i18n.js'
 import { toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf } from './toSlidev.js'
 import { withSolutions } from './quiz.js'
 import { diagramsReady } from './diagram.js'
+import { mathReady } from './math.js'
 // import/export libraries load on first use, so they stay out of the startup bundle
 const loadZip = async () => (await import('jszip')).default
 const importPptx = async (...a) => (await import('./importOffice.js')).importPptx(...a)
@@ -588,7 +589,7 @@ async function renderOutput(file, all, solutions) {
   if (!slides.length) throw new Error(t('All slides are hidden'))
   exportSlides.value = slides
   await nextTick()
-  await diagramsReady() // Mermaid renders asynchronously: the pictures first, then their <img>s
+  await Promise.all([diagramsReady(), mathReady()]) // Mermaid renders asynchronously, KaTeX loads on the first formula: those first, then their <img>s and fonts
   await nextTick()
   const out = document.querySelector('.output')
   await Promise.all([...out.querySelectorAll('img')].map(i => i.decode().catch(() => {})))

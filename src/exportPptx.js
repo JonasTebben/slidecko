@@ -1,12 +1,13 @@
 import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
-import { toJpeg } from 'html-to-image'
+import { toJpeg, toPng, getFontEmbedCSS } from 'html-to-image'
 import { OdpDoc } from './exportOdp.js'
 import { onePPr, numberFont, decorative, DECORATIVE } from './pptxFix.js'
 import { W, H, deck } from './store.js'
 import { SHADOWS } from './themes.js'
 import { t } from './i18n.js'
 import { pathPoints, markColor } from './marks.js'
+import { iconSvg } from './icons.js'
 
 // Builds the PPTX from the rendered slides (root contains one .slide per slide at 1:1), so
 // colours, fonts and sizes come from the theme CSS instead of a second theme definition.
@@ -414,9 +415,18 @@ const altOf = m => (m.decorative ? { altText: '', objectName: DECORATIVE } : m.a
 // slides – then every slide is one picture (exactly as in the editor, text not editable)
 let odp = false // OpenDocument: no text highlight, so marks are always shapes
 let google = false // Google Slides variant (see runs())
+// KaTeX is HTML that PowerPoint and LibreOffice cannot hold: a formula, or a text box with $…$ in it, becomes a
+// picture of the rendered element (3× for print; static: an absolute box comes out empty), its TeX source as alt text; fonts embedded once
+let mathFonts
+async function mathPicture(el, root) {
+  mathFonts ??= getFontEmbedCSS(root)
+  try { return await toPng(el, { pixelRatio: 3, style: { position: 'static', margin: '0' }, fontEmbedCSS: await mathFonts }) } catch { return null }
+}
+const sourceText = html => { const t = document.createElement('template'); t.innerHTML = html || ''; return t.content.textContent.replace(/\s+/g, ' ').trim() }
 export async function exportPptx(root, name = deck.title, slides = [], { format = 'pptx', images, forGoogle = false } = {}) {
   google = forGoogle
   odp = format === 'odp'
+  mathFonts = null
   IN = 10 / W
   PT = 720 / W
   const pptx = format === 'odp' ? new OdpDoc() : new PptxGenJS()
@@ -451,9 +461,14 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
     if (!masterName) slide.background = { color }
     for (const el of node.querySelectorAll('.el')) {
       const m = model.get(el.dataset.el) || {}
-      const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
+      const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points
       const sh = SHADOWS[m.shadow] && { shadow: { type: 'outer', angle: 90, blur: SHADOWS[m.shadow].blur * PT, offset: SHADOWS[m.shadow].y * PT, color: '000000', opacity: SHADOWS[m.shadow].a } }
+      if (el.classList.contains('math') || (type === 'text' && el.querySelector('.katex'))) {
+        const data = await mathPicture(el, root)
+        if (data) slide.addImage({ data, ...box(el), ...sh, altText: m.type === 'math' ? m.tex : sourceText(m.html) })
+        continue
+      }
       if (type === 'image' && !el.querySelector('img')?.naturalWidth) continue // broken picture: nothing to export
       if (type === 'image' && m.crop) {
         // cropped: the visible part as its own picture, filling the box
@@ -496,6 +511,10 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
           const ta = getComputedStyle(st.firstElementChild || st).textAlign
           if (text.length) slide.addText(text, { ...area, valign: 'middle', align: ['left', 'right', 'justify'].includes(ta) ? ta : 'center', margin: 0, fit: 'none', wrap: true })
         }
+      } else if (type === 'icon' && m.body) {
+        // a vector picture in its rendered colour (pptxgenjs adds a PNG for older readers, sized 2× the box); alt text: the label, else the icon's name
+        const svg = iconSvg(m, { color: '#' + (hex(getComputedStyle(el).color) || '000000'), width: el.offsetWidth * 2, height: el.offsetHeight * 2 })
+        slide.addImage({ data: 'data:image/svg+xml;base64,' + btoa(String.fromCharCode(...new TextEncoder().encode(svg))), ...box(el), altText: m.label || m.icon, ...sh })
       } else if (type === 'chart') {
         const svg = el.querySelector('svg')
         if (format === 'odp' || !m.series?.length || !m.categories?.length) { const data = svg && await svgImage(svg, el.offsetWidth, el.offsetHeight); if (data) slide.addImage({ data, ...box(el), ...sh }); continue }

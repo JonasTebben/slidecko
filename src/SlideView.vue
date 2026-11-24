@@ -15,8 +15,10 @@ import { longPressFired } from './longpress.js'
 import { clock, shown, done, running, toggle, reset } from './timer.js'
 import * as picker from './picker.js'
 import { diagramSrc } from './diagram.js'
+import { withMath, formulaHtml } from './math.js'
 import { LETTERS, quiz, picked, pick, toggleSolution } from './quiz.js'
 import { measureMark } from './marks.js'
+import { iconSvg, picker as iconPicker } from './icons.js'
 
 // One component for every rendering of a slide (editor, thumbnails, presenter, print, PPTX).
 // scale converts pointer movement back into slide units.
@@ -145,7 +147,7 @@ function drag(e, el, dir = '') {
     if (Nd) t += sy.d || 0
     if (Sd) b += sy.d || 0
     // corners keep the aspect ratio of images (or of anything with Shift)
-    if (dir.length === 2 && ['image', 'video'].includes(el.type) !== ev.shiftKey) {
+    if (dir.length === 2 && ['image', 'video', 'icon'].includes(el.type) !== ev.shiftKey) {
       const w = r - l
       const h = w / ratio
       if (dir.includes('n')) t = b - h
@@ -267,7 +269,8 @@ function backgroundDown(e) {
 // --- editing in place ---
 async function edit(e, el) {
   if (props.editable && el.type === 'image') return startCrop(el)
-  if (!props.editable || ['image', 'video', 'timer', 'quiz', 'picker', 'chart', 'diagram'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
+  if (props.editable && el.type === 'icon' && !decor(el)) return Object.assign(iconPicker, { open: true, target: el.id }) // another icon
+  if (!props.editable || ['image', 'video', 'timer', 'quiz', 'picker', 'chart', 'diagram', 'math'].includes(el.type) || (el.type === 'shape' && el.shape === 'line') || ui.editing === el.id) return
   const box = e.currentTarget, cell = e.target.closest?.('[data-r]')
   ui.sel = [el.id]
   ui.editing = el.id
@@ -286,6 +289,8 @@ function caretAt(e, target) {
 defineExpose({ edit })
 // notes box while presenting: a click types into it; saved like an edit in the editor (commit)
 const liveEdit = ref(null)
+// $…$ rendered, except in the box being typed into: there the TeX source is edited
+const mathed = (el, html) => ((props.editable && ui.editing === el.id) || liveEdit.value === el.id ? html : withMath(html))
 async function editLive(e, el) {
   const target = e.currentTarget
   liveEdit.value = el.id
@@ -459,11 +464,11 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
       :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
-      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram' }[el.type]) : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random picker', chart: 'Chart', diagram: 'Diagram', icon: 'Icon', math: 'Formula' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
-        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="items(el, fields(resolveImgs(el.html)))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
+        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="mathed(el, items(el, fields(resolveImgs(el.html))))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); layoutMarks()" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"
@@ -473,6 +478,7 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
         <pre v-else class="code" :class="{ dark: codeDarkOf(el) }"><code v-for="o in [codeOpts(el.meta)]" :key="0"><span v-for="(l, i) in hlLines(el.code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
       </template>
       <img v-else-if="el.type === 'image'" :src="deck.assets[el.asset]" :class="el.cls" :alt="el.decorative ? '' : el.alt || ''" draggable="false" :style="{ borderRadius: el.radius && !el.crop ? el.radius + 'px' : null }" />
+      <div v-else-if="el.type === 'math'" class="formula" v-html="formulaHtml(el.tex)" />
       <template v-else-if="el.type === 'diagram'">
         <img v-if="diagramSrc(el, theme || deck.theme)" :src="diagramSrc(el, theme || deck.theme)" :alt="t('Diagram')" draggable="false" />
         <p v-else class="diagram-empty">{{ t('Diagram') }}</p>
@@ -484,12 +490,13 @@ const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
              the edit can still save it on blur -->
         <div v-if="el.shape !== 'line'" :ref="shapeText" class="shape-text">
           <div
-            class="content" v-html="fields(resolveImgs(el.html || ''))"
+            class="content" v-html="mathed(el, fields(resolveImgs(el.html || '')))"
             :contenteditable="editable && ui.editing === el.id"
             @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); shrinkShapeText($event.currentTarget.parentElement); layoutMarks()" @paste.prevent="pasteText"
           />
         </div>
       </template>
+      <div v-else-if="el.type === 'icon'" class="icon-box" v-html="iconSvg(el)" />
       <div v-else-if="el.type === 'video'" class="video" :style="{ backgroundImage: ui.yt && !live ? `url(${ytThumb(el.youtube)})` : null }">
         <iframe v-if="live && ui.yt" :src="`https://www.youtube-nocookie.com/embed/${el.youtube}`" :title="t('YouTube video')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen />
         <i v-else class="play" />
