@@ -85,6 +85,17 @@ const WHY = [
   ['Open formats, no lock-in', 'Export to PowerPoint, OpenDocument, PDF, HTML or Slidev Markdown, or save the project as a file. Your work goes with you.'],
   ['Open source', 'Apache 2.0 licensed: read the code, adapt it or host it on your own server.'],
 ]
+// screenshots and the demo video in public/showcase/, made by scripts/showcase.js in English and German
+const SHOWCASE = [
+  ['editor', 'Design on the slide', 'Text, tables, charts, shapes, icons and images: drag, snap, align. Chart data comes straight from a spreadsheet.'],
+  ['diagram', 'Diagrams and formulas', 'Mermaid flowcharts and Gantt charts, KaTeX formulas and code with syntax highlighting, all editable on the slide.'],
+  ['markdown', 'Write in Markdown', 'Edit the whole talk as Slidev Markdown with a live preview, or paste slides an AI wrote for you.'],
+  ['presenter', 'Present with notes', 'Presenter view with notes, next slide and timer; pen, laser pointer and slide overview while you talk.'],
+  ['quiz', 'Quizzes for the class', 'Quizzes, timers and a random draw for “who’s next?”, right on the slide while presenting.'],
+  ['a11y', 'Accessible slides', 'The check finds missing alt text, weak contrast, small fonts and missing titles, and fixes most with one click.'],
+]
+const shot = name => `showcase/${name}-${lang.value === 'de' ? 'de' : 'en'}`
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches // no autoplay; the video still plays on request
 </script>
 
 <template>
@@ -119,30 +130,9 @@ const WHY = [
       <p v-if="error" class="error" role="alert">{{ error }}</p>
     </section>
 
-    <section class="home-why">
-      <h2>{{ t('Why Slidecko') }}</h2>
-      <div class="why-grid">
-        <div v-for="[title, text] in WHY" :key="title" class="why-card"><b>{{ t(title) }}</b><p>{{ t(text) }}</p></div>
-      </div>
-    </section>
-
-    <section class="home-themes">
-      <h2>{{ t('Start with a theme') }}</h2>
-      <template v-for="own in [false, true]" :key="own">
-        <h3 v-if="themeIds(own).length" class="theme-group">{{ own ? t('Own themes') : t('Built-in themes') }}</h3>
-        <div class="theme-strip">
-          <button v-for="id in themeIds(own)" :key="id" class="home-theme" :style="themeStyle(id)" :title="t('New presentation with theme {0}', own ? THEMES[id].name : t(THEMES[id].name))" @click="blank(id)">
-            <span class="theme-cover"><b>{{ t('Title') }}</b><i /></span>
-            <span class="theme-name">{{ own ? THEMES[id].name : t(THEMES[id].name) }}</span>
-          </button>
-        </div>
-      </template>
-    </section>
-
-    <section class="home-projects">
+    <section v-if="library.list.length" class="home-projects">
       <h2>{{ t('My projects') }} <small>{{ t('stored in this browser · save as .slides.json, restore via “Open project file”') }}</small>
         <button v-if="library.list.length > 1" class="tb small" @click="exportAllProjects"><Icon name="download" :size="16" />{{ t('Save all') }}</button></h2>
-      <p v-if="!library.list.length" class="empty">{{ t('No projects yet – get started above.') }}</p>
       <div class="project-grid">
         <article v-for="p in library.list" :key="p.id" class="project" :class="{ current: p.id === deck.id }" @contextmenu="onContext($event, p)">
           <button class="project-open" :style="themeStyle(p.theme)" @click="open(p.id)">
@@ -179,6 +169,39 @@ const WHY = [
         </template>
       </Menu>
     </section>
+
+    <section class="home-show">
+      <h2>{{ t('See what Slidecko can do') }}</h2>
+      <video class="show-video" :src="shot('demo') + '.mp4'" :poster="shot('editor') + '.webp'" :autoplay="!still" muted loop playsinline controls preload="metadata"
+        :aria-label="t('Demo: change a chart, switch themes and present')" />
+      <div class="show-grid">
+        <figure v-for="[name, title, text] in SHOWCASE" :key="name" class="show-card">
+          <a :href="shot(name) + '.webp'" target="_blank" rel="noopener"><img :src="shot(name) + '.webp'" :alt="t(title)" width="1600" height="1000" loading="lazy" /></a>
+          <figcaption><b>{{ t(title) }}</b><p>{{ t(text) }}</p></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="home-why">
+      <h2>{{ t('Why Slidecko') }}</h2>
+      <div class="why-grid">
+        <div v-for="[title, text] in WHY" :key="title" class="why-card"><b>{{ t(title) }}</b><p>{{ t(text) }}</p></div>
+      </div>
+    </section>
+
+    <section class="home-themes">
+      <h2>{{ t('Start with a theme') }}</h2>
+      <template v-for="own in [false, true]" :key="own">
+        <h3 v-if="themeIds(own).length" class="theme-group">{{ own ? t('Own themes') : t('Built-in themes') }}</h3>
+        <div class="theme-strip">
+          <button v-for="id in themeIds(own)" :key="id" class="home-theme" :style="themeStyle(id)" :title="t('New presentation with theme {0}', own ? THEMES[id].name : t(THEMES[id].name))" @click="blank(id)">
+            <span class="theme-cover"><b>{{ t('Title') }}</b><i /></span>
+            <span class="theme-name">{{ own ? THEMES[id].name : t(THEMES[id].name) }}</span>
+          </button>
+        </div>
+      </template>
+    </section>
+
 
     <AppFooter class="in-home" />
   </main>
