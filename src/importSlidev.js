@@ -41,13 +41,14 @@ const special = el => el.dataset.shape || el.dataset.video || el.dataset.timer |
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
+// known: image path -> id of an asset the project already has (Markdown of its own slides, edited in the app)
 // a background written as color-mix(in srgb, <colour> N%, transparent) -> { fill, fillAlpha }; var(--…) = the theme's colour
 function unmix(bg) {
   const m = bg.match(/^color-mix\(in srgb,\s*(.+?)\s+([\d.]+)%,\s*transparent(?:\s+[\d.]+%)?\)$/) // Chrome adds the second share
   if (!m) return { fill: bg }
   return { ...(!m[1].startsWith('var(') && { fill: m[1] }), fillAlpha: +m[2] }
 }
-export async function importSlidev(path, files, theme) {
+export async function importSlidev(path, files, theme, known = {}) {
   const assets = {}, bySrc = {}, missingFiles = []
   let missing = 0
   const texts = new Map(await Promise.all(
@@ -64,6 +65,7 @@ export async function importSlidev(path, files, theme) {
     if (src in bySrc) return bySrc[src]
     if (/^data:image\//.test(src)) return (bySrc[src] = storeAsset(src))
     const p = imagePath(src)
+    if (known[p]) return (bySrc[src] = known[p])
     const file = files.get(p) || files.get('public/' + p)
     return (bySrc[src] = file ? storeAsset(await readDataUrl(file)) : null)
   }

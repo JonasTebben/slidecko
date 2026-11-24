@@ -52,10 +52,11 @@ export function headFormat(md) {
   return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }), ...(TRANSITIONS.includes(tr) && { transition: tr }), ...(dur && { duration: dur }) }
 }
 
-function splitSlides(md) {
+// at: index of the slide's first body line (the source editor maps lint results back with it)
+export function splitSlides(md) {
   const lines = md.split(/\r?\n/)
   const slides = []
-  let cur = { fm: '', body: [] }
+  let cur = { fm: '', body: [], at: 0 }
   let fence = '' // the open code fence; only an equal or longer one of the same kind closes it
   for (let i = 0; i < lines.length; i++) {
     const mark = lines[i].match(/^\s*(`{3,}|~{3,})(.*)$/)
@@ -66,13 +67,14 @@ function splitSlides(md) {
       continue
     }
     slides.push(cur)
-    cur = { fm: '', body: [] }
+    cur = { fm: '', body: [], at: i + 1 }
     // a `key: value` block closed by another `---` is the new slide's frontmatter
     const end = lines.findIndex((l, j) => j > i && /^---\s*$/.test(l))
     const fm = end > i ? lines.slice(i + 1, end) : []
     if (fm.some(l => l.trim()) && fm.every(l => /^([\w-]+:|\s|$)/.test(l))) {
       cur.fm = fm.join('\n').trim()
       i = end
+      cur.at = end + 1
     }
   }
   slides.push(cur)

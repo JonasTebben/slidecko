@@ -321,6 +321,19 @@ export function slideToMarkdown(slide) {
 // projectFiles: the project's other files (theme, package.json …), written back unchanged
 // shapeFont: element id -> font size the editor shrank its shape text to
 // fonts: what the project files need from the app, zip path -> 'fonts/…' (a bundled file) or an asset id (an uploaded font)
+// image path in the Markdown -> asset id, for every image of these slides
+export function imageMap(slides) {
+  const images = {}
+  for (const s of slides) for (const el of s.elements) {
+    if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
+    for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
+      const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]
+      if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id
+    }
+  }
+  return images
+}
+
 export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition, duration, master = [], layouts = [], fonts: ownFonts = {} }, projectFiles = {}, { shapeFont = {}, assets = {} } = {}) {
   entry ||= 'slides.md'
   const dir = entry.split('/').slice(0, -1).join('/')
@@ -415,13 +428,6 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
     if (missing.length) files['package.json'] = JSON.stringify({ ...p, dependencies: { ...p.dependencies, ...Object.fromEntries(missing.map(k => [`@iconify-json/${k}`, ICONIFY_JSON])) } }, null, 2) + '\n'
   } catch { /* not JSON: leave the project's file alone */ }
 
-  const images = {}
-  for (const s of [...slides, { elements: master }, ...layouts]) for (const el of s.elements) {
-    if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
-    for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
-      const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]
-      if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id
-    }
-  }
+  const images = imageMap([...slides, { elements: master }, ...layouts])
   return { files, images, fonts }
 }
