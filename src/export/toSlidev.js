@@ -182,9 +182,9 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-timer="${el.seconds}"${more} style="${boxStyle(el)}">\n\n${el.seconds ? clock(el.seconds) : clock(0, true)}\n\n</div>`
     }
     case 'picker': // Slidev has no picker: the names as text, data-picks (JSON, one line) brings them back on import
-      return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}"${el.repeat ? ' data-repeat="1"' : ''} style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
+      return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}"${el.repeat ? ' data-repeat="1"' : ''}${el.look ? ` data-look="${el.look}"` : ''}${el.heading != null ? ` data-heading="${esc(el.heading).replace(/>/g, '&gt;')}"` : ''}${el.noIcon ? ' data-noicon="1"' : el.icon ? ` data-pick-icon="${el.icon}"` : ''} style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
     case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import
-      return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
+      return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers, look: el.look })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
     case 'icon': // Slidev's Iconify component in the box; its colour and turns are on the icon
       return `<div style="${boxStyle({ ...el, color: undefined })}">\n\n${iconTag(el)}\n\n</div>`
     case 'chart': { // the picture as inline SVG in the theme's accent; data-chart (JSON, one line) brings the editable chart back on import
@@ -192,9 +192,9 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-chart="${esc(JSON.stringify({ kind, categories, series, legend, values, stacked, title, min, max, percent, catColors, palette })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">${chartSvg(el, themeOf(curTheme).vars?.accent)}</div>`
     }
     case 'toc': { // Slidev's own <Toc>; data-toc brings the options (also the highlight Slidev lacks) back on import
-      const { minDepth, maxDepth, columns, current } = el
+      const { minDepth, maxDepth, columns, current, look } = el
       const props = [columns && ` columns="${columns}"`, minDepth && ` minDepth="${minDepth}"`, maxDepth && ` maxDepth="${maxDepth}"`].filter(Boolean).join('')
-      return `<div data-toc="${esc(JSON.stringify({ minDepth, maxDepth, columns, current }))}" style="${boxStyle(el)}">\n<Toc${props} />\n</div>`
+      return `<div data-toc="${esc(JSON.stringify({ minDepth, maxDepth, columns, current, look }))}" style="${boxStyle(el)}">\n<Toc${props} />\n</div>`
     }
     case 'video':
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`

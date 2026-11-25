@@ -6,7 +6,7 @@ import Menu from './Menu.vue'
 import Sec from './InspectorSection.vue'
 import ChartPanel from './ChartPanel.vue'
 import FontOptions from './FontOptions.vue'
-import { deck, ui, SHAPES, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont } from '../core/store.js'
+import { deck, ui, SHAPES, LOOKS, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont } from '../core/store.js'
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from '../slide/themes.js'
 import { LANGS, codeOpts } from '../slide/hl.js'
 import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from '../present/run.js'
@@ -216,6 +216,9 @@ const TIPS = {
 }
 // Mermaid code: rendered a moment after typing stops (one render, one undo step, not one per key)
 const dia = computed(() => el.value?.type === 'diagram' && diagram(el.value.code, deck.theme))
+// the style buttons of random draws, quizzes and tables of contents: the built-in one first (unset)
+const LOOK_NAMES = { picker: ['Card', 'Filled', 'Outline', 'Plain'], quiz: ['Tiles', 'List', 'Colours', 'Plain'], toc: ['Bullets', 'Numbered', 'Cards', 'Lines'] }
+const looks = type => [undefined, ...LOOKS[type]].map((k, i) => [k, LOOK_NAMES[type][i]])
 const listName = ref('') // the saved name list being saved or used
 let diaTimer
 const setDiagram = (target, code, ms = 300) => { clearTimeout(diaTimer); diaTimer = setTimeout(() => { target.code = cleanEl({ type: 'diagram', code }).code }, ms) }
@@ -648,6 +651,20 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <!-- the same limits as when loading a project -->
         <label class="field">{{ t('Names or groups, one per line') }}
           <textarea :value="el.names.join('\n')" rows="8" maxlength="20000" @change="el.names = cleanEl({ type: 'picker', names: $event.target.value.split('\n') }).names" /></label>
+        <div class="field">{{ t('Style') }}
+          <div class="seg" role="group" :aria-label="t('Style')">
+            <button v-for="[k, n] in looks(el.type)" :key="n" class="ib grow" :class="{ on: el.look === k }" :aria-pressed="el.look === k" @click="el.look = k">{{ t(n) }}</button>
+          </div>
+        </div>
+        <label class="field">{{ t('Text above (empty: none)') }}
+          <input :value="el.heading ?? t('Who’s next?')" maxlength="100" @change="el.heading = $event.target.value.replace(/\s+/g, ' ').trim()" /></label>
+        <div class="field">{{ t('Icon') }}
+          <div class="seg" role="group" :aria-label="t('Icon')">
+            <button class="ib grow" :class="{ on: !el.noIcon && !el.body }" :aria-pressed="!el.noIcon && !el.body" @click="Object.assign(el, { noIcon: undefined, icon: undefined, body: undefined, view: undefined })">{{ t('Die') }}</button>
+            <button class="ib grow" :class="{ on: !!el.body }" :aria-pressed="!!el.body" :title="el.icon" @click="el.noIcon = undefined; Object.assign(iconPicker, { open: true, target: el.id })"><Icon name="search" /> {{ t('Choose …') }}</button>
+            <button class="ib grow" :class="{ on: !!el.noIcon }" :aria-pressed="!!el.noIcon" @click="el.noIcon = true">{{ t('None') }}</button>
+          </div>
+        </div>
         <label class="check"><input type="checkbox" :checked="!!el.repeat" @change="el.repeat = $event.target.checked || undefined" /> {{ t('A name can be drawn again') }}</label>
         <!-- name lists in this browser, for every project: choosing one copies its names here -->
         <div class="field">{{ t('Saved name lists') }}
@@ -684,6 +701,11 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </div>
           <button class="ib wide" :disabled="el.answers.length >= LETTERS.length" @click="el.answers.push({ text: '' })"><Icon name="plus" /> {{ t('Add answer') }}</button>
         </div>
+        <div class="field">{{ t('Style') }}
+          <div class="seg" role="group" :aria-label="t('Style')">
+            <button v-for="[k, n] in looks(el.type)" :key="n" class="ib grow" :class="{ on: el.look === k }" :aria-pressed="el.look === k" @click="el.look = k">{{ t(n) }}</button>
+          </div>
+        </div>
         <label class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
           <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </label>
@@ -696,6 +718,11 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <label>{{ t('Columns') }}<select :value="el.columns || 1" @change="el.columns = +$event.target.value > 1 ? +$event.target.value : undefined"><option v-for="n in 4" :key="n" :value="n">{{ n }}</option></select></label>
         </div>
         <label class="check"><input type="checkbox" :checked="!!el.current" @change="el.current = $event.target.checked || undefined" /> {{ t('Highlight the current slide') }}</label>
+        <div class="field">{{ t('Style') }}
+          <div class="seg" role="group" :aria-label="t('Style')">
+            <button v-for="[k, n] in looks(el.type)" :key="n" class="ib grow" :class="{ on: el.look === k }" :aria-pressed="el.look === k" @click="el.look = k">{{ t(n) }}</button>
+          </div>
+        </div>
         <label class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
           <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </label>

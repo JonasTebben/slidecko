@@ -230,3 +230,9 @@ test('an icon is written as Slidev’s Iconify component in its box, and its set
   assert.equal(JSON.parse(toSlidev({ slides: [{ layout: 'default', elements: [icon] }] }, { 'package.json': own }).files['package.json']).dependencies['@iconify-json/mdi'], '1.1.0')
   assert.ok(!toSlidev({ slides: [{ layout: 'default', elements: [] }] }).files['package.json'].includes('iconify'))
 })
+
+test('a picker writes its style, heading and icon as data-* attributes', () => {
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'p', type: 'picker', ...box, names: ['a'], look: 'solid', heading: 'Next "one"', icon: 'mdi:star', body: '<path/>' }] })
+  assert.match(md, / data-look="solid" data-heading="Next &quot;one&quot;" data-pick-icon="mdi:star" /)
+  assert.match(slideToMarkdown({ layout: 'default', elements: [{ id: 'q', type: 'quiz', ...box, question: 'q', answers: [{ text: 'a' }, { text: 'b' }], look: 'list' }] }), /&quot;look&quot;:&quot;list&quot;/)
+})

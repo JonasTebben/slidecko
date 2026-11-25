@@ -50,6 +50,8 @@ export const deck = reactive({ id: '', title: '', source: '', typo: {}, theme: D
 export const ui = reactive({ master: null, slide: 0, sel: [], editing: null, status: '', cell: null, cellEnd: null, cellFill: false, crop: null, cropRatio: null, look: null, painting: false, home: false, save: 'saved', yt: false }) // save: saving | saved | failed; yt: YouTube content allowed in this tab (privacy: nothing loads from Google before a click; kept in sessionStorage)
 export const library = reactive({ list: [] }) // [{ id, title, theme, slides, decks, updated }]
 
+// display styles of random draws, quizzes and tables of contents (unset: the first, built-in one)
+export const LOOKS = { picker: ['solid', 'outline', 'plain'], quiz: ['list', 'colors', 'plain'], toc: ['numbered', 'cards', 'lines'] }
 export const uid = () => Math.random().toString(36).slice(2, 10)
 // Slidev's click animations are kept in the markup so they survive a round trip
 // <style> is dropped: its rules would apply to the whole app, not just the box (remote url() in style attributes stays)
@@ -185,6 +187,7 @@ export function cleanEl(e) {
     case 'toc': return {
       ...base, ...(e.minDepth > 1 && { minDepth: Math.min(6, Math.round(e.minDepth)) }), ...(e.maxDepth >= 1 && e.maxDepth < 6 && { maxDepth: Math.round(e.maxDepth) }),
       ...(e.columns > 1 && { columns: Math.min(4, Math.round(e.columns)) }), ...(e.current === true && { current: true }), ...(color(e.color) && { color: color(e.color) }),
+      ...(LOOKS.toc.includes(e.look) && { look: e.look }),
     }
     // Mermaid source, rendered (and sanitized) by diagram.js; capped so a pasted file cannot stall the renderer
     case 'diagram': return { ...base, code: (str(e.code) || '').slice(0, 20000) }
@@ -200,9 +203,15 @@ export function cleanEl(e) {
       ...(e.auto === true && { auto: true }), ...(e.silent === true && { silent: true }), // starts when visible; no sound at the end
     }
     // names or groups to draw from while presenting: plain text, trimmed, at most 200 of 100 characters; repeat: a name can come up again
-    case 'picker': return {
-      ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),
-      ...(color(e.color) && { color: color(e.color) }), ...(e.repeat === true && { repeat: true }),
+    // look, heading over the card ('' none, unset "Who's next?"), its icon: an Iconify one as for icon elements, noIcon, unset a die
+    case 'picker': {
+      const body = cleanIconBody(e.body)
+      return {
+        ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),
+        ...(color(e.color) && { color: color(e.color) }), ...(e.repeat === true && { repeat: true }), ...(LOOKS.picker.includes(e.look) && { look: e.look }),
+        ...(typeof e.heading === 'string' && { heading: e.heading.replace(/\s+/g, ' ').trim().slice(0, 100) }),
+        ...(e.noIcon === true ? { noIcon: true } : ICON_NAME.test(e.icon) && body && { icon: e.icon, body, view: /^-?[\d.]+( -?[\d.]+){3}$/.test(e.view) ? e.view : '0 0 24 24' }),
+      }
     }
     // an Iconify icon (set:name) with its SVG, so it still renders without the set; label: read out (none: decorative)
     case 'icon': {
@@ -217,7 +226,7 @@ export function cleanEl(e) {
       const line = (v, n) => (str(v) || '').replace(/\s+/g, ' ').trim().slice(0, n)
       const answers = (Array.isArray(e.answers) ? e.answers : []).filter(a => a && typeof a === 'object').slice(0, 6).map(a => ({ text: line(a.text, 200), ...(a.correct === true && { correct: true }) }))
       while (answers.length < 2) answers.push({ text: '' })
-      return { ...base, question: line(e.question, 300), answers }
+      return { ...base, question: line(e.question, 300), answers, ...(LOOKS.quiz.includes(e.look) && { look: e.look }) }
     }
     // chart data from files or the clipboard: finite numbers, short plain-text labels, at most 100 categories and 20 series
     case 'chart': {

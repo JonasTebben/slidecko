@@ -267,3 +267,16 @@ test('a module missing after a release is recognised in every browser', () => {
   for (const m of ['Failed to fetch dynamically imported module: https://x/a.js', 'Importing a module script failed.', 'error loading dynamically imported module: https://x/a.js']) assert.ok(S.staleChunk(new TypeError(m)))
   assert.equal(S.staleChunk(new Error('x is not defined')), false)
 })
+
+test('styles of draws, quizzes and tables of contents; a draw keeps its heading and icon', () => {
+  assert.equal(S.cleanEl({ type: 'picker', names: ['a'], look: 'solid' }).look, 'solid')
+  assert.equal(S.cleanEl({ type: 'picker', names: ['a'], look: 'lines' }).look, undefined) // another type's style
+  assert.equal(S.cleanEl({ type: 'quiz', question: 'q', answers: [], look: 'colors' }).look, 'colors')
+  assert.equal(S.cleanEl({ type: 'toc', look: 'cards' }).look, 'cards')
+  const p = S.cleanEl({ type: 'picker', names: ['a'], heading: '  Who   now? ', icon: 'mdi:star', body: '<path d="M1 1"/>' })
+  assert.deepEqual([p.heading, p.icon, p.view], ['Who now?', 'mdi:star', '0 0 24 24'])
+  assert.equal(S.cleanEl({ type: 'picker', names: ['a'], heading: '' }).heading, '') // no heading
+  assert.equal(S.cleanEl({ type: 'picker', names: ['a'], icon: 'mdi:star', body: '<script>x</script>' }).icon, undefined)
+  const none = S.cleanEl({ type: 'picker', names: ['a'], noIcon: true, icon: 'mdi:star', body: '<path/>' })
+  assert.deepEqual([none.noIcon, none.icon], [true, undefined])
+})

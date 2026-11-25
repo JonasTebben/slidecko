@@ -172,7 +172,7 @@ export function canOrder(where) {
 }
 // --- format painter: the look of one element onto others (⌘⌥C / ⌘⌥V or the brush in the inspector) ---
 const LOOK = {
-  text: ['shadow', 'font', 'fontSize', 'color', 'fill', 'fillAlpha', 'stroke', 'strokeWidth', 'strokeStyle', 'align', 'valign'],
+  text: ['shadow', 'font', 'fontSize', 'color', 'fill', 'fillAlpha', 'stroke', 'strokeWidth', 'strokeStyle', 'align', 'valign', 'line', 'para'],
   shape: ['shadow', 'fill', 'fillAlpha', 'stroke', 'strokeWidth', 'radius'],
   code: ['shadow', 'fontSize', 'fill', 'fillAlpha', 'radius'],
   image: ['shadow', 'radius'],

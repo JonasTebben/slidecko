@@ -155,6 +155,14 @@
 .slide .el.toc .toc { height: 100%; overflow: hidden; column-gap: 32px; }
 .slide .el.toc li { break-inside: avoid; }
 .slide .el.toc a.toc-current { font-weight: 700; border-bottom-style: solid; }
+/* styles: numbered, each entry on a tinted card with an accent edge, entries between lines */
+.slide .el.toc .look-numbered ul { list-style: decimal; }
+.slide .el.toc .look-numbered ul ul { list-style: lower-alpha; }
+.slide .el.toc :is(.look-cards, .look-lines) > ul { list-style: none; margin: 0; padding: 0; }
+.slide .el.toc :is(.look-cards, .look-lines) > ul > li { margin-left: 0; padding-left: 0; }
+.slide .el.toc :is(.look-cards, .look-lines) a { border-bottom: 0; }
+.slide .el.toc .look-cards > ul > li { margin-bottom: 10px; padding: 6px 14px; border-left: 4px solid var(--accent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.slide .el.toc .look-lines > ul > li { padding: 6px 0; border-bottom: 1px solid var(--border); }
 /* a shape or picture that jumps to a slide: the whole box is the link (not in the editor) */
 .slide .el > .el-link { position: absolute; inset: 0; z-index: 1; border: 0; cursor: pointer; }
 /* random picker: the drawn name large, how many are left small; a short pop-in (off with reduced motion) */
@@ -166,6 +174,14 @@
 .slide .el.picker .picker-face .die { width: .7em; height: .7em; fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .slide .el.picker .picker-face .die circle { fill: var(--accent); stroke: none; }
 .slide .el.picker .picker-face .pick { line-height: 1.15; }
+.slide .el.picker .picker-face .pick-icon { display: block; width: .7em; height: .7em; color: var(--accent); }
+.slide .el.picker .picker-face .pick-icon svg { display: block; }
+/* styles: filled in the accent (accent-fg on accent stays AA, as in table headers), only the frame, or no frame */
+.slide .el.picker .picker-face.look-solid { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); }
+.slide .el.picker .picker-face.look-solid :is(.die, .pick-icon) { stroke: currentColor; color: currentColor; }
+.slide .el.picker .picker-face.look-solid .die circle { fill: currentColor; }
+.slide .el.picker .picker-face.look-outline { background: none; }
+.slide .el.picker .picker-face.look-plain { background: none; border-color: transparent; }
 .slide .el.picker .picker-face small { line-height: 1.3; font-size: .3em; font-weight: 400; opacity: .75; margin-top: .3em; }
 .slide .el.picker .picker-face .pick + small { padding: .15em .7em; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); opacity: 1; }
 .slide .el.picker .picker-face .pick { animation: pick-in .4s cubic-bezier(.34, 1.56, .64, 1); }
@@ -178,6 +194,18 @@
 .slide .el.quiz .quiz-tile { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 2px solid var(--border); border-radius: 10px; background: var(--stripe); user-select: none; }
 .slide .el.quiz .quiz-tile b { flex: none; display: grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--fg); color: var(--bg); }
 .slide .el.quiz .quiz-tile.picked { border-color: var(--fg); border-width: 4px; padding: 6px 12px; }
+/* styles: one answer per row; a colour per answer (white text, all AA; no green, that is the solution); no tiles */
+.slide .el.quiz .look-list .quiz-a { grid-template-columns: 1fr; }
+.slide .el.quiz .look-colors .quiz-tile { --tile: #b91c1c; background: var(--tile); border-color: transparent; color: #fff; }
+.slide .el.quiz .look-colors .quiz-tile:nth-child(6n + 2) { --tile: #1d4ed8; }
+.slide .el.quiz .look-colors .quiz-tile:nth-child(6n + 3) { --tile: #a16207; }
+.slide .el.quiz .look-colors .quiz-tile:nth-child(6n + 4) { --tile: #7e22ce; }
+.slide .el.quiz .look-colors .quiz-tile:nth-child(6n + 5) { --tile: #0f766e; }
+.slide .el.quiz .look-colors .quiz-tile:nth-child(6n) { --tile: #be185d; }
+.slide .el.quiz .look-colors .quiz-tile b { background: #fff; color: var(--tile); }
+.slide .el.quiz .look-colors .quiz-tile.picked { border-color: var(--fg); }
+.slide .el.quiz .look-plain .quiz-tile { background: none; border-color: transparent; }
+.slide .el.quiz .look-plain .quiz-tile.picked { border-color: var(--fg); }
 .slide .el.quiz .revealed .quiz-tile[data-correct] { background: #15803d; border-color: #15803d; color: #fff; }
 .slide .el.quiz .revealed .quiz-tile[data-correct] b { background: #fff; color: #15803d; }
 .slide .el.quiz .revealed .quiz-tile:not([data-correct]) { opacity: .35; }

@@ -121,8 +121,8 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
-      // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them)
-      const elements = (await Promise.all(measure(slide, s).map(async e => (e.type !== 'icon' ? e : Object.assign(e, await getIcon(e.icon).catch(() => null)))))).filter(e => e.type !== 'icon' || e.body)
+      // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them), a picker keeps its die
+      const elements = (await Promise.all(measure(slide, s).map(async e => (e.type === 'icon' || (e.type === 'picker' && e.icon) ? Object.assign(e, await getIcon(e.icon).catch(() => null)) : e)))).filter(e => e.type !== 'icon' || e.body)
       const bg = bgPath(fmGet(s.fm, 'background')), bgId = bg && await asset(bg)
       slides.push({ id: uid(), layout: s.layout, elements,
         ...(bgId && { bg: { asset: bgId, src: bg, fit: fmGet(s.fm, 'backgroundSize'), dim: +fmGet(s.fm, 'backgroundDim') || undefined } }),
@@ -224,11 +224,11 @@ function measure(slide, parsed) {
     } else if (n.dataset.picks) {
       let names = []
       try { names = JSON.parse(n.dataset.picks) } catch { /* a broken list: an empty picker, cleanEl checks the rest */ }
-      Object.assign(el, { type: 'picker', names, repeat: n.dataset.repeat === '1' })
+      Object.assign(el, { type: 'picker', names, repeat: n.dataset.repeat === '1', look: n.dataset.look, heading: n.dataset.heading, noIcon: n.dataset.noicon === '1', icon: n.dataset.pickIcon }) // the icon's SVG from its set below
     } else if (n.dataset.quiz) {
       let q = {}
       try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }
-      Object.assign(el, { type: 'quiz', question: q?.question, answers: q?.answers })
+      Object.assign(el, { type: 'quiz', question: q?.question, answers: q?.answers, look: q?.look })
     } else if (n.dataset.toc) {
       let o = {}
       try { o = JSON.parse(n.dataset.toc) } catch { /* broken data: the default options */ }
