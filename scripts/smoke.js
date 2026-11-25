@@ -264,7 +264,9 @@ async function presenting(page, label, touch) {
     }
     else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 80, y, { steps: 4 }); await page.mouse.up() }
     ok(await page.locator('.pv-ink polyline').count() > 0, 'no stroke')
-    await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]')
+    // a tap right after the stroke can be lost on a slow machine: tap again until the pen is off
+    for (let k = 0; k < 3 && await page.locator('.pv-ink.on').count(); k++) { await page.waitForTimeout(300); await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]') }
+    ok(!(await page.locator('.pv-ink.on').count()), 'the pen stays on')
   }
   await step(`${label}: drawing with the pen`, draw)
   await step(`${label}: the bar's own timer`, async () => {
