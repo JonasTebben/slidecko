@@ -224,7 +224,7 @@ const LIVE = { title: 'Live', theme: 'ozean', slides: [
     { type: 'text', board: true, liveTemp: true, html: '<p>Temp</p>', x: 500, y: 360, w: 400, h: 120 }] },
   { layout: 'default', elements: [{ type: 'text', html: '<p>Two</p>', x: 40, y: 40, w: 400, h: 80 }] }] }
 async function presenting(page, label, touch) {
-  const tap = async sel => { const b = await page.locator(sel).first().boundingBox(); if (!b) throw new Error(`${sel} not shown`); const x = b.x + b.width / 2, y = b.y + b.height / 2; touch ? await page.touchscreen.tap(x, y) : await page.mouse.click(x, y) }
+  const tap = async sel => { const b = await page.locator(sel).first().boundingBox({ timeout: 10000 }).catch(() => null); if (!b) throw new Error(`${sel} not shown`); const x = b.x + b.width / 2, y = b.y + b.height / 2; touch ? await page.touchscreen.tap(x, y) : await page.mouse.click(x, y) }
   const dbl = async sel => { await tap(sel); await page.waitForTimeout(80); await tap(sel) }
   const text = sel => page.locator(sel).first().innerText()
   const running = sel => page.locator(sel).first().evaluate(n => n.classList.contains('running'))
@@ -255,7 +255,9 @@ async function presenting(page, label, touch) {
   const draw = async () => {
     await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1))
     await tap('.pv-bar button[aria-label=Pen]')
-    const b = await page.locator('.pv-ink').boundingBox(), x = b.x + 100, y = b.y + b.height - 60
+    const b = await page.locator('.pv-ink').boundingBox({ timeout: 10000 }).catch(() => null)
+    if (!b) throw new Error('the pen did not switch on')
+    const x = b.x + 100, y = b.y + b.height - 60
     if (touch) { // a real finger stroke (Chromium's touch input), so pointer capture works as on an iPad
       const cdp = await page.context().newCDPSession(page)
       for (const [type, dx] of [['touchStart', 0], ['touchMove', 40], ['touchMove', 80], ['touchEnd', 80]]) await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: x + dx, y }] })

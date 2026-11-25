@@ -31,3 +31,4 @@ jobs:
           name: smoke
           path: .smoke-tmp/*.png
           if-no-files-found: ignore
+          include-hidden-files: true # .smoke-tmp
