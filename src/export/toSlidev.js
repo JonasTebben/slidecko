@@ -81,6 +81,9 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replac
 // decorative: role="presentation", because Markdown pictures without a description come with an empty alt too
 const altAttr = el => (el.decorative ? ' alt="" role="presentation"' : el.alt ? ` alt="${esc(el.alt)}"` : '')
 
+const SPACING_CSS = `[style*="--lh"] :is(p, li, h1, h2, h3, h4, h5, h6, blockquote) { line-height: var(--lh) !important; }
+[style*="--ps"] > * { margin-block: 0 !important; }
+[style*="--ps"] > * + *, [style*="--ps"] li + li { margin-top: var(--ps) !important; }`
 function boxStyle(el, extra = '') {
   const px = n => Math.round(n) + 'px'
   let s = `position:absolute;left:${px(el.x)};top:${px(el.y)};width:${px(el.w)};height:${px(el.h)}`
@@ -96,6 +99,8 @@ function boxStyle(el, extra = '') {
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
   if (el.morph) s += `;--morph:${el.morph}` // Magic move name, likewise
   if (el.board) s += ';--board:1' // editable while presenting, likewise
+  if (el.line != null) s += `;--lh:${el.line}` // line and paragraph spacing: SPACING_CSS in style.css applies them
+  if (el.para != null) s += `;--ps:${el.para}px`
   if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`
   return s + extra
 }
@@ -441,7 +446,9 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   if (typoRules) files['style.css'] = `${files['style.css'] || projectFiles['style.css'] || ''}\n/* font sizes for all slides (Slidecko) */\n${typoRules}`.trimStart()
   // fonts the slides or the theme name come along in public/fonts/ (Slidev serves public/ at /), so the project needs no network;
   // the block of an earlier export (style.css imported with the project) is replaced, not repeated
-  if (files['style.css']) files['style.css'] = files['style.css'].replace(/\n?\/\* fonts \(Slidecko\) \*\/[\s\S]*?\/\* end of fonts \*\/\n?/g, '')
+  if (files['style.css']) files['style.css'] = files['style.css'].replace(/\n?\/\* spacing \(Slidecko\) \*\/[\s\S]*?\/\* end of spacing \*\/\n?/g, '').replace(/\n?\/\* fonts \(Slidecko\) \*\/[\s\S]*?\/\* end of fonts \*\/\n?/g, '')
+  // a text box's own line and paragraph spacing (--lh, --ps in its style), as in the editor (slide.css)
+  if ([...slides, { elements: master }, ...layouts].some(s => s.elements?.some(e => e.line != null || e.para != null))) files['style.css'] = `${files['style.css'] || ''}\n/* spacing (Slidecko) */\n${SPACING_CSS}\n/* end of spacing */\n`.trimStart()
   const text = Object.values(files).join('\n'), fonts = {}, src = {}
   const bundled = Object.keys(BUNDLED).filter(k => usesFamily(text, BUNDLED[k][0]))
   for (const k of bundled) for (const f of [...bundledFaces(k).map(x => x[0]), `${k}/OFL.txt`]) fonts['public/fonts/' + f] = 'fonts/' + f

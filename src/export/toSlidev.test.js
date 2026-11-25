@@ -85,6 +85,12 @@ test('a picker keeps its names in one escaped data-picks attribute that reads ba
   assert.match(md, /🎲 Ana/)
 })
 
+test('line and paragraph spacing go into the box style, with their CSS in style.css only when used', () => {
+  const el = { id: 's', type: 'text', ...box, html: '<p>a</p><p>b</p>', line: 1.5, para: 12 }
+  assert.match(slideToMarkdown({ layout: 'default', elements: [el] }), /;--lh:1\.5;--ps:12px/)
+  assert.doesNotMatch(slideToMarkdown({ layout: 'default', elements: [{ ...el, line: undefined, para: undefined }] }), /--lh|--ps/)
+})
+
 test('a notes box keeps its "editable while presenting" flag as --board in its box style', () => {
   const el = { id: 'n', type: 'text', ...box, html: '<ul><li>idea</li></ul>', board: true }
   assert.match(slideToMarkdown({ layout: 'default', elements: [el] }), /<div style="position:absolute[^"]*;--board:1[^"]*">/) // positioned, not flowed

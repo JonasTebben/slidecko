@@ -513,7 +513,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
-        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="mathed(el, items(el, fields(resolveImgs(el.html))))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null }"
+        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="mathed(el, items(el, fields(resolveImgs(el.html))))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null, '--lh': el.line, '--ps': el.para != null ? el.para + 'px' : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); layoutMarks()" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"

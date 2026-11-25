@@ -354,6 +354,12 @@ onMounted(async () => {
   addEventListener('pagehide', () => saveSession(sessionState())) // the list's scroll position is not reactive
   addEventListener('keydown', onKey)
   for (const type of ['copy', 'cut', 'paste']) addEventListener(type, onClipboard)
+  // Enter in a dialog's field means its main button; the browser would take the first one, which is Cancel
+  addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing || !e.target.matches?.('form[method=dialog] input:not([type=checkbox], [type=radio], [type=file])')) return
+    const b = e.target.form.querySelector('button.primary:not(:disabled)')
+    if (b) { e.preventDefault(); b.click() }
+  })
   addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault() })
   addEventListener('drop', onWindowDrop)
   addEventListener('resize', fitPresenter)
@@ -604,7 +610,7 @@ function applyDeck() {
 }
 function addVideo() {
   if (ytDialog.value.returnValue !== 'ok') return
-  const id = ytUrl.value.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{6,20})/)?.[1] || (/^[\w-]{6,20}$/.test(ytUrl.value.trim()) ? ytUrl.value.trim() : null)
+  const id = ytUrl.value.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{6,20})/)?.[1] || (/^[\w-]{6,20}$/.test(ytUrl.value.trim()) ? ytUrl.value.trim() : null)
   id ? A.insert('video', id) : A.toast(t('Not a valid YouTube link.'))
 }
 
@@ -1099,15 +1105,19 @@ function onClipboard(e) {
             <hr />
             <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
             <hr />
-            <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ kbd('insertVideo') }}</kbd></button>
+            <!-- media · data and formulas · for presenting with the audience · structure -->
             <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
+            <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ kbd('insertVideo') }}</kbd></button>
+            <hr />
             <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
             <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
             <button class="mi" @click="A.insert('math')"><Icon name="formula" />{{ t('Formula') }}</button>
+            <hr />
             <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
             <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
             <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random draw') }}</button>
             <button class="mi" @click="A.insert('board')"><Icon name="notes" />{{ t('Live notes box') }}</button>
+            <hr />
             <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ kbd('markdownSlides') }}</kbd></button>
           </Menu>
@@ -1183,15 +1193,19 @@ function onClipboard(e) {
           <hr />
           <button v-for="[k, n, c] in CALLOUTS" :key="k" class="mi" @click="A.insert('callout', k)"><i class="dot" :style="{ background: c }" />{{ t('Callout: {0}', t(n)) }}</button>
           <hr />
-          <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <!-- media · data and formulas · for presenting with the audience · structure -->
           <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
+          <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <hr />
           <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
           <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
           <button class="mi" @click="A.insert('math')"><Icon name="formula" />{{ t('Formula') }}</button>
+          <hr />
           <button class="mi" @click="A.insert('timer')"><Icon name="timer" />{{ t('Timer') }}</button>
           <button class="mi" @click="A.insert('quiz')"><Icon name="quiz" />{{ t('Quiz') }}</button>
           <button class="mi" @click="A.insert('picker')"><Icon name="dice" />{{ t('Random draw') }}</button>
           <button class="mi" @click="A.insert('board')"><Icon name="notes" />{{ t('Live notes box') }}</button>
+          <hr />
           <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
           <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>⇧M</kbd></button>
         </Menu></span>

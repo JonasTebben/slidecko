@@ -1264,4 +1264,6 @@ export default {
   "Delete list": "Liste löschen",
   "While presenting: a click draws a name, nobody twice until everyone was drawn (unless a name can come up again); a double click starts over.": "Beim Präsentieren: Ein Klick zieht einen Namen, niemand kommt doppelt dran, bis alle gezogen wurden (außer ein Name darf erneut kommen); ein Doppelklick fängt von vorn an.",
   "Time and recording": "Zeit und Aufnahme",
+  "Line spacing": "Zeilenabstand",
+  "Paragraph spacing": "Absatzabstand",
 }

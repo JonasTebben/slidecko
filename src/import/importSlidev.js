@@ -177,6 +177,8 @@ function measure(slide, parsed) {
     if (box.style.getPropertyValue('--locked')) el.locked = true
     if (box.style.getPropertyValue('--group')) el.group = box.style.getPropertyValue('--group').trim()
     if (box.style.getPropertyValue('--board')) el.board = true
+    if (box.style.getPropertyValue('--lh')) el.line = parseFloat(box.style.getPropertyValue('--lh')) // cleanEl checks both
+    if (box.style.getPropertyValue('--ps')) el.para = parseFloat(box.style.getPropertyValue('--ps'))
     if (box.style.getPropertyValue('--morph')) el.morph = box.style.getPropertyValue('--morph').trim()
     // shadow written by toSlidev: drop-shadow(… 0px Ypx BLURpx), recognised by its blur
     const blur = box.style.filter.match(/drop-shadow\(.*?([\d.]+)px\)?\s*\)?$/)?.[1]

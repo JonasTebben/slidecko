@@ -177,6 +177,8 @@ test('notes box: the "editable while presenting" flag is kept only on text boxes
   DOMPurify.sanitize = String // no DOM here; the sanitizing itself is not under test
   try {
     assert.equal(S.cleanEl({ type: 'text', html: '<p>x</p>', board: true }).board, true)
+    assert.deepEqual([S.cleanEl({ type: 'text', html: '', line: 9, para: -5 })].map(e => [e.line, e.para]), [[3, 0]]) // spacing within limits
+    assert.equal(S.cleanEl({ type: 'text', html: '' }).line, undefined)
     assert.equal(S.cleanEl({ type: 'text', html: '<p>x</p>', board: 'yes' }).board, undefined)
     assert.equal(S.cleanEl({ type: 'timer', seconds: 60, board: true }).board, undefined)
   } finally { DOMPurify.sanitize = real }

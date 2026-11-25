@@ -139,6 +139,8 @@ export function cleanEl(e) {
       ...(color(e.color) && { color: color(e.color) }), ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(fontStack(e.font) && { font: e.font }),
       ...(e.board === true && { board: true }), // notes box: the class's answers are typed into it while presenting
       ...(e.clickItems === true && { clickItems: true }), // its list items appear one per click while presenting
+      // line spacing (a multiple of the font size) and the space between paragraphs and list items in px; unset: the theme's
+      ...(e.line != null && { line: num(e.line, 0.8, 3) }), ...(e.para != null && { para: num(e.para, 0, 120) }),
       // border: colour, width in px, line style
       ...(color(e.stroke) && e.stroke !== 'none' && { stroke: color(e.stroke), strokeWidth: num(e.strokeWidth || 1, 0.5, 20), ...(['dashed', 'dotted'].includes(e.strokeStyle) && { strokeStyle: e.strokeStyle }) }),
     }

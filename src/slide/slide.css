@@ -87,6 +87,10 @@
 .slide .el > .content.v-bottom { justify-content: flex-end; }
 .slide .el > .content > :first-child { margin-top: 0 !important; }
 .slide .el > .content > :last-child { margin-bottom: 0 !important; }
+/* a text box's own line and paragraph spacing (--lh, --ps); the same rules go into a Slidev export's style.css */
+.slide .el > .content[style*="--lh"] :is(p, li, h1, h2, h3, h4, h5, h6, blockquote) { line-height: var(--lh) !important; }
+.slide .el > .content[style*="--ps"] > * { margin-block: 0 !important; }
+.slide .el > .content[style*="--ps"] > * + *, .slide .el > .content[style*="--ps"] li + li { margin-top: var(--ps) !important; }
 .slide .el.filled > .content { padding: 12px 16px; border-radius: 10px; }
 /* element shadow (--shadow set per element): on what is drawn, not on the selection frame and handles */
 .slide .el > :not(.handle) { filter: var(--shadow, none); }

@@ -1264,4 +1264,6 @@ export default {
   "Delete list": "Lijst verwijderen",
   "While presenting: a click draws a name, nobody twice until everyone was drawn (unless a name can come up again); a double click starts over.": "Tijdens het presenteren: een klik trekt een naam, niemand twee keer tot iedereen is getrokken (tenzij een naam opnieuw mag komen); een dubbelklik begint opnieuw.",
   "Time and recording": "Tijd en opname",
+  "Line spacing": "Regelafstand",
+  "Paragraph spacing": "Alinea-afstand",
 }

@@ -384,6 +384,12 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             <button v-for="[a, i, lbl] in [['top', 'vTop', 'Text top'], ['middle', 'vMiddle', 'Text middle'], ['bottom', 'vBottom', 'Text bottom']]" :key="a" class="ib" :class="{ on: (el.valign || 'top') === a }" :aria-pressed="(el.valign || 'top') === a" :aria-label="t(lbl)" :title="t(lbl)" @click="el.valign = a === 'top' ? undefined : a"><Icon :name="i" /></button>
           </span>
         </div>
+        <div class="btn-row">
+          <label class="field grow">{{ t('Line spacing') }}
+            <select :value="el.line ?? ''" @change="el.line = $event.target.value ? +$event.target.value : undefined"><option value="">{{ t('Theme') }}</option><option v-for="v in [1, 1.15, 1.3, 1.5, 2, 2.5]" :key="v" :value="v">{{ v }}</option></select></label>
+          <label class="field grow">{{ t('Paragraph spacing') }}
+            <select :value="el.para ?? ''" @change="el.para = $event.target.value ? +$event.target.value : undefined"><option value="">{{ t('Theme') }}</option><option v-for="v in [0, 4, 8, 12, 16, 24, 32, 48]" :key="v" :value="v">{{ v }} px</option></select></label>
+        </div>
         <label class="check" :title="t('While presenting, a click into the box lets you type into it, e.g. ideas from the audience; it is saved in the project.')"><input type="checkbox" :checked="!!el.board" @change="el.board = $event.target.checked || undefined" /> {{ t('Editable while presenting') }}</label>
         <label class="check"><input v-model="el.title" type="checkbox" /> {{ t('Slide title') }}</label>
       </Sec>
