@@ -1279,4 +1279,9 @@ export default {
   "Text above (empty: none)": "Tekst erboven (leeg: geen)",
   "Die": "Dobbelsteen",
   "Choose …": "Kiezen …",
+  "Keep what is typed after presenting": "Getypte tekst na het presenteren bewaren",
+  "Off: what is typed while presenting is shown until the presentation ends, and the box keeps its text.": "Uit: wat tijdens het presenteren wordt getypt, blijft zichtbaar tot het einde van de presentatie; het vak houdt zijn tekst.",
+  "Keep": "Bewaren",
+  "On: the drawing stays on the slide as a picture when you leave it": "Aan: de tekening blijft als afbeelding op de dia wanneer je die verlaat",
+  "Drawing from the presentation": "Tekening uit de presentatie",
 }

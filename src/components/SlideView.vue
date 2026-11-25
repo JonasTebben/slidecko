@@ -15,6 +15,7 @@ import { t } from '../core/i18n.js'
 import { longPressFired } from '../core/longpress.js'
 import { face, progress, warning, done, running, toggle, reset, autostart, second } from '../present/timer.js'
 import * as picker from '../present/picker.js'
+import { liveText, keepTyped } from '../present/board.js'
 import { diagramSrc } from '../slide/diagram.js'
 import { withMath, formulaHtml } from '../slide/math.js'
 import { LETTERS, quiz, picked, pick, toggleSolution } from '../present/quiz.js'
@@ -314,10 +315,16 @@ function editLive(e, el) {
 // el.html is only written when editing ends: re-rendering v-html while typing would reset the caret
 function commit(e, el) {
   const html = clean(unresolveImgs(e.target.innerHTML))
-  if (html !== el.html) el.html = html
+  if (liveEdit.value === el.id) keepTyped(el, html)
+  else if (html !== el.html) el.html = html
   if (ui.editing === el.id) ui.editing = null
   if (liveEdit.value === el.id) { liveEdit.value = null; root.value?.closest('[tabindex]')?.focus() } // back to the slide keys
 }
+// a slide change or the end of the presentation removes the box without a blur (iPad: a tap on a button does not take the focus)
+onBeforeUnmount(() => {
+  const el = liveEdit.value && props.slide.elements.find(e => e.id === liveEdit.value), n = el && root.value?.querySelector('.el.board > .content[contenteditable=true]')
+  if (n) keepTyped(el, clean(unresolveImgs(n.innerHTML)))
+})
 function textKey(e) {
   // ⌘⇧7 numbering, ⌘⇧8 bullets, as in Google Slides and Docs (by key position: ⇧7 is "/" on German keyboards)
   const mod = e.metaKey || e.ctrlKey
@@ -513,7 +520,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
-        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="mathed(el, items(el, fields(resolveImgs(el.html))))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null, '--lh': el.line, '--ps': el.para != null ? el.para + 'px' : null }"
+        v-if="el.type === 'text'" :ref="n => fit(n, el)" class="content" :class="el.valign && 'v-' + el.valign" v-html="mathed(el, items(el, fields(resolveImgs((live ? liveText[el.id] : undefined) ?? el.html))))" :style="{ backgroundColor: fillCss(el), border: el.stroke ? `${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}` : null, '--lh': el.line, '--ps': el.para != null ? el.para + 'px' : null }"
         :contenteditable="editable && ui.editing === el.id || live && liveEdit === el.id"
         @blur="commit($event, el)" @keydown="textKey" @input="typed($event.currentTarget, $event); autoList($event.currentTarget, $event); layoutMarks()" @paste.prevent="pasteText"
         @click="live && el.board && liveEdit !== el.id && editLive($event, el)"

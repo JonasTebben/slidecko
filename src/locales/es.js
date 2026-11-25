@@ -1279,4 +1279,9 @@ export default {
   "Text above (empty: none)": "Texto encima (vacío: ninguno)",
   "Die": "Dado",
   "Choose …": "Elegir …",
+  "Keep what is typed after presenting": "Conservar lo escrito después de presentar",
+  "Off: what is typed while presenting is shown until the presentation ends, and the box keeps its text.": "Desactivado: lo que se escribe al presentar se ve hasta que termina la presentación y el cuadro conserva su texto.",
+  "Keep": "Conservar",
+  "On: the drawing stays on the slide as a picture when you leave it": "Activado: el dibujo queda en la diapositiva como imagen al salir de ella",
+  "Drawing from the presentation": "Dibujo de la presentación",
 }

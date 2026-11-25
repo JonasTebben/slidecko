@@ -176,7 +176,7 @@ function measure(slide, parsed) {
     if (box.style.borderTopStyle && box.style.borderTopStyle !== 'none') Object.assign(el, { stroke: box.style.borderTopColor, strokeWidth: px(box.style.borderTopWidth), ...(box.style.borderTopStyle !== 'solid' && { strokeStyle: box.style.borderTopStyle }) })
     if (box.style.getPropertyValue('--locked')) el.locked = true
     if (box.style.getPropertyValue('--group')) el.group = box.style.getPropertyValue('--group').trim()
-    if (box.style.getPropertyValue('--board')) el.board = true
+    if (box.style.getPropertyValue('--board')) Object.assign(el, { board: true, liveTemp: box.style.getPropertyValue('--board').trim() === '2' })
     if (box.style.getPropertyValue('--lh')) el.line = parseFloat(box.style.getPropertyValue('--lh')) // cleanEl checks both
     if (box.style.getPropertyValue('--ps')) el.para = parseFloat(box.style.getPropertyValue('--ps'))
     if (box.style.getPropertyValue('--morph')) el.morph = box.style.getPropertyValue('--morph').trim()

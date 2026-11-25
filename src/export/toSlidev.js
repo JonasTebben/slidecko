@@ -98,7 +98,7 @@ function boxStyle(el, extra = '') {
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
   if (el.morph) s += `;--morph:${el.morph}` // Magic move name, likewise
-  if (el.board) s += ';--board:1' // editable while presenting, likewise
+  if (el.board) s += el.liveTemp ? ';--board:2' : ';--board:1' // editable while presenting (2: what is typed is not kept), likewise
   if (el.line != null) s += `;--lh:${el.line}` // line and paragraph spacing: SPACING_CSS in style.css applies them
   if (el.para != null) s += `;--ps:${el.para}px`
   if (shadowCss(el.shadow)) s += `;filter:${shadowCss(el.shadow)}`

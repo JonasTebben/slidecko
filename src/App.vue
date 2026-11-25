@@ -23,10 +23,11 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./components/A11yPanel.vue'))
 import { checkDeck } from './editor/a11yCheck.js'
 import { t, lang } from './core/i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts } from './core/store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, cleanEl, uid } from './core/store.js'
 import { parseRatio } from './slide/format.js'
-import { slidePoint, arrowHead } from './present/draw.js'
+import { slidePoint, arrowHead, inkSvg } from './present/draw.js'
 import { toggleSolution, resetQuiz } from './present/quiz.js'
+import { resetLiveText } from './present/board.js'
 import { resetLive, setLines } from './present/run.js'
 import { BUNDLED, fontCss } from './slide/fonts.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './slide/themes.js'
@@ -636,6 +637,7 @@ async function present(from = ui.slide) {
   overview.value = false
   strokes.value = []
   resetQuiz()
+  resetLiveText()
   resetLive()
   clickStep.value = 0
   started.value = Date.now()
@@ -661,7 +663,17 @@ const INKS = ['#e5202a', '#facc15', '#16a34a', '#2563eb', '#ffffff'], WIDTHS = [
 const ink = reactive({ color: INKS[0], width: 6 })
 const drawing = computed(() => tool.value === 'pen' || tool.value === 'arrow')
 const setTool = n => { tool.value = tool.value === n ? null : n; laser.value = null }
-watch(() => ui.slide, () => { strokes.value = [] })
+// kept drawings (switch in the pen bar, remembered here): on leaving the slide they become a picture on it, so every
+// export shows them and the editor can move or delete them; off: a slide change wipes them
+const keepInk = ref((() => { try { return localStorage.getItem('slides-builder:keep-ink') !== '0' } catch { return true } })())
+watch(keepInk, v => { try { localStorage.setItem('slides-builder:keep-ink', v ? '1' : '0') } catch { /* private mode */ } })
+async function saveInk(s, list) {
+  if (!keepInk.value || !list.length || !s) return
+  const { id, path } = await storeImage(new File([inkSvg(list, format.w, format.h)], 'drawing.svg', { type: 'image/svg+xml' }))
+  s.elements.push(cleanEl({ id: uid(), type: 'image', asset: id, src: path, x: 0, y: 0, w: format.w, h: format.h, alt: t('Drawing from the presentation') }))
+}
+watch(() => ui.slide, (i, old) => { if (presenting.value) saveInk(deck.slides[old], strokes.value); strokes.value = [] })
+watch(presenting, v => { if (!v) { saveInk(deck.slides[ui.slide], strokes.value); strokes.value = [] } })
 // Chrome: a short Esc reaches the page in full screen (holding it still leaves), so Esc can drop the tool first
 watch(tool, v => v ? navigator.keyboard?.lock?.(['Escape'])?.catch(() => {}) : navigator.keyboard?.unlock?.())
 let stroke = null
@@ -1778,6 +1790,7 @@ function onClipboard(e) {
       <span class="pv-group" role="group" :aria-label="t('Line width')">
         <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
       </span>
+      <button class="tb small" :class="{ on: keepInk }" :aria-pressed="keepInk" :title="t('On: the drawing stays on the slide as a picture when you leave it')" @click="keepInk = !keepInk"><Icon name="pin" :size="16" />{{ t('Keep') }}</button>
     </div>
     <!-- in groups: where you are, drawing, timer and recording, the view, the way out -->
     <div class="pv-bar">

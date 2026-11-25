@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Slidecko is a presentation editor that runs entirely in the browser (Vue 3 + Vite, plain JavaScript, no TypeScript). The server (`server.js`) only serves `dist/`. Read [README.md](README.md) for the project layout and [docs/features.md](docs/features.md) for the full behaviour.
+Slidecko is a presentation editor that runs entirely in the browser (Vue 3 + Vite, plain JavaScript, no TypeScript). The server (`server.js`) only serves `dist/`. Read [docs/architecture.md](docs/architecture.md) for how the parts fit (and the checklist for adding something), [README.md](README.md) for the project layout and [docs/features.md](docs/features.md) for the full behaviour. [CONTRIBUTING.md](CONTRIBUTING.md) has the same rules for people.
 
 ## Commands
 
@@ -23,6 +23,8 @@ Run `bun test` and `bun run build` before you call a change done. Also run `bun 
 - Dependencies are pinned to exact versions. Do not add one for a few lines of code. Heavy import/export code is loaded lazily with `import()`; keep it that way.
 - Coordinates are in logical slide units (`W`/`H` in `src/core/store.js`); views only scale them.
 - Sanitize HTML from imports or paste with DOMPurify, through the existing sanitizing in `src/core/store.js`.
+- Touch and mouse alike: presenting runs on iPads. A click handler must work for a tap, a double click must not rely on `dblclick` (`second()` in `src/present/timer.js`), focus for typing and audio unlocks happen inside the tap.
+- `bun test` does not compile `.vue` files: run `bun run build` too. New interactions get a step in `scripts/smoke.js`.
 
 ## Required updates
 

@@ -7,3 +7,9 @@ export function arrowHead([ax, ay], [bx, by], width) {
   const barb = d => [r(bx - len * Math.cos(ang + d)), r(by - len * Math.sin(ang + d))]
   return [barb(0.45), [bx, by], barb(-0.45)]
 }
+// a slide's drawing as an SVG picture of the whole slide, kept on it as an image element (every export shows it)
+export function inkSvg(strokes, w, h) {
+  const line = p => `<polyline points="${p.join(' ')}"/>`
+  const body = strokes.map(s => `<g stroke="${s.color}" stroke-width="${s.width}">${line(s.pts)}${s.arrow ? line(arrowHead(s.pts[0], s.pts[1], s.width)) : ''}</g>`).join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" fill="none" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
+}

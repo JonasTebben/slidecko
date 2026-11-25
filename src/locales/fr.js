@@ -1258,4 +1258,9 @@ export default {
   "Text above (empty: none)": "Texte au-dessus (vide : aucun)",
   "Die": "Dé",
   "Choose …": "Choisir …",
+  "Keep what is typed after presenting": "Garder le texte saisi après la présentation",
+  "Off: what is typed while presenting is shown until the presentation ends, and the box keeps its text.": "Désactivé : ce qui est saisi pendant la présentation reste visible jusqu’à la fin, puis la zone garde son texte.",
+  "Keep": "Garder",
+  "On: the drawing stays on the slide as a picture when you leave it": "Activé : le dessin reste sur la diapositive comme image quand vous la quittez",
+  "Drawing from the presentation": "Dessin de la présentation",
 }

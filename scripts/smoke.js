@@ -1,7 +1,7 @@
 // Smoke test of the whole app in a browser: every module loads, the main dialogs open, every export
 // downloads and imports again, in the dev server and in the production build. Run with `bun run smoke`
 // (installs Chromium for Playwright once and builds first). Exits with 1 when a step fails.
-import { chromium } from 'playwright'
+import { chromium, devices } from 'playwright'
 import { readdirSync, statSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
@@ -66,8 +66,8 @@ const DECK = {
 
 const browser = await chromium.launch()
 const errors = []
-const open = async (url, label, viewport = { width: 1280, height: 800 }) => {
-  const ctx = await browser.newContext({ viewport, locale: 'en', acceptDownloads: true })
+const open = async (url, label, viewport = { width: 1280, height: 800 }, device = {}) => {
+  const ctx = await browser.newContext({ viewport, ...device, locale: 'en', acceptDownloads: true })
   await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
   const page = current = await ctx.newPage()
   page.on('pageerror', e => errors.push(`${label}: ${e.message}`))
@@ -196,7 +196,88 @@ await step('prod: open the project file on the start page', async () => {
 await editor(page, 'prod')
 await page.context().close()
 
-// 3. phone layout
+// 3. presenting with a mouse and with iPad touch (taps, double taps): timers, draws, notes boxes, drawings, the bar's timer
+const LIVE = { title: 'Live', theme: 'ozean', slides: [
+  { layout: 'default', elements: [
+    { type: 'timer', seconds: 60, fontSize: 56, x: 40, y: 40, w: 300, h: 120 },
+    { type: 'timer', seconds: 120, auto: true, fontSize: 56, x: 400, y: 40, w: 300, h: 120 },
+    { type: 'picker', names: ['Ana', 'Ben'], repeat: true, look: 'solid', heading: 'Your turn', fontSize: 48, x: 40, y: 220, w: 400, h: 140 },
+    { type: 'text', board: true, html: '<p>Kept</p>', x: 500, y: 200, w: 400, h: 120 },
+    { type: 'text', board: true, liveTemp: true, html: '<p>Temp</p>', x: 500, y: 360, w: 400, h: 120 }] },
+  { layout: 'default', elements: [{ type: 'text', html: '<p>Two</p>', x: 40, y: 40, w: 400, h: 80 }] }] }
+async function presenting(page, label, touch) {
+  const tap = async sel => { const b = await page.locator(sel).first().boundingBox(); if (!b) throw new Error(`${sel} not shown`); const x = b.x + b.width / 2, y = b.y + b.height / 2; touch ? await page.touchscreen.tap(x, y) : await page.mouse.click(x, y) }
+  const dbl = async sel => { await tap(sel); await page.waitForTimeout(80); await tap(sel) }
+  const text = sel => page.locator(sel).first().innerText()
+  const running = sel => page.locator(sel).first().evaluate(n => n.classList.contains('running'))
+  const shown = () => page.locator('.pv-bar span').first().innerText()
+  const ok = (cond, msg) => { if (!cond) throw new Error(msg) }
+  const T1 = '.pv-slide .el.timer:nth-child(1) .timer-face', T2 = '.pv-slide .el.timer:nth-child(2) .timer-face', P = '.pv-slide .picker-face'
+  const start = async () => { await tap('button.tb.primary[data-tour=present]'); await page.waitForSelector('.presenter .pv-slide') }
+  const leave = async () => { await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1)); await tap('.pv-bar button[aria-label="Exit (Esc)"]'); await page.waitForSelector('.presenter', { state: 'detached' }) }
+  await step(`${label}: create the live deck`, async () => {
+    await page.evaluate(async d => { const S = await import('/src/core/store.js'); await S.createProject({ ...d, slides: d.slides.map(s => ({ ...s, elements: s.elements.map(e => ({ id: S.uid(), ...e })) })) }) }, LIVE)
+    await page.waitForSelector('.stage .slide')
+    await start()
+  })
+  await step(`${label}: a timer waits for its tap, an auto one runs`, async () => { ok((await text(T1)) === '1:00' && !(await running(T1)), 'started by itself'); ok(await running(T2), 'auto timer stopped') })
+  await step(`${label}: a tap starts a timer and does not turn the slide`, async () => { await tap(T1); await page.waitForTimeout(1200); ok(await running(T1), 'not running'); ok((await shown()) === '1 / 2', 'slide turned') })
+  await step(`${label}: a double tap sets a timer back`, async () => { await page.waitForTimeout(400); await dbl(T1); await page.waitForTimeout(150); ok((await text(T1)) === '1:00' && !(await running(T1)), await text(T1)) })
+  await step(`${label}: a draw shows its own text, then names without a count`, async () => {
+    ok((await text(P)).includes('Your turn') && !(await text(P)).includes('Click to draw'), 'card text')
+    await tap(P); await page.waitForTimeout(400); await tap(P)
+    ok(/Ana|Ben/.test(await text(P + ' .pick')) && !(await page.locator(P + ' small').count()), 'no name drawn')
+    await page.waitForTimeout(400); await dbl(P); await page.waitForTimeout(150)
+    ok(!(await page.locator(P + ' .pick').count()), 'not started over')
+  })
+  const type = async (n, s) => { await tap(`.pv-slide .el.board >> nth=${n}`); await page.waitForTimeout(150); ok(await page.evaluate(() => !!document.activeElement?.isContentEditable), 'notes box not focused'); await page.keyboard.type(s) }
+  await step(`${label}: typing into notes boxes`, async () => { await type(0, ' one'); await type(1, ' two'); ok((await shown()) === '1 / 2', 'slide turned') })
+  await step(`${label}: drawing with the pen`, async () => {
+    await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1))
+    await tap('.pv-bar button[aria-label=Pen]')
+    const b = await page.locator('.pv-ink').boundingBox(), x = b.x + 100, y = b.y + b.height - 60
+    if (touch) { // a real finger stroke (Chromium's touch input), so pointer capture works as on an iPad
+      const cdp = await page.context().newCDPSession(page)
+      for (const [type, dx] of [['touchStart', 0], ['touchMove', 40], ['touchMove', 80], ['touchEnd', 80]]) await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: x + dx, y }] })
+    }
+    else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 80, y, { steps: 4 }); await page.mouse.up() }
+    ok(await page.locator('.pv-ink polyline').count() > 0, 'no stroke')
+    await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]')
+  })
+  await step(`${label}: the bar's own timer`, async () => {
+    await tap('.pv-bar button[aria-label=Timer]'); await tap('.pv-clock button[aria-label="One minute more"]')
+    ok((await text('.pv-clock-face')) === '6:00', await text('.pv-clock-face'))
+    await tap('.pv-clock-face'); await page.waitForTimeout(1200)
+    ok((await text('.pv-clock-face')) === '5:59', await text('.pv-clock-face'))
+  })
+  await step(`${label}: after editing, notes and drawing are kept as set, timers wait for a tap`, async () => {
+    await leave()
+    await page.waitForTimeout(300)
+    const els = await page.evaluate(async () => (await import('/src/core/store.js')).deck.slides[0].elements.map(e => [e.type, e.html || '']))
+    ok(els.some(([, h]) => h.includes('Kept one')), 'kept notes lost')
+    ok(els.some(([, h]) => h === '<p>Temp</p>'), 'temporary notes saved')
+    ok(els.filter(([t]) => t === 'image').length === 1, 'drawing not kept')
+    await page.waitForTimeout(1000)
+    await start()
+    const t2 = await text(T2)
+    await page.waitForTimeout(1200)
+    ok(!(await running(T1)) && (await text(T2)) !== t2, 'timers')
+    ok(!(await text('.pv-slide .el.board >> nth=1')).includes('two'), 'temporary notes still shown')
+    await leave()
+  })
+}
+page = await open(DEV, 'mouse')
+await presenting(page, 'mouse', false)
+await step('mouse: Enter in the YouTube dialog inserts the video', async () => {
+  await palette(page, 'Insert YouTube'); await page.fill('dialog[open] input', 'https://www.youtube.com/live/dQw4w9WgXcQ'); await page.keyboard.press('Enter')
+  await page.waitForSelector('.stage .el.video', { timeout: 5000 })
+})
+await page.context().close()
+page = await open(DEV, 'ipad', undefined, devices['iPad Pro 11 landscape'])
+await presenting(page, 'ipad', true)
+await page.context().close()
+
+// 4. phone layout
 page = await open(PROD, 'phone', { width: 390, height: 844 })
 await step('phone: start page', () => page.screenshot({ path: join(OUT, 'phone-home.png') }))
 await browser.close()

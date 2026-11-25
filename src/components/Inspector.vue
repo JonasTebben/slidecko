@@ -394,6 +394,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             <select :value="el.para ?? ''" @change="el.para = $event.target.value ? +$event.target.value : undefined"><option value="">{{ t('Theme') }}</option><option v-for="v in [0, 4, 8, 12, 16, 24, 32, 48]" :key="v" :value="v">{{ v }} px</option></select></label>
         </div>
         <label class="check" :title="t('While presenting, a click into the box lets you type into it, e.g. ideas from the audience; it is saved in the project.')"><input type="checkbox" :checked="!!el.board" @change="el.board = $event.target.checked || undefined" /> {{ t('Editable while presenting') }}</label>
+        <label v-if="el.board" class="check sub" :title="t('Off: what is typed while presenting is shown until the presentation ends, and the box keeps its text.')"><input type="checkbox" :checked="!el.liveTemp" @change="el.liveTemp = !$event.target.checked || undefined" /> {{ t('Keep what is typed after presenting') }}</label>
         <label class="check"><input v-model="el.title" type="checkbox" /> {{ t('Slide title') }}</label>
       </Sec>
       <Sec v-if="el.type === 'text'" id="colors" icon="fill" :title="t('Fill & outline')">

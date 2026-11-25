@@ -1279,4 +1279,9 @@ export default {
   "Text above (empty: none)": "Text darüber (leer: keiner)",
   "Die": "Würfel",
   "Choose …": "Auswählen …",
+  "Keep what is typed after presenting": "Eingetipptes nach dem Präsentieren behalten",
+  "Off: what is typed while presenting is shown until the presentation ends, and the box keeps its text.": "Aus: Was beim Präsentieren eingetippt wird, ist bis zum Ende der Präsentation zu sehen; das Feld behält seinen Text.",
+  "Keep": "Behalten",
+  "On: the drawing stays on the slide as a picture when you leave it": "An: Die Zeichnung bleibt beim Verlassen der Folie als Bild auf ihr",
+  "Drawing from the presentation": "Zeichnung aus der Präsentation",
 }

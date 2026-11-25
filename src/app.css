@@ -183,6 +183,7 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .inspector .actions .danger { margin-left: auto; }
 .inspector .grow { flex: 1; }
 .check { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 12.5px; }
+.check.sub { margin-left: 20px; } /* belongs to the switch above */
 .swatches { display: flex; flex-wrap: wrap; gap: 5px; }
 .swatches .sw { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid #0002; cursor: pointer; }
 .swatches .sw.on { box-shadow: 0 0 0 2px var(--ui-panel), 0 0 0 4px var(--ui-accent); }
