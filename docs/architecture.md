@@ -1,6 +1,6 @@
 # Architecture
 
-How Slidecko is put together, for contributors and coding agents. The README lists the files and [features.md](features.md) the behaviour; this page explains how the parts fit and where a change belongs.
+How Slidecko is put together, for contributors and coding agents. [features.md](features.md) describes the behaviour; this page explains how the parts fit, where a change belongs and which file holds what ("Project layout" at the end).
 
 ## The big picture
 
@@ -55,11 +55,11 @@ For a new element type, field or style:
 
 1. `src/core/store.js` – `cleanEl`: accept and limit it (a test in `store.test.js`).
 2. `src/slide/presets.js` – the defaults of a new element.
-3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA (README, "Theme readability").
+3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA (CONTRIBUTING.md, "Themes").
 4. `src/components/Inspector.vue` – the controls; every string in `t()` and in all `src/locales/*.js`.
 5. Presenting behaviour in `src/present/` with a test, the same behaviour in the HTML presentation script.
 6. Exports and imports: check each format, add `data-*` for the Slidev round trip (test in `toSlidev.test.js`).
-7. `docs/features.md`; the README table "What the app stores" if browser storage changes.
+7. `docs/features.md`; [privacy.md](privacy.md) if browser storage changes.
 8. `bun test`, `bun run build`, `bun run smoke`.
 
 ## Tests
@@ -72,3 +72,46 @@ For a new element type, field or style:
 - Coordinates are logical; never store `getBoundingClientRect` values without dividing by the scale.
 - `slides-builder` is the storage prefix (existing user data), not a leftover name.
 - Slides keep their theme colours in dark mode; only the app chrome follows `src/core/scheme.js`.
+
+## Project layout
+
+`src/main.js` and `src/App.vue` are the entry and the app shell; the rest of `src/` is grouped by area:
+
+| Folder | Holds |
+| --- | --- |
+| `src/core/` | project state, persistence, commands, view session, translations, light/dark, shortcuts |
+| `src/slide/` | what a slide is made of: themes, fonts, format, presets, charts, diagrams, formulas, icons, marks, links |
+| `src/editor/` | editing helpers: lists, tables, paste, spacing, search, accessibility check, source editor, tutorial, tour |
+| `src/present/` | presenting: clicks, magic move, drawing, rehearsal, recording, quiz, picker, timer, runnable code |
+| `src/import/`, `src/export/` | reading other formats into slides, writing slides out (Slidev, PPTX, ODP, images, HTML, Git) |
+| `src/components/` | Vue components |
+| `src/locales/` | interface translations |
+
+| Path | Purpose |
+| --- | --- |
+| `src/import/parseSlidev.js` | Markdown → slides (frontmatter, `src:` includes, blocks) |
+| `src/editor/source.js`, `src/editor/sourceLang.js`, `src/components/SourceEditor.vue` | Markdown source editor: deck files to slide texts and back, lint and format, Slidev frontmatter highlighting, and its window (lazy-loaded) |
+| `src/editor/tutorial.js`, `src/components/MarkdownTutorial.vue` | Markdown tutorial: lessons with their checks, and its dialog (lazy-loaded) |
+| `src/import/importSlidev.js` | renders each slide like Slidev does and measures its elements |
+| `src/import/importOffice.js` | PowerPoint and OpenDocument import |
+| `src/export/toSlidev.js` | slides → Slidev project files |
+| `src/slide/marks.js` | hand-drawn marks (`v-mark`): directive parsing and writing, seeded strokes |
+| `src/export/exportPptx.js` | PPTX and ODP from the rendered slides (one layout pass) |
+| `src/export/pptxFix.js` | schema fixes for the slide XML pptxgenjs writes |
+| `src/export/exportOdp.js` | OpenDocument writer with the pptxgenjs interface |
+| `src/export/exportFormats.js` | images, exact PPTX, HTML presentation, print preparation |
+| `src/slide/fonts.js`, `src/components/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
+| `src/slide/themes.js`, `src/slide/slide.css` | themes, table and callout styles (shared by the editor and the Slidev export) |
+| `src/components/ThemeEditor.vue`, `src/components/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
+| `src/core/store.js`, `src/core/actions.js` | project state, persistence, commands |
+| `src/slide/icons.js`, `src/components/IconPicker.vue` | icons: bundled Iconify sets (one lazy chunk each), search, SVG, Slidev tags; the picker dialog |
+| `src/slide/diagram.js` | Mermaid diagrams: rendering (Mermaid loaded on first use), sanitizing, cache per code and theme |
+| `src/slide/math.js`, `src/slide/katexCss.js` | formulas: `$…$`/`$$…$$` in text and Markdown, KaTeX rendering (loaded on first use, fonts served by the app) |
+| `src/core/session.js` | view state in the URL hash and per-tab state for reloads |
+| `src/core/i18n.js`, `src/locales/` | interface translations |
+| `src/core/scheme.js` | light/dark mode |
+| `src/components/AppFooter.vue`, `src/core/support.js` | footer and its build-time links |
+| `index.html` | app entry |
+| `src/present/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
+| `server.js` | Bun server: serves `dist/`, `/health` |
+| `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Slidecko is a presentation editor that runs entirely in the browser (Vue 3 + Vite, plain JavaScript, no TypeScript). The server (`server.js`) only serves `dist/`. Read [docs/architecture.md](docs/architecture.md) for how the parts fit (and the checklist for adding something), [README.md](README.md) for the project layout and [docs/features.md](docs/features.md) for the full behaviour. [CONTRIBUTING.md](CONTRIBUTING.md) has the same rules for people.
+Slidecko is a presentation editor that runs entirely in the browser (Vue 3 + Vite, plain JavaScript, no TypeScript). The server (`server.js`) only serves `dist/`. Read [docs/architecture.md](docs/architecture.md) for how the parts fit (and the checklist for adding something), "Project layout" there for which file holds what and [docs/features.md](docs/features.md) for the full behaviour. [CONTRIBUTING.md](CONTRIBUTING.md) has the same rules for people.
 
 ## Commands
 
@@ -29,8 +29,8 @@ Run `bun test` and `bun run build` before you call a change done. Also run `bun 
 ## Required updates
 
 - **Interface text**: English is the key. Wrap every new string in `t()` and add its entry to every file in `src/locales/` (German, French, Dutch, Spanish); `src/i18n.test.js` fails when one is missing. Tests assert the English text.
-- **Storage**: if you change what is kept in IndexedDB, localStorage or sessionStorage, update the "What the app stores" table in the README. The `slides-builder` key prefix stays (existing user data).
-- **Themes**: built-in themes must stay WCAG AA; see "Theme readability" in the README.
+- **Storage**: if you change what is kept in IndexedDB, localStorage or sessionStorage, update [docs/privacy.md](docs/privacy.md). The `slides-builder` key prefix stays (existing user data).
+- **Themes**: built-in themes must stay WCAG AA; see "Themes" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Formats**: anything new (an element, an option, a style) must work in every way a project leaves the app: project file and Save-all ZIP (`cleanEl` in `src/core/store.js` keeps it), HTML presentation, PDF and images, PowerPoint (also "for Google"), OpenDocument and Slidev, with the import reading it back where the format allows (Slidev `data-*`, PowerPoint/ODP as close as the format gets: a picture or text when there is no native equivalent). Say in `docs/features.md` what each format gets, and run `bun run smoke`.
 - **Features**: user-visible changes go into `docs/features.md` (and the README feature list if they are major).
 - **Licences**: a new dependency goes into `NOTICE` in the same commit, with its licence and "loaded only for …" if it is lazy, plus the packages it bundles into `dist/` under a licence other than MIT.

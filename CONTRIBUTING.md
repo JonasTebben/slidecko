@@ -30,9 +30,27 @@ Every change has to keep these working, and the review checks them:
 - **Untrusted input.** Anything from files, the clipboard or browser storage passes through `cleanEl` in `src/core/store.js` (limits, allowed values) and HTML through DOMPurify. Never put imported HTML or SVG into the page unchecked.
 - **Interface text.** English is the key: wrap every new string in `t()` and add it to every file in `src/locales/` (German, French, Dutch, Spanish). `bun test` fails when a translation is missing.
 - **Accessibility.** Buttons get a label (`aria-label` or text), new controls work with the keyboard, and built-in themes and colours stay at WCAG AA contrast.
-- **Storage.** If you change what is kept in IndexedDB, localStorage or sessionStorage, update the table "What the app stores" in the README. Keys keep the `slides-builder` prefix.
+- **Storage.** If you change what is kept in IndexedDB, localStorage or sessionStorage, update [docs/privacy.md](docs/privacy.md). Keys keep the `slides-builder` prefix.
 - **Dependencies.** Avoid new ones; a few lines of code do not justify a package. If one is needed, pin the exact version, load heavy import/export code lazily with `import()`, and add it to `NOTICE` with its licence in the same commit.
 - **Documentation.** User-visible changes go into `docs/features.md` (and the README feature list if they are major).
+
+## Translations
+
+English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
+
+- Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
+- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/core/i18n.js`.
+- Tests always run in English, because they check English text.
+
+## Themes
+
+All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, callout, code block and table preset. For new or changed themes:
+
+- Set `accent-fg` when the accent is light (text on table headers). The accent itself must reach 4.5:1 on `bg`, because links use it.
+- Set `cover-fg` when the cover has a coloured background (`cover-bg`). Quotes, numbers and links on centred layouts take this colour.
+- `bar` may be a colour or a gradient.
+- Presets in `src/slide/presets.js` use translucent fills (`fillAlpha`) rather than fixed light ones, so dark themes stay readable.
+- Syntax colours for light code backgrounds are in `src/slide/slide.css`. On dark backgrounds `codeDark()` switches to GitHub Dark.
 
 ## Testing
 
