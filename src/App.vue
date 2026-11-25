@@ -23,7 +23,7 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./components/A11yPanel.vue'))
 import { checkDeck } from './editor/a11yCheck.js'
 import { t, lang } from './core/i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, cleanEl, uid } from './core/store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid } from './core/store.js'
 import { parseRatio } from './slide/format.js'
 import { slidePoint, arrowHead, inkSvg } from './present/draw.js'
 import { toggleSolution, resetQuiz } from './present/quiz.js'
@@ -669,8 +669,13 @@ const keepInk = ref((() => { try { return localStorage.getItem('slides-builder:k
 watch(keepInk, v => { try { localStorage.setItem('slides-builder:keep-ink', v ? '1' : '0') } catch { /* private mode */ } })
 async function saveInk(s, list) {
   if (!keepInk.value || !list.length || !s) return
-  const { id, path } = await storeImage(new File([inkSvg(list, format.w, format.h)], 'drawing.svg', { type: 'image/svg+xml' }))
-  s.elements.push(cleanEl({ id: uid(), type: 'image', asset: id, src: path, x: 0, y: 0, w: format.w, h: format.h, alt: t('Drawing from the presentation') }))
+  // the slide's drawing from an earlier presentation takes the new strokes, while it still covers the whole slide (not moved)
+  const old = s.elements.find(e => e.type === 'image' && e.ink && !e.x && !e.y && e.w === format.w && e.h === format.h && deck.assets[e.asset]?.startsWith('data:image/svg+xml'))
+  const before = old && await (await fetch(deck.assets[old.asset])).text()
+  const file = new File([inkSvg(list, format.w, format.h, before)], 'drawing.svg', { type: 'image/svg+xml' })
+  if (old) { deck.assets[old.asset] = await readDataUrl(file); return }
+  const { id, path } = await storeImage(file)
+  s.elements.push(cleanEl({ id: uid(), type: 'image', asset: id, src: path, x: 0, y: 0, w: format.w, h: format.h, alt: t('Drawing from the presentation'), ink: true }))
 }
 watch(() => ui.slide, (i, old) => { if (presenting.value) saveInk(deck.slides[old], strokes.value); strokes.value = [] })
 watch(presenting, v => { if (!v) { saveInk(deck.slides[ui.slide], strokes.value); strokes.value = [] } })

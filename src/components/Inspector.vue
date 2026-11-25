@@ -10,11 +10,11 @@ import { deck, ui, SHAPES, LOOKS, deckOfSlide, clean, cleanEl, textStyles, saveT
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from '../slide/themes.js'
 import { LANGS, codeOpts } from '../slide/hl.js'
 import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from '../present/run.js'
-import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, canOrder, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup, setBackground, slideChoices, setSlideProp } from '../core/actions.js'
+import { canRevert, revertSlides, fitHeight, slide, selection, primary, align, distribute, order, canOrder, duplicate, remove, format, replaceImage, startCrop, endCrop, setCropRatio, resetCrop, CROP_RATIOS, run, duplicateSlide, deleteSlide, list, paint, pasteLook, setSlideLayout, editMaster, group, ungroup, setBackground, slideChoices, setSlideProp, download, toast } from '../core/actions.js'
 import { layoutOf } from '../export/toSlidev.js'
 import * as table from '../editor/tableOps.js'
 import { clock, parseClock } from '../present/timer.js'
-import { lists, saveList, removeList } from '../present/picker.js'
+import { lists, saveList, removeList, listsFile, importLists } from '../present/picker.js'
 import { LETTERS } from '../present/quiz.js'
 import { t } from '../core/i18n.js'
 import { kbd } from '../core/keys.js'
@@ -206,7 +206,7 @@ const TIPS = {
   image: 'Dragging a corner keeps the aspect ratio (⇧ for free).',
   shape: 'Double-click the shape to write text in it.',
   timer: 'While presenting: a click starts or pauses it, a double click sets it back.',
-  picker: 'While presenting: a click draws a name, nobody twice until everyone was drawn (unless a name can come up again); a double click starts over.',
+  picker: 'While presenting: a click draws a name, nobody twice until everyone was drawn (unless a name can come up again); the arrow at its edge starts over.',
   quiz: 'While presenting: a click marks an answer, “Reveal” (or Q) shows the solution.',
   diagram: 'Mermaid syntax (mermaid.js.org): flowchart, sequence, class, state, gantt, pie, mind map and more. In Slidev it is rendered by Slidev itself.',
   math: 'TeX as in Slidev and LaTeX (rendered by KaTeX). In text boxes, write $…$ inside a line and $$…$$ for a centred formula; \\$ is a dollar sign.',
@@ -219,7 +219,17 @@ const dia = computed(() => el.value?.type === 'diagram' && diagram(el.value.code
 // the style buttons of random draws, quizzes and tables of contents: the built-in one first (unset)
 const LOOK_NAMES = { picker: ['Card', 'Filled', 'Outline', 'Plain'], quiz: ['Tiles', 'List', 'Colours', 'Plain'], toc: ['Bullets', 'Numbered', 'Cards', 'Lines'] }
 const looks = type => [undefined, ...LOOKS[type]].map((k, i) => [k, LOOK_NAMES[type][i]])
-const listName = ref('') // the saved name list being saved or used
+const listName = ref('')
+// name lists to and from a file (another browser or device)
+const exportLists = () => download(new Blob([listsFile()], { type: 'application/json' }), 'name-lists.json')
+const readLists = async e => {
+  const f = e.target.files[0]
+  e.target.value = ''
+  if (!f) return
+  let n = 0
+  try { n = importLists(JSON.parse(await f.text())) } catch { /* not JSON: counted as nothing */ }
+  toast(n ? t('{0} name lists imported', n) : t('No name lists found in this file.'))
+} // the saved name list being saved or used
 let diaTimer
 const setDiagram = (target, code, ms = 300) => { clearTimeout(diaTimer); diaTimer = setTimeout(() => { target.code = cleanEl({ type: 'diagram', code }).code }, ms) }
 const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.shape === 'line') && TIPS[el.value.type])
@@ -679,6 +689,11 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             <input v-model="listName" class="grow" maxlength="100" :placeholder="t('List name, e.g. class 7b')" :aria-label="t('List name')" @keydown.enter="saveList(listName, el.names)" />
             <button class="ib" :disabled="!listName.trim() || !el.names.length" :title="t('Save these names as a list in this browser')" @click="saveList(listName, el.names)">{{ lists[listName.trim()] ? t('Update') : t('Save') }}</button>
             <button v-if="lists[listName.trim()]" class="ib" :title="t('Delete list')" :aria-label="t('Delete list')" @click="removeList(listName.trim()); listName = ''"><Icon name="trash" /></button>
+          </div>
+          <div class="btn-row">
+            <button class="ib grow" :disabled="!Object.keys(lists).length" :title="t('Save all name lists as a file, e.g. for another device')" @click="exportLists">{{ t('Export lists') }}</button>
+            <button class="ib grow" :title="t('Add the name lists from a file')" @click="$refs.listFile.click()">{{ t('Import lists …') }}</button>
+            <input ref="listFile" type="file" accept=".json,application/json" hidden @change="readLists" />
           </div>
         </div>
         <div class="btn-row">

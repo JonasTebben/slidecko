@@ -1,0 +1,33 @@
+# Every push and pull request: unit tests, the production build (compiles the .vue files) and the browser smoke test
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run build
+      - name: Chromium for the smoke test
+        run: bunx playwright install --with-deps chromium
+      - run: bun run smoke
+      - name: Screenshots of failed smoke steps
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke
+          path: .smoke-tmp/*.png
+          if-no-files-found: ignore

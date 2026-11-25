@@ -24,3 +24,11 @@ test('a drawing becomes an SVG of the whole slide, arrows with their head', () =
   assert.match(svg, /<g stroke="#e5202a" stroke-width="6"><polyline points="1,2 3,4"\/><\/g>/)
   assert.equal(svg.match(/<polyline/g).length, 3)
 })
+
+test('new strokes go into the drawing a slide already has', () => {
+  const first = inkSvg([{ pts: [[1, 2], [3, 4]], color: '#e5202a', width: 6 }], 980, 551)
+  const both = inkSvg([{ pts: [[5, 6], [7, 8]], color: '#2563eb', width: 3 }], 980, 551, first)
+  assert.equal(both.match(/<svg/g).length, 1)
+  assert.equal(both.match(/<polyline/g).length, 2)
+  assert.ok(both.endsWith('<polyline points="5,6 7,8"/></g></svg>'))
+})

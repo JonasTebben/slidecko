@@ -1,78 +1,51 @@
 # Contributing to Slidecko
 
-Thanks for helping. This guide covers setting up, the rules a change has to follow and how to send it. For how the app is built, read [docs/architecture.md](docs/architecture.md) first; [docs/features.md](docs/features.md) describes what it does.
+Welcome, and thank you for thinking about helping! Slidecko is a presentation editor that runs entirely in the browser, and it gets better with every bug report, idea, translation and fix. You don't need to know the whole code base to start.
 
-## Setting up
+## Ways to help
 
-You need [Bun](https://bun.sh) (the version in `package.json` → `packageManager`). Bun only: do not use npm, yarn or pnpm, and do not commit their lock files.
+- **Report a bug**: open an issue and tell us what you did, what you expected and what happened, plus your browser and device. A small sample file helps a lot for import and export problems (leave out anything private).
+- **Suggest an idea**: open an issue and describe what you want to do with it. We'll talk about how it could work before anyone writes code.
+- **Translate**: the interface is in English, German, French, Dutch and Spanish. Better wording or a new language is very welcome (see "Translations" in [docs/architecture.md](docs/architecture.md)).
+- **Fix or build something**: small fixes can go straight to a pull request; for bigger changes, open an issue first so your work fits in.
+
+## Get it running
+
+You need [Bun](https://bun.sh).
 
 ```bash
 git clone https://github.com/JonasTebben/slidecko.git
 cd slidecko
 bun install
-bun run dev       # editor with hot reload at http://localhost:5173
+bun run dev        # opens the editor with hot reload
 ```
 
-## Before you start
+Then have a look at [docs/architecture.md](docs/architecture.md): it explains how the app fits together on one page, and has a checklist for adding something.
 
-- **Bugs**: open an issue with the steps, what you expected and what happened, the browser and device (touch or mouse), and a small sample file if an import or export is involved. Leave out anything private from the sample.
-- **Features**: open an issue first for anything bigger than a small fix, so we can agree on the behaviour before you write it. A feature has to fit an app that runs entirely in the browser: no server, no account, no upload of user content.
-- Small fixes (typos, translations, an obvious bug) can go straight to a pull request.
+## Good to know
 
-## Making a change
+A few things matter in this project, so you won't be surprised in the review:
 
-Follow the code around you: plain JavaScript (no TypeScript), no semicolons, single quotes, short functions, one-line comments that say *why*.
+- **It works in every format.** Something new should also come out right in PowerPoint, OpenDocument, PDF, the HTML presentation and Slidev. Not sure how? Ask in the issue; we'll figure it out together.
+- **Touch counts as much as a mouse.** Many people present from an iPad.
+- **Everything stays in the browser.** No server, no account, no upload of anyone's slides.
+- **Every text is translatable.** Wrap interface text in `t('…')` and add it to the files in `src/locales/`; the tests tell you if one is missing.
+- **Match the code around you.** Plain JavaScript, no semicolons, single quotes, short comments that say *why*.
 
-Every change has to keep these working, and the review checks them:
-
-- **Every format.** Whatever you add (an element, an option, a style) must work in the project file, the HTML presentation, PDF and images, PowerPoint, OpenDocument and Slidev, and come back on import where the format allows. Describe what each format gets in `docs/features.md`.
-- **Mouse and touch.** Presenting is used on iPads and phones. Taps, double taps (no `dblclick`), typing and drawing must work with touch as well as with a mouse.
-- **Untrusted input.** Anything from files, the clipboard or browser storage passes through `cleanEl` in `src/core/store.js` (limits, allowed values) and HTML through DOMPurify. Never put imported HTML or SVG into the page unchecked.
-- **Interface text.** English is the key: wrap every new string in `t()` and add it to every file in `src/locales/` (German, French, Dutch, Spanish). `bun test` fails when a translation is missing.
-- **Accessibility.** Buttons get a label (`aria-label` or text), new controls work with the keyboard, and built-in themes and colours stay at WCAG AA contrast.
-- **Storage.** If you change what is kept in IndexedDB, localStorage or sessionStorage, update [docs/privacy.md](docs/privacy.md). Keys keep the `slides-builder` prefix.
-- **Dependencies.** Avoid new ones; a few lines of code do not justify a package. If one is needed, pin the exact version, load heavy import/export code lazily with `import()`, and add it to `NOTICE` with its licence in the same commit.
-- **Documentation.** User-visible changes go into `docs/features.md` (and the README feature list if they are major).
-
-## Translations
-
-English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
-
-- Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
-- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/core/i18n.js`.
-- Tests always run in English, because they check English text.
-
-## Themes
-
-All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, callout, code block and table preset. For new or changed themes:
-
-- Set `accent-fg` when the accent is light (text on table headers). The accent itself must reach 4.5:1 on `bg`, because links use it.
-- Set `cover-fg` when the cover has a coloured background (`cover-bg`). Quotes, numbers and links on centred layouts take this colour.
-- `bar` may be a colour or a gradient.
-- Presets in `src/slide/presets.js` use translucent fills (`fillAlpha`) rather than fixed light ones, so dark themes stay readable.
-- Syntax colours for light code backgrounds are in `src/slide/slide.css`. On dark backgrounds `codeDark()` switches to GitHub Dark.
-
-## Testing
+## Check your change
 
 ```bash
-bun test          # unit tests, next to the source as *.test.js
-bun run build     # the production build (also compiles the .vue files; bun test does not)
-bun run smoke     # the whole app in Chromium: modules, dialogs, every export and its import, presenting with mouse and touch
+bun test          # quick unit tests
+bun run build     # the production build
+bun run smoke     # the whole app in a browser, takes a few minutes
 ```
 
-- Add a unit test for new logic: parsing, cleaning, import/export writers, presenting state (`src/<folder>/<name>.test.js`, Bun test globals, no import needed).
-- Add a step to `scripts/smoke.js` for a new interaction or dialog, so a later change cannot break it unnoticed.
-- Run all three before you open a pull request. `bun run smoke` takes a few minutes; run it whenever you touch imports, exports, files that move or dependencies.
-- Exports are checked by opening them in LibreOffice and Google Slides.
+All three also run automatically on every pull request. If a new piece of logic has no test yet, add one next to its file (`name.test.js`).
 
-## Pull requests
+## Send a pull request
 
-- One topic per pull request, with a description of what changed and why, and how you tested it (browsers, touch device).
-- Screenshots or a short recording for visible changes.
-- Keep commits focused; the message says what the change does for the user.
-- Do not commit personal data, secrets, hosting details or legal pages: this repository contains only the app.
-- By contributing you agree that your contribution is licensed under the project's [Apache 2.0 licence](LICENSE).
+Describe what you changed and why, and how you tried it. A screenshot helps for anything visible. Keep one topic per pull request; it makes reviewing quick.
 
-## Project rules for coding agents
+By contributing you agree that your work is licensed under the project's [Apache 2.0 licence](LICENSE).
 
-[AGENTS.md](AGENTS.md) holds the same rules in short form for AI coding agents. Keep it in step when a rule here changes.
+Questions? Just open an issue. There are no silly questions.

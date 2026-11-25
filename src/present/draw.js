@@ -8,8 +8,10 @@ export function arrowHead([ax, ay], [bx, by], width) {
   return [barb(0.45), [bx, by], barb(-0.45)]
 }
 // a slide's drawing as an SVG picture of the whole slide, kept on it as an image element (every export shows it)
-export function inkSvg(strokes, w, h) {
+// before: the SVG the slide already has from an earlier presentation; the new strokes go into it (one picture per slide)
+export function inkSvg(strokes, w, h, before) {
   const line = p => `<polyline points="${p.join(' ')}"/>`
   const body = strokes.map(s => `<g stroke="${s.color}" stroke-width="${s.width}">${line(s.pts)}${s.arrow ? line(arrowHead(s.pts[0], s.pts[1], s.width)) : ''}</g>`).join('')
+  if (before?.includes('</svg>')) return before.replace(/<\/svg>\s*$/, body + '</svg>')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" fill="none" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 }

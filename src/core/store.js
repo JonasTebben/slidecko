@@ -159,6 +159,7 @@ export function cleanEl(e) {
       ...(e.radius && { radius: num(e.radius, 0, 500) }), ...(cleanCrop(e.crop) && { crop: cleanCrop(e.crop) }),
       // alt text for screen readers and exports; decorative: screen readers skip it (empty alt)
       ...(str(e.alt)?.trim() && { alt: e.alt.trim().slice(0, 2000) }), ...(e.decorative === true && { decorative: true }),
+      ...(e.ink === true && { ink: true }), // a drawing kept from presenting: the next one on this slide is added to it
     } : null
     case 'table': {
       const rows = (Array.isArray(e.rows) ? e.rows : []).filter(Array.isArray).map(r => r.map(c => clean(c)))

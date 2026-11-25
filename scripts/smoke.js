@@ -174,6 +174,24 @@ await step('dev: Export Git project', async () => {
   files.git = await download(page, () => page.evaluate(async () => { (await import('/src/core/actions.js')).slidev({ git: true }) }), 'dev-git')
 })
 await step('dev: insert text, shape, table', () => page.evaluate(async () => { const A = await import('/src/core/actions.js'); for (const k of ['text', 'shape', 'table']) A.insert(k) }))
+await step('dev: HTML presentation: its own timer (T), a draw starts over with its button', async () => {
+  const p = await page.context().newPage()
+  await p.goto('file://' + files.html.path)
+  await p.keyboard.press('t')
+  await p.locator('.clock [data-more]').click()
+  if ((await p.locator('.clock [data-face]').innerText()) !== '6:00') throw new Error('minutes not set')
+  await p.locator('.clock [data-face]').click(); await p.waitForTimeout(1200)
+  if ((await p.locator('.clock [data-face]').innerText()) !== '5:59') throw new Error('not running')
+  for (let k = 0; k < 4; k++) await p.keyboard.press('ArrowRight')
+  const face = p.locator('.slide.on .picker-face')
+  if (await face.count()) {
+    await face.click(); await p.waitForTimeout(100); await face.click()
+    if (!(await face.locator('.pick').count())) throw new Error('two clicks did not draw')
+    await face.locator('.pick-reset').click()
+    if (await face.locator('.pick').count()) throw new Error('not started over')
+  } else throw new Error('no picker on slide 5')
+  await p.close()
+})
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides] = await page.evaluate(async ({ b64, name }) => {
     const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
@@ -227,12 +245,14 @@ async function presenting(page, label, touch) {
     ok((await text(P)).includes('Your turn') && !(await text(P)).includes('Click to draw'), 'card text')
     await tap(P); await page.waitForTimeout(400); await tap(P)
     ok(/Ana|Ben/.test(await text(P + ' .pick')) && !(await page.locator(P + ' small').count()), 'no name drawn')
-    await page.waitForTimeout(400); await dbl(P); await page.waitForTimeout(150)
+    await page.waitForTimeout(400); await tap(P); await page.waitForTimeout(150)
+    ok(await page.locator(P + ' .pick').count() === 1, 'two quick taps are two draws')
+    await tap(P + ' .pick-reset'); await page.waitForTimeout(150)
     ok(!(await page.locator(P + ' .pick').count()), 'not started over')
   })
   const type = async (n, s) => { await tap(`.pv-slide .el.board >> nth=${n}`); await page.waitForTimeout(150); ok(await page.evaluate(() => !!document.activeElement?.isContentEditable), 'notes box not focused'); await page.keyboard.type(s) }
   await step(`${label}: typing into notes boxes`, async () => { await type(0, ' one'); await type(1, ' two'); ok((await shown()) === '1 / 2', 'slide turned') })
-  await step(`${label}: drawing with the pen`, async () => {
+  const draw = async () => {
     await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1))
     await tap('.pv-bar button[aria-label=Pen]')
     const b = await page.locator('.pv-ink').boundingBox(), x = b.x + 100, y = b.y + b.height - 60
@@ -243,7 +263,8 @@ async function presenting(page, label, touch) {
     else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 80, y, { steps: 4 }); await page.mouse.up() }
     ok(await page.locator('.pv-ink polyline').count() > 0, 'no stroke')
     await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]')
-  })
+  }
+  await step(`${label}: drawing with the pen`, draw)
   await step(`${label}: the bar's own timer`, async () => {
     await tap('.pv-bar button[aria-label=Timer]'); await tap('.pv-clock button[aria-label="One minute more"]')
     ok((await text('.pv-clock-face')) === '6:00', await text('.pv-clock-face'))
@@ -263,7 +284,11 @@ async function presenting(page, label, touch) {
     await page.waitForTimeout(1200)
     ok(!(await running(T1)) && (await text(T2)) !== t2, 'timers')
     ok(!(await text('.pv-slide .el.board >> nth=1')).includes('two'), 'temporary notes still shown')
+    await draw()
     await leave()
+    await page.waitForTimeout(500)
+    const ink = await page.evaluate(async () => { const S = await import('/src/core/store.js'); const imgs = S.deck.slides[0].elements.filter(e => e.type === 'image'); return [imgs.length, imgs[0] && (await (await fetch(S.deck.assets[imgs[0].asset])).text()).match(/<polyline/g)?.length] })
+    ok(ink[0] === 1 && ink[1] >= 2, `the second drawing is not in the first one's picture: ${ink}`)
   })
 }
 page = await open(DEV, 'mouse')

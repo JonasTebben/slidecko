@@ -98,6 +98,11 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .hud button { font: inherit; color: inherit; background: #fff1; border: 0; border-radius: 6px; padding: 6px 9px; margin-left: 4px; cursor: pointer; }
 .hud button:hover { background: #fff3; color: #fff; }
 @media (hover: none) { .hud { opacity: 1; } .hud button { min-width: 44px; min-height: 44px; } }
+.clock { position: fixed; right: 14px; top: 10px; display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 14px; background: #000b; color: #fff; font: 14px/1 system-ui, sans-serif; user-select: none; }
+.clock[hidden], .clock [hidden] { display: none; }
+.clock button { min-width: 32px; min-height: 32px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; cursor: pointer; touch-action: manipulation; }
+.clock [data-face] { min-width: 4.5ch; font: 700 28px/1.1 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.clock.done [data-face] { animation: timer-done 1s steps(2, jump-none) infinite; }
 .hud button[aria-pressed=true] { background: #fff4; color: #fff; }
 body[data-tool=laser], body[data-tool=laser] * { cursor: none !important; }
 body[data-tool=pen] .deck { touch-action: none; cursor: crosshair; }
@@ -194,6 +199,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'a') setTool('arrow')
   else if (e.key === 'e' || e.key === 'c') clearInk()
   else if (e.key === 'f') full()
+  else if (e.key === 't') clockToggle()
   else return
   e.preventDefault()
 })
@@ -229,6 +235,31 @@ for (const f of document.querySelectorAll('.timer-face')) {
     run(!!since)
   })
 }
+// a timer of its own (T or ⏱ in the bar), as in the editor's presenting bar: − and + set the minutes (0: a stopwatch) until it
+// starts, a tap starts or pauses it, a double tap sets it back, × closes it
+const ck = document.querySelector('.clock'), ckFace = ck.querySelector('[data-face]'), ckBtn = document.querySelector('[data-clock]')
+let ckTotal = 300, ckAcc = 0, ckSince = 0, ckTick = null, ckRung = false
+const ckLeft = () => { const e = (ckAcc + (ckSince ? Date.now() - ckSince : 0)) / 1000; return ckTotal ? Math.max(0, ckTotal - e) : e }
+const ckDraw = () => {
+  const l = ckLeft()
+  ckFace.textContent = ckTotal ? clock(l) : clock(l, true)
+  ck.classList.toggle('done', !!ckTotal && l <= 0)
+  for (const b of ck.querySelectorAll('[data-less], [data-more]')) b.hidden = !!(ckSince || ckAcc)
+  if (ckTotal && ckSince && l <= 0 && !ckRung) { ckRung = true; chime() }
+}
+const ckRun = on => { clearInterval(ckTick); ckTick = on ? setInterval(ckDraw, 100) : null; ckDraw() }
+const ckReset = () => { ckAcc = ckSince = 0; ckRung = false; ckRun(false) }
+function clockToggle() { ckReset(); ck.hidden = !ck.hidden; ckBtn.setAttribute('aria-pressed', !ck.hidden) }
+ckFace.onclick = e => {
+  e.stopPropagation()
+  unlock()
+  if (second(ck)) return ckReset()
+  if (ckTotal && ckLeft() <= 0) { ckAcc = 0; ckSince = Date.now(); ckRung = false } else if (ckSince) { ckAcc += Date.now() - ckSince; ckSince = 0 } else ckSince = Date.now()
+  ckRun(!!ckSince)
+}
+ck.querySelector('[data-less]').onclick = e => { e.stopPropagation(); ckTotal = Math.max(0, ckTotal - 60); ckDraw() }
+ck.querySelector('[data-more]').onclick = e => { e.stopPropagation(); ckTotal = Math.min(359940, ckTotal + 60); ckDraw() }
+ck.querySelector('[data-close]').onclick = ckBtn.onclick = e => { e.stopPropagation(); clockToggle() }
 // quizzes: a click marks an answer, the button (or Q) shows the solution (same as in the editor)
 for (const q of document.querySelectorAll('.el > .quiz')) {
   const b = document.createElement('button')
@@ -239,21 +270,24 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
   for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
 }
 addEventListener('keydown', e => { if (e.key.toLowerCase() === 'q' && !e.metaKey && !e.ctrlKey && !e.altKey) for (const b of slides[i].querySelectorAll('.quiz-reveal')) b.click() })
-// random pickers: a click draws a name, nobody twice until everyone was drawn (data-repeat: anyone each time), a double click starts over (same as in the editor)
+// random pickers: a click draws a name, nobody twice until everyone was drawn (data-repeat: anyone each time), the button at the edge starts over (same as in the editor)
 for (const f of document.querySelectorAll('.picker-face')) {
   const names = JSON.parse(f.dataset.picks || '[]'), label = [...f.childNodes]
   let left = []
   f.setAttribute('role', 'button'); f.setAttribute('aria-live', 'polite')
   f.addEventListener('click', e => {
     e.stopPropagation()
-    if (second(f)) { left = []; return f.replaceChildren(...label) }
     if (!names.length) return
     if (!left.length || f.dataset.repeat) left = names.slice()
     const p = document.createElement('p'), s = document.createElement('small')
     p.className = 'pick'
     p.textContent = left.splice(Math.floor(Math.random() * left.length), 1)[0]
     s.textContent = f.dataset.repeat ? '' : left.length ? f.dataset.left.replace('{0}', left.length).replace('{1}', names.length) : f.dataset.all
-    f.replaceChildren(p, s)
+    const r = document.createElement('button') // start over, as in the editor (a small button at the edge)
+    r.className = 'pick-reset'; r.title = r.ariaLabel = f.dataset.reset
+    r.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>'
+    r.addEventListener('click', ev => { ev.stopPropagation(); left = []; f.replaceChildren(...label) })
+    f.replaceChildren(r, p, s)
   })
 }
 // links to slides (table of contents, Link to slide) jump there, as when presenting in the editor
@@ -355,7 +389,7 @@ function addPoint(e) {
 }
 const svg = (parent, tag) => parent.appendChild(document.createElementNS('http://www.w3.org/2000/svg', tag))
 addEventListener('pointerdown', e => {
-  if ((tool !== 'pen' && tool !== 'arrow') || !e.isPrimary || e.button > 0 || e.target.closest('.hud, .inks')) return
+  if ((tool !== 'pen' && tool !== 'arrow') || !e.isPrimary || e.button > 0 || e.target.closest('.hud, .inks, .clock')) return
   if (!ink) { ink = svg(slides[i], 'svg'); ink.setAttribute('class', 'ink'); ink.setAttribute('viewBox', '0 0 ${W} ${H}') }
   line = svg(ink, tool === 'arrow' ? 'g' : 'polyline')
   line.setAttribute('stroke', pen.color); line.setAttribute('stroke-width', pen.width)
@@ -430,9 +464,10 @@ export async function htmlDeck(root, title, list, files) {
 <div class="deck">
 ${slides}
 </div>
-<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-laser aria-label="Laser pointer" title="Laser pointer (L)" aria-pressed="false">◉</button><button data-pen aria-label="Pen" title="Pen (D)" aria-pressed="false">✎</button><button data-arrow aria-label="Arrow" title="Arrow (A)" aria-pressed="false">➚</button><button data-clear aria-label="Clear drawing" title="Clear drawing (E)">⌫</button><button data-full aria-label="Full screen">⛶</button></div>
+<div class="hud"><span></span><button data-prev aria-label="Previous">‹</button><button data-next aria-label="Next">›</button><button data-laser aria-label="Laser pointer" title="Laser pointer (L)" aria-pressed="false">◉</button><button data-pen aria-label="Pen" title="Pen (D)" aria-pressed="false">✎</button><button data-arrow aria-label="Arrow" title="Arrow (A)" aria-pressed="false">➚</button><button data-clear aria-label="Clear drawing" title="Clear drawing (E)">⌫</button><button data-clock aria-label="${esc(t('Timer'))}" title="${esc(t('Timer'))} (T)" aria-pressed="false">⏱</button><button data-full aria-label="Full screen">⛶</button></div>
 <div class="inks" hidden>${['#e5202a', '#facc15', '#16a34a', '#2563eb', '#ffffff'].map(c => `<button data-color="${c}" style="background:${c}" aria-label="Pen colour ${c}" aria-pressed="${c === '#e5202a'}"></button>`).join('')}${[3, 6, 12].map(w => `<button class="w" data-width="${w}" aria-label="Line width ${w}" aria-pressed="${w === 6}"><i style="height:${w / 2 + 1}px"></i></button>`).join('')}</div>
 <div class="laser" hidden></div>
+<div class="clock" hidden><button data-less aria-label="${esc(t('One minute less'))}">−</button><button data-face aria-label="${esc(t('Start or pause the timer'))}">5:00</button><button data-more aria-label="${esc(t('One minute more'))}">+</button><button data-close aria-label="${esc(t('Close timer'))}">×</button></div>
 <script type="application/json" id="slides-builder-project">${project.replace(/</g, '\\u003c')}</script>
 ${runner ? `<script type="text/plain" id="slides-builder-runner" data-run="${esc(t('Run'))}" data-stopped="${esc(t('Stopped after 3 seconds (endless loop?)'))}">${runner.replace(/<\/script/gi, '<\\/script')}</script>\n` : ''}<script>${viewerJs()}</script>
 </body>

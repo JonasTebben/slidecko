@@ -42,3 +42,11 @@ export function saveList(name, names) {
   return true
 }
 export function removeList(name) { delete lists[name]; keep() }
+// the lists as a file to take to another browser or device, and reading one back (lists of the same name are replaced)
+export const listsFile = () => JSON.stringify({ format: 'slidecko-name-lists', lists }, null, 2)
+export function importLists(data) {
+  const got = cleanLists(data?.format === 'slidecko-name-lists' ? data.lists : data)
+  Object.assign(lists, got)
+  keep()
+  return Object.keys(got).length
+}

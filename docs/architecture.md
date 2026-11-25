@@ -55,12 +55,39 @@ For a new element type, field or style:
 
 1. `src/core/store.js` – `cleanEl`: accept and limit it (a test in `store.test.js`).
 2. `src/slide/presets.js` – the defaults of a new element.
-3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA (CONTRIBUTING.md, "Themes").
-4. `src/components/Inspector.vue` – the controls; every string in `t()` and in all `src/locales/*.js`.
+3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA ("Themes" below).
+4. `src/components/Inspector.vue` – the controls; every string in `t()` and in all `src/locales/*.js` ("Translations" below).
 5. Presenting behaviour in `src/present/` with a test, the same behaviour in the HTML presentation script.
 6. Exports and imports: check each format, add `data-*` for the Slidev round trip (test in `toSlidev.test.js`).
 7. `docs/features.md`; [privacy.md](privacy.md) if browser storage changes.
 8. `bun test`, `bun run build`, `bun run smoke`.
+
+## Project rules
+
+- **Dependencies**: avoid new ones; a few lines of code do not justify a package. If one is needed, pin the exact version, load heavy import/export code lazily with `import()`, and add it to `NOTICE` with its licence (and "loaded only for …" if it is lazy) in the same commit.
+- **Storage**: a change to what is kept in IndexedDB, localStorage or sessionStorage updates [privacy.md](privacy.md); keys keep the `slides-builder` prefix (existing user data).
+- **Accessibility**: every control has a name (text or `aria-label`), works with the keyboard and keeps 4.5:1 contrast; motion respects reduced motion.
+- **Untrusted input**: files, the clipboard and browser storage go through `cleanEl`, HTML through DOMPurify; imported HTML or SVG never reaches the page unchecked.
+- **The repository holds only the app**: no personal data, secrets, hosting details or legal pages.
+- Exports are checked by opening them in LibreOffice and Google Slides.
+
+## Translations
+
+English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
+
+- Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
+- Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/core/i18n.js`.
+- Tests always run in English, because they check English text.
+
+## Themes
+
+All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, callout, code block and table preset. For new or changed themes:
+
+- Set `accent-fg` when the accent is light (text on table headers). The accent itself must reach 4.5:1 on `bg`, because links use it.
+- Set `cover-fg` when the cover has a coloured background (`cover-bg`). Quotes, numbers and links on centred layouts take this colour.
+- `bar` may be a colour or a gradient.
+- Presets in `src/slide/presets.js` use translucent fills (`fillAlpha`) rather than fixed light ones, so dark themes stay readable.
+- Syntax colours for light code backgrounds are in `src/slide/slide.css`. On dark backgrounds `codeDark()` switches to GitHub Dark.
 
 ## Tests
 

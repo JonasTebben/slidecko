@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { draw, next, reset, picks, cleanLists, lists, saveList, removeList } from './picker.js'
+import { draw, next, reset, picks, cleanLists, lists, saveList, removeList, listsFile, importLists } from './picker.js'
 
 test('everyone is drawn once before the bag starts over', () => {
   const names = ['Ana', 'Ben', 'Cem', 'Dia']
@@ -51,4 +51,15 @@ test('saved name lists: only named, non-empty lists of trimmed strings are kept'
   assert.deepEqual(lists.Class, ['a', 'b'])
   removeList('Class')
   assert.equal(lists.Class, undefined)
+})
+
+test('name lists go out as a file and come back, checked like stored ones', () => {
+  saveList('A', ['x'])
+  const file = JSON.parse(listsFile())
+  removeList('A')
+  assert.equal(importLists(file), 1)
+  assert.deepEqual(lists.A, ['x'])
+  assert.equal(importLists({ B: ['y', 5], C: 'bad' }), 1) // a plain object of lists works too
+  assert.equal(importLists('nonsense'), 0)
+  removeList('A'); removeList('B')
 })
