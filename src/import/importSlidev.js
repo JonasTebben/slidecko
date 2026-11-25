@@ -222,7 +222,7 @@ function measure(slide, parsed) {
     } else if (n.dataset.picks) {
       let names = []
       try { names = JSON.parse(n.dataset.picks) } catch { /* a broken list: an empty picker, cleanEl checks the rest */ }
-      Object.assign(el, { type: 'picker', names })
+      Object.assign(el, { type: 'picker', names, repeat: n.dataset.repeat === '1' })
     } else if (n.dataset.quiz) {
       let q = {}
       try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }

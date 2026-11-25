@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { parseClock, clock, toggle, shown, done, reset, running, face, progress, warning, autostart } from './timer.js'
+import { parseClock, clock, toggle, shown, done, reset, running, face, progress, warning, autostart, holdAll, second } from './timer.js'
 
 test('durations are read and shown like a clock', () => {
   assert.equal(parseClock('10'), 600)
@@ -52,4 +52,23 @@ test('auto timers start once when their slide appears', () => {
   autostart([el]) // back on the slide: stays paused
   assert.ok(!running('a'))
   reset('a')
+})
+
+test('leaving the presentation pauses timers; only auto ones go on by themselves', () => {
+  const auto = { id: 'h1', type: 'timer', seconds: 60, auto: true }, hand = { id: 'h2', type: 'timer', seconds: 60 }
+  autostart([auto]); toggle(hand)
+  holdAll()
+  assert.ok(!running('h1') && !running('h2'))
+  autostart([auto, hand]) // presenting again
+  assert.ok(running('h1') && !running('h2'))
+  toggle(hand) // a click goes on
+  assert.ok(running('h2'))
+  reset('h1'); reset('h2')
+})
+
+test('a second click on the same thing right away is a double click, a third starts over', () => {
+  assert.equal(second('x'), false)
+  assert.equal(second('x'), true)
+  assert.equal(second('x'), false)
+  assert.equal(second('y'), false) // another element
 })

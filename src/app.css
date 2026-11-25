@@ -408,6 +408,8 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .pv-bar .tb:hover { background: #fff2 !important; }
 .pv-bar .pv-timer { font-variant-numeric: tabular-nums; }
 .pv-bar .tb.on { background: #fff3; }
+.pv-group { display: flex; align-items: center; gap: 4px; padding-right: 10px; border-right: 1px solid #fff4; } /* the bar's groups, a line between them */
+.pv-group:last-of-type { padding-right: 0; border-right: 0; }
 /* L / D: laser pointer and pen; the ink is in slide units (viewBox), so it scales with the slide */
 .presenter.laser, .presenter.laser * { cursor: none !important; }
 .pv-laser { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: #ff2a2a; box-shadow: 0 0 6px 3px #ff2a2acc, 0 0 18px 8px #ff2a2a66; pointer-events: none; z-index: 1; }
@@ -425,6 +427,11 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .pv-keys kbd { margin-left: 4px; }
 .pv-keys > button { margin-top: 14px; }
 .pv-blank.white { background: #fff; }
+.pv-clock { position: fixed; z-index: 1; right: max(16px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 18px; background: #000b; color: #fff; }
+.pv-clock .tb { color: #fff; }
+.pv-clock-face { min-width: 4.5ch; padding: 2px 8px; border: 0; background: none; color: inherit; font: 700 32px/1.1 system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; }
+.pv-clock.warn .pv-clock-face { color: #ff8a8a; }
+.pv-clock.done .pv-clock-face { animation: timer-done 1s steps(2, jump-none) infinite; }
 .pv-jump { position: fixed; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); padding: 6px 14px; border-radius: 18px; background: #000b; color: #fff; font-size: 15px; font-variant-numeric: tabular-nums; pointer-events: none; }
 .pv-jump:empty { display: none; }
 .pv-blank ~ .pv-progress { display: none; }

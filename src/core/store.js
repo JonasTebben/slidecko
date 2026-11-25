@@ -197,10 +197,10 @@ export function cleanEl(e) {
       ...(color(e.fill) && { fill: color(e.fill) }), ...(e.warn === true && { warn: true }),
       ...(e.auto === true && { auto: true }), ...(e.silent === true && { silent: true }), // starts when visible; no sound at the end
     }
-    // names or groups to draw from while presenting: plain text, trimmed, at most 200 of 100 characters
+    // names or groups to draw from while presenting: plain text, trimmed, at most 200 of 100 characters; repeat: a name can come up again
     case 'picker': return {
       ...base, names: (Array.isArray(e.names) ? e.names : []).map(n => str(n)?.trim().slice(0, 100)).filter(Boolean).slice(0, 200),
-      ...(color(e.color) && { color: color(e.color) }),
+      ...(color(e.color) && { color: color(e.color) }), ...(e.repeat === true && { repeat: true }),
     }
     // an Iconify icon (set:name) with its SVG, so it still renders without the set; label: read out (none: decorative)
     case 'icon': {

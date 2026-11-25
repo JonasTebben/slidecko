@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { draw, next, reset, picks } from './picker.js'
+import { draw, next, reset, picks, cleanLists, lists, saveList, removeList } from './picker.js'
 
 test('everyone is drawn once before the bag starts over', () => {
   const names = ['Ana', 'Ben', 'Cem', 'Dia']
@@ -28,4 +28,27 @@ test('a click draws, a double click starts fresh, an empty list does nothing', (
   assert.equal(picks.p, undefined)
   next({ id: 'q', names: [] })
   assert.equal(picks.q, undefined)
+})
+
+test('repeat: every draw takes from all names, the bag never empties', () => {
+  const names = ['A', 'B']
+  let left
+  for (let i = 0; i < 5; i++) ({ left } = draw(names, left, () => 0, true))
+  assert.deepEqual(left, names)
+  const el = { id: 'r', names: ['X'], repeat: true }
+  next(el); next(el)
+  assert.equal(picks.r.pick, 'X')
+  assert.deepEqual(picks.r.left, ['X'])
+})
+
+test('saved name lists: only named, non-empty lists of trimmed strings are kept', () => {
+  assert.deepEqual(cleanLists({ ' 7b ': [' Ana ', '', 3, 'Ben'], empty: [], bad: 'x', '': ['a'] }), { '7b': ['Ana', 'Ben'] })
+  assert.deepEqual(cleanLists(['a']), {})
+  assert.deepEqual(cleanLists(null), {})
+  assert.equal(saveList('  ', ['a']), false)
+  assert.equal(saveList('Class', []), false)
+  assert.equal(saveList(' Class ', ['a', 'b']), true)
+  assert.deepEqual(lists.Class, ['a', 'b'])
+  removeList('Class')
+  assert.equal(lists.Class, undefined)
 })

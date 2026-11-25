@@ -13,7 +13,7 @@ import { pasteHtml } from '../editor/paste.js'
 import { toggleList, undoList, typed, indent, autoList } from '../editor/lists.js'
 import { t } from '../core/i18n.js'
 import { longPressFired } from '../core/longpress.js'
-import { face, progress, warning, done, running, toggle, reset, autostart } from '../present/timer.js'
+import { face, progress, warning, done, running, toggle, reset, autostart, second } from '../present/timer.js'
 import * as picker from '../present/picker.js'
 import { diagramSrc } from '../slide/diagram.js'
 import { withMath, formulaHtml } from '../slide/math.js'
@@ -303,11 +303,12 @@ defineExpose({ edit })
 const liveEdit = ref(null)
 // $…$ rendered, except in the box being typed into: there the TeX source is edited
 const mathed = (el, html) => ((props.editable && ui.editing === el.id) || liveEdit.value === el.id ? html : withMath(html))
-async function editLive(e, el) {
+function editLive(e, el) {
   const target = e.currentTarget
+  // editable and focused right in the tap, or iOS keeps the keyboard closed
+  target.contentEditable = 'true'
+  target.focus()
   liveEdit.value = el.id
-  await nextTick()
-  target?.focus()
   caretAt(e, target)
 }
 // el.html is only written when editing ends: re-rendering v-html while typing would reset the caret
@@ -562,11 +563,11 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       <!-- while presenting a click starts or pauses it, a double click sets it back -->
       <div v-else-if="el.type === 'timer'" class="content timer-face" :class="[el.face, { running: live && running(el.id), done: live && done(el), warn: warning(el, live), filled: el.fill }]"
         :data-timer="el.seconds" :data-warn="el.warn ? 1 : null" :data-auto="el.auto ? 1 : null" :data-silent="el.silent ? 1 : null" :style="{ '--p': progress(el, live), '--chars': face(el, live).length, '--timer-accent': (!warning(el, live) && el.accent) || null, background: el.fill || null }"
-        :role="live ? 'button' : null" :aria-label="live ? t(el.seconds ? 'Start or pause the timer' : 'Start or pause the stopwatch') : null" @click="live && toggle(el)" @dblclick="live && reset(el.id)"><p>{{ face(el, live) }}</p></div>
+        :role="live ? 'button' : null" :aria-label="live ? t(el.seconds ? 'Start or pause the timer' : 'Start or pause the stopwatch') : null" @click="live && (second(el.id) ? reset(el.id) : toggle(el))"><p>{{ face(el, live) }}</p></div>
       <!-- while presenting a click draws a name (nobody twice until everyone was drawn), a double click starts over; data-left is for the HTML export -->
-      <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-left="t('{0} of {1} left', '{0}', '{1}')" :data-all="t('Everyone drawn · click to start over')" :role="live ? 'button' : null"
-        :aria-label="live ? t('Draw a name') : null" :aria-live="live ? 'polite' : null" @click="live && picker.next(el)" @dblclick="live && picker.reset(el.id)">
-        <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small>{{ picker.picks[el.id].left.length ? t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) : t('Everyone drawn · click to start over') }}</small></template>
+      <div v-else-if="el.type === 'picker'" class="content picker-face" :data-picks="JSON.stringify(el.names)" :data-repeat="el.repeat ? 1 : null" :data-left="t('{0} of {1} left', '{0}', '{1}')" :data-all="t('Everyone drawn · click to start over')" :role="live ? 'button' : null"
+        :aria-label="live ? t('Draw a name') : null" :aria-live="live ? 'polite' : null" @click="live && (second(el.id) ? picker.reset(el.id) : picker.next(el))">
+        <template v-if="live && picker.picks[el.id]"><p :key="picker.picks[el.id].n" class="pick">{{ picker.picks[el.id].pick }}</p><small v-if="!el.repeat">{{ picker.picks[el.id].left.length ? t('{0} of {1} left', picker.picks[el.id].left.length, el.names.length) : t('Everyone drawn · click to start over') }}</small></template>
         <span v-else class="label"><svg class="die" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" /><circle cx="8.5" cy="8.5" r="1.4" /><circle cx="15.5" cy="15.5" r="1.4" /><circle cx="15.5" cy="8.5" r="1.4" /><circle cx="8.5" cy="15.5" r="1.4" /><circle cx="12" cy="12" r="1.4" /></svg>
           <strong>{{ t('Who’s next?') }}</strong><small>{{ t('Click to draw · {0}', t(el.names.length === 1 ? '{0} name' : '{0} names', el.names.length)) }}</small></span>
       </div>

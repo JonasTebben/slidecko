@@ -201,7 +201,12 @@ addEventListener('keydown', e => {
 // a stopwatch shows tenths, ring and bar follow --p, data-warn: the last minute in red, data-auto: starts when visible, a sound at the end unless data-silent
 const clock = (sec, tenths) => { if (tenths) { const t = Math.floor(Math.max(0, sec) * 10 + 1e-6); return clock(Math.floor(t / 10)) + '.' + (t % 10) } sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + s : m + ':' + s }
 let audio
-const chime = () => { try { audio ||= new AudioContext(); for (const k of [0, 1, 2]) { const o = audio.createOscillator(), g = audio.createGain(), at = audio.currentTime + k * 0.3; o.frequency.value = 880; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.4, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.25); o.connect(g).connect(audio.destination); o.start(at); o.stop(at + 0.26) } } catch {} }
+// made and resumed in a click, or iOS keeps it silent; 'playback': also with the silent switch on (timer.js)
+const unlock = () => { try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; audio ||= new AudioContext(); audio.resume() } catch {} }
+// a second click within 350 ms is a double click: dblclick does not come on iPad touch (timer.js)
+let lastTap = null
+const second = f => { const t = Date.now(), d = lastTap?.f === f && t - lastTap.t < 350; lastTap = d ? null : { f, t }; return d }
+const chime = () => { try { unlock(); for (const k of [0, 1, 2]) { const o = audio.createOscillator(), g = audio.createGain(), at = audio.currentTime + k * 0.3; o.frequency.value = 880; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.4, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.25); o.connect(g).connect(audio.destination); o.start(at); o.stop(at + 0.26) } } catch {} }
 for (const f of document.querySelectorAll('.timer-face')) {
   const total = +f.dataset.timer || 0, p = f.querySelector('p')
   let acc = 0, since = 0, tick = null, rung = false
@@ -218,10 +223,11 @@ for (const f of document.querySelectorAll('.timer-face')) {
   f.start = () => { if (!since && !acc) { since = Date.now(); run(true) } } // data-auto, once
   f.addEventListener('click', e => {
     e.stopPropagation()
+    unlock()
+    if (second(f)) { acc = 0; since = 0; rung = false; return run(false) }
     if (total && left() <= 0) { acc = 0; since = Date.now(); rung = false } else if (since) { acc += Date.now() - since; since = 0 } else since = Date.now()
     run(!!since)
   })
-  f.addEventListener('dblclick', () => { acc = 0; since = 0; rung = false; run(false) })
 }
 // quizzes: a click marks an answer, the button (or Q) shows the solution (same as in the editor)
 for (const q of document.querySelectorAll('.el > .quiz')) {
@@ -233,22 +239,22 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
   for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
 }
 addEventListener('keydown', e => { if (e.key.toLowerCase() === 'q' && !e.metaKey && !e.ctrlKey && !e.altKey) for (const b of slides[i].querySelectorAll('.quiz-reveal')) b.click() })
-// random pickers: a click draws a name, nobody twice until everyone was drawn, a double click starts over (same as in the editor)
+// random pickers: a click draws a name, nobody twice until everyone was drawn (data-repeat: anyone each time), a double click starts over (same as in the editor)
 for (const f of document.querySelectorAll('.picker-face')) {
   const names = JSON.parse(f.dataset.picks || '[]'), label = [...f.childNodes]
   let left = []
   f.setAttribute('role', 'button'); f.setAttribute('aria-live', 'polite')
   f.addEventListener('click', e => {
     e.stopPropagation()
+    if (second(f)) { left = []; return f.replaceChildren(...label) }
     if (!names.length) return
-    if (!left.length) left = names.slice()
+    if (!left.length || f.dataset.repeat) left = names.slice()
     const p = document.createElement('p'), s = document.createElement('small')
     p.className = 'pick'
     p.textContent = left.splice(Math.floor(Math.random() * left.length), 1)[0]
-    s.textContent = left.length ? f.dataset.left.replace('{0}', left.length).replace('{1}', names.length) : f.dataset.all
+    s.textContent = f.dataset.repeat ? '' : left.length ? f.dataset.left.replace('{0}', left.length).replace('{1}', names.length) : f.dataset.all
     f.replaceChildren(p, s)
   })
-  f.addEventListener('dblclick', () => { left = []; f.replaceChildren(...label) })
 }
 // links to slides (table of contents, Link to slide) jump there, as when presenting in the editor
 document.querySelector('.deck').addEventListener('click', e => {

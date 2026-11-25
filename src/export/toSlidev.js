@@ -177,7 +177,7 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-timer="${el.seconds}"${more} style="${boxStyle(el)}">\n\n${el.seconds ? clock(el.seconds) : clock(0, true)}\n\n</div>`
     }
     case 'picker': // Slidev has no picker: the names as text, data-picks (JSON, one line) brings them back on import
-      return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
+      return `<div data-picks="${esc(JSON.stringify(el.names)).replace(/>/g, '&gt;')}"${el.repeat ? ' data-repeat="1"' : ''} style="${boxStyle(el)}">\n\n🎲 ${turndown.escape(el.names.join(' · '))}\n\n</div>`
     case 'quiz': // Slidev has no quiz: question and answers as text, the correct ones boxed in green on the next click (v-mark), data-quiz (JSON, one line) brings it back on import
       return `<div data-quiz="${esc(JSON.stringify({ question: el.question, answers: el.answers })).replace(/>/g, '&gt;')}" style="${boxStyle(el)}">\n\n**${turndown.escape(el.question)}**\n\n${el.answers.map((a, i) => (a.correct ? `- <span v-mark.box.green>**${'ABCDEF'[i]}** ${turndown.escape(a.text)}</span>` : `- **${'ABCDEF'[i]}** ${turndown.escape(a.text)}`)).join('\n')}\n\n</div>`
     case 'icon': // Slidev's Iconify component in the box; its colour and turns are on the icon

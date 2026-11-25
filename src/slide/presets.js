@@ -49,7 +49,7 @@ export const ELEMENTS = {
   board: () => T(`<p><strong>${t('Collected ideas …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
   math: () => ({ type: 'math', tex: FORMULAS.quadratic[1], fontSize: 40, x: 230, y: 200, w: 520, h: 130 }),
   diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),
-  timer: () => ({ type: 'timer', seconds: 600, auto: true, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
+  timer: () => ({ type: 'timer', seconds: 600, fontSize: 64, x: 340, y: 210, w: 300, h: 110 }),
   picker: () => ({ type: 'picker', names: [1, 2, 3, 4].map(n => t('Group {0}', n)), fontSize: 64, x: 280, y: 190, w: 420, h: 160 }),
   toc: () => ({ type: 'toc', x: 56, y: 110, w: 868, h: 380 }), // the slide titles as links, kept up to date
   chart: () => ({ type: 'chart', kind: 'column', legend: true, categories: ['Q1', 'Q2', 'Q3', 'Q4'], series: [{ name: t('Series {0}', 1), values: [12, 19, 15, 24] }, { name: t('Series {0}', 2), values: [8, 11, 14, 17] }], x: 140, y: 100, w: 700, h: 380 }),

@@ -1,7 +1,7 @@
 import { reactive, ref } from 'vue'
 
 // Timer elements: a countdown (seconds > 0) or a stopwatch (0) started by a click while presenting.
-// The running state is not part of the project: every presentation starts fresh.
+// The running state is not part of the project; it lasts while the app is open (paused while editing).
 
 // "10", "10:00", "1:30:00" -> seconds (plain numbers are minutes); null when unreadable
 export function parseClock(s) {
@@ -24,9 +24,17 @@ export const now = ref(Date.now())
 let tick = null
 // the end of a countdown: three short tones, made by Web Audio (no sound file); silent where audio is unavailable
 let audio
+// made and resumed in a click (unlock), or iOS keeps it silent; 'playback' also plays with the iPad's silent switch on
+export function unlock() {
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback'
+    audio ||= new AudioContext()
+    audio.resume()
+  } catch { /* no audio */ }
+}
 export function chime() {
   try {
-    audio ||= new AudioContext()
+    unlock()
     for (const k of [0, 1, 2]) {
       const o = audio.createOscillator(), g = audio.createGain(), at = audio.currentTime + k * 0.3
       o.frequency.value = 880
@@ -61,8 +69,10 @@ export const progress = (el, live) => (el.seconds ? (live ? shown(el) / el.secon
 export const warning = (el, live) => !!(live && el.warn && el.seconds && shown(el) > 0 && shown(el) <= 60)
 // click: start, pause, go on; a finished countdown starts over
 export function toggle(el) {
+  unlock()
   now.value = Date.now()
   const r = runs[el.id] ||= { acc: 0, since: 0 }
+  r.held = false
   Object.assign(r, { total: el.seconds, sound: !el.silent })
   if (done(el)) Object.assign(r, { acc: 0, since: now.value, rung: false })
   else if (r.since) Object.assign(r, { acc: r.acc + now.value - r.since, since: 0 })
@@ -70,5 +80,18 @@ export function toggle(el) {
   sync()
 }
 export function reset(id) { delete runs[id]; sync() }
-// "starts when the slide appears": once per presentation, a timer that was never started
-export function autostart(els) { for (const el of els) if (el.type === 'timer' && el.auto && !runs[el.id]) toggle(el) }
+// leaving the presentation pauses every running timer; only "starts when the slide appears" ones go on by themselves
+export function holdAll() {
+  const t = Date.now()
+  for (const r of Object.values(runs)) if (r.since) Object.assign(r, { acc: r.acc + t - r.since, since: 0, held: true })
+  sync()
+}
+// "starts when the slide appears": a timer never started, or one held when the presentation was left
+export function autostart(els) { for (const el of els) if (el.type === 'timer' && el.auto && (!runs[el.id] || runs[el.id].held)) toggle(el) }
+// a second click on the same thing within 350 ms is a double click: dblclick does not come on iPad touch
+let last = null
+export function second(key) {
+  const t = Date.now(), dbl = last?.key === key && t - last.t < 350
+  last = dbl ? null : { key, t }
+  return dbl
+}

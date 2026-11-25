@@ -42,7 +42,7 @@ import { find, replace, ranges, pattern } from './editor/search.js'
 import * as R from './present/rehearse.js'
 import { keyOf, kbd, comboOf, GLOBAL, PRESENT_LABELS, format as fmtKey } from './core/keys.js'
 import KeysDialog from './components/KeysDialog.vue'
-import { clock } from './present/timer.js'
+import { clock, face, done, warning, toggle as toggleTimer, reset as resetRun, runs as timerRuns, holdAll, unlock, second } from './present/timer.js'
 import { loadSession, saveSession, sessionView, selIds, selIndexes, viewHash, parseViewHash } from './core/session.js'
 
 const { slide, selection, primary } = A
@@ -633,11 +633,16 @@ async function present(from = ui.slide) {
   resetLive()
   clickStep.value = 0
   started.value = Date.now()
+  unlock() // in the click that starts the presentation: a timer's sound can play later (iOS)
   await nextTick()
   presenter.value.focus()
   await presenter.value.requestFullscreen?.().catch(() => {}) // without fullscreen it fills the window
   fitPresenter()
 }
+// a timer of its own while presenting, not saved: ± sets the minutes (0: a stopwatch) until it starts, a click starts it
+const extra = ref(null)
+const toggleExtra = () => { resetRun('pv-extra'); extra.value = extra.value ? null : reactive({ id: 'pv-extra', type: 'timer', seconds: 300 }) }
+watch(presenting, v => { if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
 function stopPresenting() {
   presenting.value = false
   tool.value = null
@@ -761,7 +766,7 @@ function presentClick(e) {
   if (a) return window.open(a.href, '_blank', 'noopener')
   if (tool.value) return // pointing or drawing does not turn the slide
   // composedPath: the path at the click; a picker's or quiz's own handler may have replaced the clicked node already (detached, closest finds nothing)
-  if (e.composedPath().some(n => n.matches?.('iframe, .pv-side, .pv-bar, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar'))) return // a timer click starts the timer, a picker click draws, not the next slide
+  if (e.composedPath().some(n => n.matches?.('iframe, .pv-side, .pv-bar, .pv-clock, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar'))) return // a timer click starts the timer, a picker click draws, not the next slide
   presentStep(e.clientX < innerWidth / 4 ? -1 : 1) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
@@ -1737,6 +1742,12 @@ function onClipboard(e) {
     </aside>
     <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
     <div v-if="tool === 'laser' && laser" class="pv-laser" :style="{ translate: `${laser[0]}px ${laser[1]}px` }" aria-hidden="true" />
+    <div v-if="extra" class="pv-clock" :class="{ done: done(extra), warn: warning(extra, true) }" @click.stop>
+      <button v-if="!timerRuns[extra.id]" class="tb icon small" :title="t('One minute less')" :aria-label="t('One minute less')" :disabled="!extra.seconds" @click="extra.seconds = Math.max(0, extra.seconds - 60)"><b aria-hidden="true">−</b></button>
+      <button class="pv-clock-face" :aria-label="t(extra.seconds ? 'Start or pause the timer' : 'Start or pause the stopwatch')" @click="second('pv-extra') ? resetRun(extra.id) : toggleTimer(extra)">{{ face(extra, true) }}</button>
+      <button v-if="!timerRuns[extra.id]" class="tb icon small" :title="t('One minute more')" :aria-label="t('One minute more')" @click="extra.seconds = Math.min(359940, extra.seconds + 60)"><Icon name="plus" :size="16" /></button>
+      <button class="tb icon small" :title="t('Close timer')" :aria-label="t('Close timer')" @click="toggleExtra"><Icon name="x" :size="16" /></button>
+    </div>
     <div class="pv-jump" aria-live="polite">{{ jump && t('Slide {0}', jump) }}</div>
     <Overview v-if="overview" @go="i => { presentGo(i); closeOverview() }" @close="closeOverview" />
     <div v-if="keysHelp" class="pv-keys" role="dialog" :aria-label="t('Keys while presenting')" @click.stop="keysHelp = false">
@@ -1747,22 +1758,36 @@ function onClipboard(e) {
     <!-- pen options in a row of their own above the bar, so the tools and the way out stay in reach on a phone -->
     <div class="pv-bars">
     <div v-if="drawing" class="pv-bar pv-ink-bar" @click.stop>
-      <button v-for="c in INKS" :key="c" class="pv-swatch" :class="{ on: ink.color === c }" :style="{ background: c }" :title="c" :aria-label="t('Pen colour {0}', c)" :aria-pressed="ink.color === c" @click="ink.color = c" />
-      <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
+      <span class="pv-group" role="group" :aria-label="t('Pen colour')">
+        <button v-for="c in INKS" :key="c" class="pv-swatch" :class="{ on: ink.color === c }" :style="{ background: c }" :title="c" :aria-label="t('Pen colour {0}', c)" :aria-pressed="ink.color === c" @click="ink.color = c" />
+      </span>
+      <span class="pv-group" role="group" :aria-label="t('Line width')">
+        <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
+      </span>
     </div>
+    <!-- in groups: where you are, drawing, timer and recording, the view, the way out -->
     <div class="pv-bar">
-      <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
-      <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
-      <span v-if="rehearsal" class="pv-timer">⏱ {{ clock(rhTotal) }}</span>
-      <button v-else-if="presenterView" class="tb small pv-timer" :title="`${t('Reset timer')} (${kbd('present-timer')})`" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
-      <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="`${t('Laser pointer')} (${kbd('present-laser')})`" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
-      <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="`${t('Pen')} (${kbd('present-draw')})`" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
-      <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="`${t('Arrow')} (${kbd('present-arrow')})`" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
-      <button class="tb icon small" :title="`${t('Slide overview')} (${kbd('present-overview')})`" :aria-label="t('Slide overview')" @click.stop="overview = true"><Icon name="grid" :size="16" /></button>
-      <Recorder ref="recorder" />
-      <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
-      <button v-if="strokes.length" class="tb icon small" :title="`${t('Clear drawing')} (${kbd('present-erase')})`" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
-      <button class="tb icon small" :title="`${t('Presenter view')} (${kbd('present-view')})`" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
+      <span class="pv-group" role="group" :aria-label="t('Slides')">
+        <span>{{ ui.slide + 1 }} / {{ deck.slides.length }}</span>
+        <span v-if="presenterView && clickSteps(slide).length" :title="t('Click steps shown')">· {{ Math.min(clickStep, clickSteps(slide).length) }}/{{ clickSteps(slide).length }}</span>
+        <button class="tb icon small" :title="`${t('Slide overview')} (${kbd('present-overview')})`" :aria-label="t('Slide overview')" @click.stop="overview = true"><Icon name="grid" :size="16" /></button>
+      </span>
+      <span class="pv-group" role="group" :aria-label="t('Draw')">
+        <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="`${t('Laser pointer')} (${kbd('present-laser')})`" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
+        <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="`${t('Pen')} (${kbd('present-draw')})`" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
+        <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="`${t('Arrow')} (${kbd('present-arrow')})`" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
+        <button v-if="strokes.length" class="tb icon small" :title="`${t('Clear drawing')} (${kbd('present-erase')})`" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
+      </span>
+      <span class="pv-group" role="group" :aria-label="t('Time and recording')">
+        <span v-if="rehearsal" class="pv-timer">⏱ {{ clock(rhTotal) }}</span>
+        <button v-else-if="presenterView" class="tb small pv-timer" :title="`${t('Reset timer')} (${kbd('present-timer')})`" :aria-label="t('Reset timer')" @click.stop="resetTimer">⏱ {{ elapsed }}</button>
+        <button class="tb icon small" :class="{ on: extra }" :title="t('Timer')" :aria-label="t('Timer')" :aria-pressed="!!extra" @click.stop="toggleExtra"><Icon name="timer" :size="16" /></button>
+        <Recorder ref="recorder" />
+      </span>
+      <span class="pv-group" role="group" :aria-label="t('View')">
+        <button class="tb icon small" :class="{ on: presenterView }" :title="`${t('Presenter view')} (${kbd('present-view')})`" :aria-label="t('Presenter view')" :aria-pressed="presenterView" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
+        <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
+      </span>
       <!-- like Esc: with a tool on, the first press puts the tool away, so the tool buttons come back instead of the presentation ending -->
       <button class="tb icon small" :title="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" :aria-label="tool ? t('Put the tool away (Esc)') : t('Exit (Esc)')" @click.stop="tool ? (tool = null) : stopPresenting()"><Icon name="x" :size="16" /></button>
     </div>
