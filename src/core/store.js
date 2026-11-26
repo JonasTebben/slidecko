@@ -29,7 +29,7 @@ export function setFormat(aspectRatio = '16/9', canvasWidth = 980) {
   deck.canvasWidth = cw >= 100 && cw <= 10000 ? cw : 980
   ;({ w: W, h: H } = formatSize(r || 16 / 9, deck.canvasWidth))
   Object.assign(format, { w: W, h: H })
-  if (typeof document === 'undefined') return
+  if (!globalThis.document?.documentElement) return // no page (tests)
   document.documentElement.style.setProperty('--slide-w', W + 'px')
   document.documentElement.style.setProperty('--slide-h', H + 'px')
   // @page can't use var(): one page per slide at the current size (app.css has the 16:9 fallback)
@@ -419,7 +419,8 @@ let saving = Promise.resolve(), pending = 0, assetsFailed = false
 const queue = (job, assets) => {
   pending++
   ui.save = 'saving'
-  saving = saving.then(job).then(() => {
+  // a full disk: the older half of this project's snapshots makes room, then the write is tried once more
+  saving = saving.then(job).catch(async e => { if (e?.name !== 'QuotaExceededError' || !(await freeSnaps())) throw e; await job(); ui.status = t('The browser’s storage was full: older snapshots of this project were removed to make room.') }).then(() => {
     if (assets) assetsFailed = false
     if (!--pending) ui.save = assetsFailed ? 'failed' : 'saved'
   }, e => {
@@ -564,6 +565,14 @@ export const snapAssets = (list, assets) => {
   return Object.fromEntries(Object.entries(assets || {}).filter(([k]) => used.has(k)))
 }
 const snapFailed = e => { ui.status = t('Snapshot could not be stored ({0}). The project itself is saved as usual.', e.message) }
+// true when snapshots were removed (the newest stay)
+async function freeSnaps(id = deck.id) {
+  const v = await readSnaps(id)
+  if (v.list.length < 2) return false
+  const list = v.list.slice(0, Math.floor(v.list.length / 2))
+  await put('s:' + id, { list, assets: snapAssets(list, v.assets) })
+  return true
+}
 const readSnaps = async id => { const v = await get('s:' + id); return { list: Array.isArray(v?.list) ? v.list : [], assets: v?.assets || {} } }
 // its own record and transaction: a full disk fails the snapshot, never the project save.
 // After the queued project writes, so a delete of the project cannot be undone by a late snapshot.

@@ -328,3 +328,15 @@ test('web pages on slides: https only, never the app itself (its sandbox would a
     for (const bad of ['https://slidecko.example/app/', 'https://slidecko.example/runner.html', 'http://example.org/', 'https://u:p@example.org/', 'javascript:alert(1)']) assert.equal(webUrl(bad), undefined)
   } finally { globalThis.location = real }
 })
+
+test('a full disk: the older half of the project\'s snapshots makes room and the save is tried again', async () => {
+  const snap = at => ({ at, slides: 1, json: JSON.stringify({ slides: [] }) })
+  data.set('s:full', { list: [snap(4), snap(3), snap(2), snap(1)], assets: {} })
+  quota = true
+  await S.createProject({ title: 'Full', slides: [{ elements: [] }] }, 'full')
+  assert.deepEqual(data.get('s:full').list.map(s => s.at), [4, 3])
+  assert.equal(JSON.parse(data.get('p:full')).title, 'Full')
+  assert.equal(S.ui.save, 'saved')
+  assert.match(S.ui.status, /storage was full/)
+  await S.removeProject('full')
+})

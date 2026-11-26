@@ -1391,4 +1391,5 @@ export default {
   "This project is also open in another tab. Edit it in one tab only: each tab saves its own state.": "Dieses Projekt ist auch in einem anderen Tab geöffnet. Bearbeite es nur in einem Tab: Jeder Tab speichert seinen eigenen Stand.",
   "This file comes from a newer Slidecko. What this version does not know is left out.": "Diese Datei stammt aus einer neueren Slidecko-Version. Was diese Version nicht kennt, fehlt.",
   "{0} elements could not be read and were left out.": "{0} Elemente konnten nicht gelesen werden und fehlen.",
+  "The browser’s storage was full: older snapshots of this project were removed to make room.": "Der Speicher des Browsers war voll: Ältere Zwischenstände dieses Projekts wurden entfernt, um Platz zu schaffen.",
 }

@@ -1391,4 +1391,5 @@ export default {
   "This project is also open in another tab. Edit it in one tab only: each tab saves its own state.": "Dit project is ook in een ander tabblad geopend. Bewerk het in één tabblad: elk tabblad slaat zijn eigen stand op.",
   "This file comes from a newer Slidecko. What this version does not know is left out.": "Dit bestand komt uit een nieuwere versie van Slidecko. Wat deze versie niet kent, ontbreekt.",
   "{0} elements could not be read and were left out.": "{0} elementen konden niet worden gelezen en ontbreken.",
+  "The browser’s storage was full: older snapshots of this project were removed to make room.": "De opslag van de browser was vol: oudere momentopnamen van dit project zijn verwijderd om ruimte te maken.",
 }

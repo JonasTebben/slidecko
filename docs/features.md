@@ -2,7 +2,7 @@
 
 ## Start page
 
-A project open in two tabs at once says so in the second tab (each tab saves its own state, so edit in one only). If saving fails (the browser's storage is full), closing the tab asks first. A project file from a newer Slidecko, or one with elements this version cannot read, says so when it opens.
+A project open in two tabs at once says so in the second tab (each tab saves its own state, so edit in one only). When the browser's storage is full, the older half of the project's snapshots is removed to make room and the save is tried again (a message says so); if it still fails, closing the tab asks first. A project file from a newer Slidecko, or one with elements this version cannot read, says so when it opens.
 
 Ways to start (three cards: New presentation, Import presentation, Open slides written as text (Markdown); a saved `.slides.json` or the ZIP from "Save all" is restored through Import), below them three templates, below those the Markdown tutorial and "Open Slidev project folder …" for people who write slides as code, then your projects (only when there are any), then the theme gallery. What Slidecko can do is shown on the landing page; its screenshots and demo video live in `public/showcase/`, recorded by `scripts/showcase.js`.
 
