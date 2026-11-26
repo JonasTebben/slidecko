@@ -334,13 +334,22 @@ async function presenting(page, label, touch) {
     await tap('.pv-bar button[aria-label=Pen]')
     const b = await page.locator('.pv-ink').boundingBox({ timeout: 10000 }).catch(() => null)
     if (!b) throw new Error('the pen did not switch on')
-    const x = b.x + 100, y = b.y + b.height - 60
-    if (touch) { // a real finger stroke (Chromium's touch input), so pointer capture works as on an iPad
-      const cdp = await page.context().newCDPSession(page)
-      for (const [type, dx] of [['touchStart', 0], ['touchMove', 40], ['touchMove', 80], ['touchEnd', 80]]) await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: x + dx, y }] })
+    const stroke = async y => {
+      const x = b.x + 100
+      if (touch) { // a real finger stroke (Chromium's touch input), so pointer capture works as on an iPad
+        const cdp = await page.context().newCDPSession(page)
+        for (const [type, dx] of [['touchStart', 0], ['touchMove', 40], ['touchMove', 80], ['touchEnd', 80]]) await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: x + dx, y }] })
+      }
+      else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 80, y, { steps: 4 }); await page.mouse.up() }
     }
-    else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 80, y, { steps: 4 }); await page.mouse.up() }
-    ok(await page.locator('.pv-ink polyline').count() > 0, 'no stroke')
+    await stroke(b.y + b.height - 60)
+    const lines = await page.locator('.pv-ink polyline').count()
+    ok(lines > 0, 'no stroke')
+    // a second stroke, taken back with the button
+    await stroke(b.y + b.height - 100)
+    ok(await page.locator('.pv-ink polyline').count() > lines, 'no second stroke')
+    await tap('.pv-ink-bar button[aria-label="Take back the last stroke"]')
+    ok(await page.locator('.pv-ink polyline').count() === lines, 'the last stroke was not taken back')
     // a tap right after the stroke can be lost on a slow machine: tap again until the pen is off
     for (let k = 0; k < 3 && await page.locator('.pv-ink.on').count(); k++) { await page.waitForTimeout(300); await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]') }
     ok(!(await page.locator('.pv-ink.on').count()), 'the pen stays on')

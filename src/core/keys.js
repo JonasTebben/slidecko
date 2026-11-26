@@ -20,13 +20,13 @@ export const DEFAULTS = {
   revertSlide: '', revertAll: '', editTheme: '', importTheme: '',
   // while presenting (handled separately, so the same key can mean something else there)
   'present-view': 'p', 'present-black': 'b', 'present-white': 'w', 'present-timer': 'r', 'present-quiz': 'q', 'present-laser': 'l',
-  'present-draw': 'd', 'present-arrow': 'a', 'present-erase': 'e', 'present-overview': 'o', 'present-help': 'h',
+  'present-draw': 'd', 'present-arrow': 'a', 'present-erase': 'e', 'present-undo': 'z', 'present-overview': 'o', 'present-help': 'h',
 }
 // labels of the presenting keys (English t() keys); the editor ones come from the command list
 export const PRESENT_LABELS = {
   'present-view': 'Presenter view', 'present-black': 'Black screen', 'present-white': 'White screen', 'present-timer': 'Reset the talk timer',
   'present-quiz': 'Show the quiz solution', 'present-laser': 'Laser pointer', 'present-draw': 'Draw', 'present-arrow': 'Draw an arrow',
-  'present-erase': 'Erase the drawing', 'present-overview': 'Slide overview', 'present-help': 'Keys while presenting',
+  'present-erase': 'Erase the drawing', 'present-undo': 'Take back the last stroke', 'present-overview': 'Slide overview', 'present-help': 'Keys while presenting',
 }
 export const isPresent = id => id.startsWith('present-')
 // these also work while typing in a field, so a plain letter would swallow that letter

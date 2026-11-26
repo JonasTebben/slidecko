@@ -1325,4 +1325,5 @@ export default {
   "all, or e.g. 1, 6-8": "todas, o p. ej. 1, 6-8",
   "Numbers as in the slide list; hidden slides stay out": "Números como en la lista de diapositivas; las ocultas quedan fuera",
   "Not a slide range of this scope.": "No es un rango de diapositivas de este ámbito.",
+  "Take back the last stroke": "Deshacer el último trazo",
 }

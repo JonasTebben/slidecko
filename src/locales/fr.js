@@ -1304,4 +1304,5 @@ export default {
   "all, or e.g. 1, 6-8": "toutes, ou p. ex. 1, 6-8",
   "Numbers as in the slide list; hidden slides stay out": "Numéros comme dans la liste des diapositives ; les diapositives masquées restent dehors",
   "Not a slide range of this scope.": "Pas une plage de diapositives de cette étendue.",
+  "Take back the last stroke": "Annuler le dernier trait",
 }

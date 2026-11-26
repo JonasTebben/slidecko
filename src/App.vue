@@ -759,7 +759,7 @@ const PRESENT_ACTS = {
   'present-timer': () => (rehearsal.value ? rhRestart() : resetTimer()),
   'present-quiz': () => { for (const el of deck.slides[ui.slide]?.elements || []) if (el.type === 'quiz') toggleSolution(el.id) },
   'present-laser': () => setTool('laser'), 'present-draw': () => setTool('pen'), 'present-arrow': () => setTool('arrow'),
-  'present-erase': () => { strokes.value = [] }, 'present-overview': () => { overview.value = true }, 'present-help': () => { keysHelp.value = !keysHelp.value },
+  'present-erase': () => { strokes.value = [] }, 'present-undo': () => { strokes.value = strokes.value.slice(0, -1) }, 'present-overview': () => { overview.value = true }, 'present-help': () => { keysHelp.value = !keysHelp.value },
 }
 const keysHelp = ref(false)
 const overview = ref(false), recorder = ref()
@@ -779,6 +779,7 @@ function presentKey(e) {
   const k = e.key.toLowerCase(), combo = comboOf(e)
   const act = combo && Object.keys(PRESENT_ACTS).find(id => keyOf(id) === combo)
   if (act) { PRESENT_ACTS[act](); return e.preventDefault() }
+  if (comboOf(e) === 'mod+z') { PRESENT_ACTS['present-undo'](); return e.preventDefault() } // as in the editor
   const alias = plain && { '.': 'present-black', ',': 'present-white', c: 'present-erase', g: 'present-overview' }[k] // g: Slidev's go-to, the overview takes a typed number too
   if (alias || e.key === '?') { PRESENT_ACTS[alias || 'present-help'](); return e.preventDefault() }
   if (e.key === 'Escape' && keysHelp.value) { keysHelp.value = false; return e.preventDefault() }
@@ -1844,6 +1845,7 @@ function onClipboard(e) {
       <span class="pv-group" role="group" :aria-label="t('Line width')">
         <button v-for="w in WIDTHS" :key="w" class="tb icon small" :class="{ on: ink.width === w }" :title="t('Line width {0}', w)" :aria-label="t('Line width {0}', w)" :aria-pressed="ink.width === w" @click="ink.width = w"><i class="pv-width" :style="{ height: w / 2 + 1 + 'px' }" /></button>
       </span>
+      <button class="tb icon small" :disabled="!strokes.length" :title="`${t('Take back the last stroke')} (${kbd('present-undo')})`" :aria-label="t('Take back the last stroke')" @click="PRESENT_ACTS['present-undo']()"><Icon name="undo" :size="16" /></button>
       <button class="tb small" :class="{ on: keepInk }" :aria-pressed="keepInk" :title="t('On: the drawing stays on the slide as a picture when you leave it')" @click="keepInk = !keepInk"><Icon name="pin" :size="16" />{{ t('Keep') }}</button>
     </div>
     <!-- in groups: where you are, drawing, timer and recording, the view, the way out -->
@@ -1857,6 +1859,7 @@ function onClipboard(e) {
         <button class="tb icon small" :class="{ on: tool === 'laser' }" :title="`${t('Laser pointer')} (${kbd('present-laser')})`" :aria-label="t('Laser pointer')" :aria-pressed="tool === 'laser'" @click.stop="setTool('laser')"><Icon name="laser" :size="16" /></button>
         <button class="tb icon small" :class="{ on: tool === 'pen' }" :title="`${t('Pen')} (${kbd('present-draw')})`" :aria-label="t('Pen')" :aria-pressed="tool === 'pen'" @click.stop="setTool('pen')"><Icon name="brush" :size="16" /></button>
         <button class="tb icon small" :class="{ on: tool === 'arrow' }" :title="`${t('Arrow')} (${kbd('present-arrow')})`" :aria-label="t('Arrow')" :aria-pressed="tool === 'arrow'" @click.stop="setTool('arrow')"><Icon name="arrowDraw" :size="16" /></button>
+        <button v-if="strokes.length" class="tb icon small" :title="`${t('Take back the last stroke')} (${kbd('present-undo')})`" :aria-label="t('Take back the last stroke')" @click.stop="PRESENT_ACTS['present-undo']()"><Icon name="undo" :size="16" /></button>
         <button v-if="strokes.length" class="tb icon small" :title="`${t('Clear drawing')} (${kbd('present-erase')})`" :aria-label="t('Clear drawing')" @click.stop="strokes = []"><Icon name="trash" :size="16" /></button>
       </span>
       <span class="pv-group" role="group" :aria-label="t('Time and recording')">

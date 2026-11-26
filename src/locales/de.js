@@ -1325,4 +1325,5 @@ export default {
   "all, or e.g. 1, 6-8": "alle, oder z. B. 1, 6-8",
   "Numbers as in the slide list; hidden slides stay out": "Nummern wie in der Folienliste; ausgeblendete Folien bleiben draußen",
   "Not a slide range of this scope.": "Kein Folienbereich dieses Umfangs.",
+  "Take back the last stroke": "Letzten Strich zurücknehmen",
 }

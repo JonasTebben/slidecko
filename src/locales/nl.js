@@ -1325,4 +1325,5 @@ export default {
   "all, or e.g. 1, 6-8": "alle, of bijv. 1, 6-8",
   "Numbers as in the slide list; hidden slides stay out": "Nummers zoals in de dialijst; verborgen dia’s blijven weg",
   "Not a slide range of this scope.": "Geen diabereik van dit bereik.",
+  "Take back the last stroke": "Laatste lijn ongedaan maken",
 }
