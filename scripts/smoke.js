@@ -314,6 +314,34 @@ for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[ke
   if (!opened && key !== 'json') throw new Error('no new project opened')
   if (slides < DECK.slides.length) throw new Error(`${slides} slides`)
 })
+await step('dev: a Slidev folder imported as a new project is measured without the open project\'s font sizes', async () => {
+  const h = await page.evaluate(async () => {
+    const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
+    S.deck.typo = { code: 30, codeLine: 40 } // the open project: big code
+    const f = new File(['# Code\n\n```js\na\nb\n```\n'], 'slides.md')
+    Object.defineProperty(f, 'webkitRelativePath', { value: 'measure/slides.md' })
+    const before = S.deck.id
+    await A.importProject([f], 'slides.md')
+    if (S.deck.id === before) throw new Error('no new project opened')
+    return S.deck.slides[0].elements.find(e => e.type === 'code')?.h
+  })
+  // two lines at the new project's 12px/18px plus padding; with the 30px/40px of the old project it would be about 100
+  if (!(h > 30 && h < 70)) throw new Error(`code box ${h}px high`)
+})
+await step('dev: the caret below the edge of a text box longer than the slide does not scroll the slide', async () => {
+  await page.evaluate(async () => {
+    const S = await import('/src/core/store.js')
+    await S.createProject({ title: 'long', slides: [{ elements: [{ id: S.uid(), type: 'text', x: 56, y: 40, w: 400, h: 700, html: Array.from({ length: 40 }, (_, i) => `<p>Line ${i + 1}</p>`).join('') }] }] })
+  })
+  const box = page.locator('.stage .el.text').first()
+  await box.dblclick({ position: { x: 20, y: 20 } })
+  await page.waitForSelector('.stage .el.text .content[contenteditable=true]')
+  for (let i = 0; i < 45; i++) await page.keyboard.press('ArrowDown')
+  await page.waitForFunction(() => { const s = getSelection(); return s.rangeCount && /Line 40/.test(s.anchorNode?.textContent || '') }, null, { timeout: 5000 })
+  const top = await page.evaluate(() => document.querySelector('.stage .slide').scrollTop)
+  if (top !== 0) throw new Error(`slide scrolled by ${top}px`)
+  await page.keyboard.press('Escape')
+})
 await page.context().close()
 
 // 2. production build: the saved project file through the start page, then the same checks
