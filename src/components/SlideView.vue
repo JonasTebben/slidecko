@@ -7,7 +7,7 @@ import { themeStyle, fontStack, codeDark, shadowCss, themeOf } from '../slide/th
 import { chartSvg } from '../slide/chart.js'
 import { hlLines, codeOpts } from '../slide/hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from '../core/actions.js'
-import { shapeSvg, fillFields } from '../export/toSlidev.js'
+import { shapeSvg, fillFields } from '../slide/slidevModel.js'
 import { slideHref, tocEntries, tocHtml } from '../slide/links.js'
 import TableEl from './TableEl.vue'
 import { pasteHtml } from '../editor/paste.js'

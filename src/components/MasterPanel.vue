@@ -4,7 +4,7 @@ import Icon from './Icon.vue'
 import SlideView from './SlideView.vue'
 import { deck, ui, format } from '../core/store.js'
 import { themeLayouts } from '../slide/themes.js'
-import { FIELDS, slidevNames } from '../export/toSlidev.js'
+import { FIELDS, slidevNames } from '../slide/slidevModel.js'
 import * as A from '../core/actions.js'
 import { t } from '../core/i18n.js'
 

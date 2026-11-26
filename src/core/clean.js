@@ -1,6 +1,6 @@
 // Validation of untrusted data (files, IndexedDB, clipboard, import): every element, slide and HTML string passes here
 import DOMPurify from 'dompurify'
-import { layoutOf } from '../export/toSlidev.js'
+import { layoutOf } from '../slide/slidevModel.js'
 import { TRANSITIONS, EFFECTS, fmGet } from '../import/parseSlidev.js'
 import { fontStack, SHADOWS } from '../slide/themes.js'
 import { t } from './i18n.js'

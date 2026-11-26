@@ -13,6 +13,8 @@ import { iconTag, iconSet, ICON_SETS, ICONIFY_JSON } from '../slide/icons.js'
 import { BUNDLED, bundledFaces, fontCss, usesFamily, FONT_EXT } from '../slide/fonts.js'
 import { MATH } from '../slide/math.js'
 import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, codeDark, shadowCss, CENTERED } from '../slide/themes.js'
+import { FIELD, decorations, flowHash, fmSet, imageMap, layoutOf, shapeSvg, slideHash, slidevNames } from '../slide/slidevModel.js'
+export { FIELDS, decorations, fillFields, flowHash, flowable, fmSet, imageMap, imagePath, layoutOf, lineEnds, readLayers, shapeSvg, slideHash, slidevNames } from '../slide/slidevModel.js'
 
 // Project -> Slidev project files. Pure (no store, no browser-only APIs) so it is tested in Node.
 //
@@ -25,6 +27,7 @@ import { tableCss, calloutCss, slidevThemeCss, themeOf, typoCss, fontStack, code
 
 const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '*' })
 turndown.use(gfm)
+
 // text "<" would be read as an HTML tag (List<T> breaks Slidev's Vue compile), "&lt;" as an entity; code is not escaped
 const mdEscape = turndown.escape.bind(turndown)
 // $…$ math stays as typed (Slidev reads it as TeX), and so does an escaped \$
@@ -37,8 +40,10 @@ turndown.escape = s => {
 turndown.keep(node => ['V-CLICKS', 'V-CLICK', 'V-AFTER', 'MARK', 'U', 'SUB', 'SUP', 'KBD'].includes(node.nodeName) ||
   (node.nodeName === 'SPAN' && node.getAttribute('style')) || (node.nodeName === 'DIV' && node.getAttribute('data-callout')) ||
   (/^(P|H\d|LI)$/.test(node.nodeName) && /text-align/.test(node.getAttribute('style') || '')))
+
 // list items one by one: each top-level list in Slidev's <v-clicks>, from the step of its first item (set by elementMd)
 let listAt = 0
+
 const inItem = n => { for (let p = n.parentNode; p; p = p.parentNode) if (p.nodeName === 'LI') return true }
 turndown.addRule('clickItems', {
   filter: n => listAt > 0 && /^[OU]L$/.test(n.nodeName) && !inItem(n),
@@ -48,6 +53,7 @@ turndown.addRule('clickItems', {
     return `\n\n<v-clicks at="${at}">\n\n${content.replace(/^\n+|\n+$/g, '')}\n\n</v-clicks>\n\n`
   },
 })
+
 // a link to a slide: Slidev's <Link to="n"> with the slide's number now; to a deleted or hidden slide: just the text
 let curNums = new Map() // slide id -> Slidev number while toSlidev() runs
 turndown.addRule('slideLink', {
@@ -74,25 +80,18 @@ turndown.addRule('img', {
   },
 })
 
-// identity of a slide's content, ignoring element ids (they change on every load) and the output of runnable code (Slidev runs it itself)
-const hashOf = v => { let h = 0; for (const c of JSON.stringify(v)) h = (h * 31 + c.charCodeAt(0)) | 0; return h }
-export const slideHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, output, ...e }) => e)])
-// a new slide's arrangement without its text (and heights, which grow with the text): while it stays the same,
-// the slide follows the Slidev layout and is written as plain Markdown instead of positioned boxes
-export const flowHash = slide => hashOf([slide.layout, slide.elements.map(({ id, mid, html, code, h, output, ...e }) => e)])
-// only one column of text and code flows in Markdown the way it sits in the editor
-export const flowable = els => els.every(e => (e.type === 'text' && !e.board) || e.type === 'code') && new Set(els.map(e => `${e.x},${e.w}`)).size <= 1
-// a malformed escape ("100%.png") stays as written instead of stopping the export
-export const imagePath = src => { try { src = decodeURI(src) } catch { /* keep src */ } return src.replace(/^\.?\//, '') }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
 // decorative: role="presentation", because Markdown pictures without a description come with an empty alt too
 const altAttr = el => (el.decorative ? ' alt="" role="presentation"' : el.alt ? ` alt="${esc(el.alt)}"` : '')
 
 // a box's own font size counts for its headings too, as in the editor (slide.css)
 const SIZE_CSS = `[style*="font-size"] > :is(h1, h2, h3, h4, h5, h6) { font-size: inherit !important; line-height: 1.25 !important; }`
+
 const SPACING_CSS = `[style*="--lh"] :is(p, li, h1, h2, h3, h4, h5, h6, blockquote) { line-height: var(--lh) !important; }
 [style*="--ps"] > * { margin-block: 0 !important; }
 [style*="--ps"] > * + *, [style*="--ps"] li + li { margin-top: var(--ps) !important; }`
+
 function boxStyle(el, extra = '') {
   const px = n => Math.round(n) + 'px'
   let s = `position:absolute;left:${px(el.x)};top:${px(el.y)};width:${px(el.w)};height:${px(el.h)}`
@@ -118,6 +117,7 @@ function boxStyle(el, extra = '') {
 
 // a table cell is one Markdown line: a list in it stays HTML (Markdown would make it "- a<br>- b" text)
 const inline = html => (/<(ul|ol)[\s>]/.test(html || '') ? html.replace(/\n+/g, '') : turndown.turndown(html || '').replace(/\n+/g, '<br>')).replace(/\|/g, '\\|') || ' '
+
 function tableMd(el) {
   const align = c => ({ left: ':---', center: ':---:', right: '---:' })[el.align?.[c]] || '---'
   if (el.header !== false && !el.fills && !el.borders) {
@@ -133,42 +133,12 @@ function tableMd(el) {
   return `<table>${head}<tbody>${el.rows.slice(n).map((r, i) => `<tr>${r.map(cell('td', i + n)).join('')}</tr>`).join('')}</tbody></table>`
 }
 
-// a line's ends: straight through the middle, or corner to corner (slope down / up)
-export const lineEnds = ({ w, h, slope }) => (slope === 'down' ? [[0, 0], [w, h]] : slope === 'up' ? [[0, h], [w, 0]] : [[0, h / 2], [w, h / 2]])
-// the line, shortened under its arrowheads (filled triangles in the line's colour, sized by its width)
-function lineSvg(el) {
-  const c = el.stroke && el.stroke !== 'none' ? el.stroke : el.fill, lw = el.strokeWidth || 3
-  let [a, b] = lineEnds(el)
-  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len
-  const L = Math.min(len / 2, Math.max(10, lw * 3.5)), W = Math.max(6, lw * 2)
-  // a triangle with its tip at the end, pointing along d (+1: towards the end, -1: towards the start); returns [svg, its base]
-  const head = (tip, d) => {
-    const bx = tip[0] - d * ux * L, by = tip[1] - d * uy * L
-    return [`<polygon points="${tip[0]},${tip[1]} ${bx - uy * W},${by + ux * W} ${bx + uy * W},${by - ux * W}" fill="${c}"/>`, [bx, by]]
-  }
-  let heads = ''
-  if (el.head === 'end' || el.head === 'both') { const [p, base] = head(b, 1); heads += p; b = base }
-  if (el.head === 'start' || el.head === 'both') { const [p, base] = head(a, -1); heads += p; a = base }
-  return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${lw}" stroke-linecap="${el.head ? 'butt' : 'round'}"/>${heads}`
-}
-export function shapeSvg(el) {
-  const { w, h } = el, sw = el.strokeWidth || 0, f = el.fill || 'none', st = el.stroke || 'none'
-  const a = `fill="${f}"${el.fillAlpha != null ? ` fill-opacity="${el.fillAlpha / 100}"` : ''} stroke="${st}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`
-  const i = sw / 2
-  const body = {
-    rect: `<rect x="${i}" y="${i}" width="${Math.max(0, w - sw)}" height="${Math.max(0, h - sw)}" rx="${el.radius || 0}" ${a}/>`,
-    rounded: `<rect x="${i}" y="${i}" width="${Math.max(0, w - sw)}" height="${Math.max(0, h - sw)}" rx="${Math.min(w, h) / 4}" ${a}/>`,
-    ellipse: `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${Math.max(0, w / 2 - i)}" ry="${Math.max(0, h / 2 - i)}" ${a}/>`,
-    triangle: `<polygon points="${w / 2},${i} ${w - i},${h - i} ${i},${h - i}" ${a}/>`,
-    arrow: `<polygon points="0,${h * 0.3} ${w - h / 2},${h * 0.3} ${w - h / 2},0 ${w},${h / 2} ${w - h / 2},${h} ${w - h / 2},${h * 0.7} 0,${h * 0.7}" ${a}/>`,
-    line: lineSvg(el),
-  }[el.shape] || ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="overflow:visible">${body}</svg>`
-}
-
 let curShapeFont = {} // toSlidev()'s shapeFont while it runs
+
 let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
+
 let curMorph = new Map() // element id -> view-transition-name while toSlidev() runs
+
 // Magic move in Slidev: `transition: view-transition`, and the elements it pairs share a view-transition-name
 // (an element paired on both sides keeps the name it got from the slide before, so each slide's names stay unique)
 function morphNames(slides, def) {
@@ -183,6 +153,7 @@ function morphNames(slides, def) {
   })
   return names
 }
+
 function elementMd(el, flat, at = 0) { // at: step of the first list item (list items one by one)
   switch (el.type) {
     case 'image': {
@@ -263,35 +234,10 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
   }
 }
 
-// --- master and layouts (slide types) ---
-// a field in master or layout text: <span data-field="page">#</span>, shown as the slide number, slide count or project title
-export const FIELDS = { page: 'Slide number', total: 'Slide count', title: 'Project title' }
-const FIELD = /(<span\b[^>]*\bdata-field="(page|total|title)"[^>]*>)[^<]*(<\/span>)/g
-const htmlText = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-export const fillFields = (html, v) => (html?.includes('data-field') ? html.replace(FIELD, (_, a, k, b) => a + htmlText(v[k]) + b) : html)
-// a slide's project layout: its own while that still has the slide's Slidev layout, else the first one with it
-export const layoutOf = (s, layouts = []) => layouts.find(l => l.id === s.type && l.layout === s.layout) || layouts.find(l => l.layout === s.layout)
-// drawn behind every slide of the layout (placeholders are copied into new slides instead)
-export const decorations = l => l?.elements.filter(e => !e.placeholder) || []
-const SLIDEV_LAYOUTS = ['cover', 'default', 'center', 'end', 'fact', 'full', 'iframe', 'iframe-left', 'iframe-right', 'image', 'image-left', 'image-right', 'intro', 'none', 'quote', 'section', 'statement', 'two-cols', 'two-cols-header']
-// the Slidev names the deck's own layouts get on export (only decorated ones become layouts/<name>.vue); `theirs`: the project's own layout files
-export const slidevNames = (layouts, theme, theirs = []) => layoutSlugs(layouts, [...SLIDEV_LAYOUTS, ...(themeOf(theme).layouts || []).map(x => x[0]), ...theirs])
-// file names for decorated layouts, from their names; never the name of a Slidev or theme layout
-function layoutSlugs(layouts, reserved) {
-  const used = new Set(reserved), out = {}
-  for (const l of layouts.filter(l => decorations(l).length)) {
-    let base = l.name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'layout'
-    if (used.has(base)) base += '-layout'
-    let k = base
-    for (let i = 2; used.has(k); i++) k = `${base}-${i}`
-    used.add(k)
-    out[l.id] = k
-  }
-  return out
-}
 // Slidev's global layers and layouts are Vue files: elements as HTML (no Markdown there), fields as Slidev's own values;
 // timers, pickers and quizzes need Markdown and are left out
 const FIELD_VUE = { page: '{{ $nav.currentPage }}', total: '{{ $nav.total }}', title: '{{ $slidev.configs.title }}' }
+
 function layerHtml(el) {
   const html = el.type === 'text' ? `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">${el.html}</div>`
     : el.type === 'code' ? `<pre style="${boxStyle(el)};margin:0;overflow:hidden"><code>${esc(el.code)}</code></pre>`
@@ -299,9 +245,12 @@ function layerHtml(el) {
         : ['image', 'shape', 'video', 'media', 'chart', 'icon'].includes(el.type) ? elementMd(el) : ''
   return '    ' + escapeMustache(html).replace(FIELD, (_, a, k, b) => a + FIELD_VUE[k] + b)
 }
+
 // the data rides along in a comment, so a re-import gets the editable master and layouts back
 const layerComment = (kind, data) => `<!-- slidecko-${kind} ${JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')} -->\n`
+
 const strip = els => els.map(({ id, ...e }) => e)
+
 // the master as Slidev's global-top layer: global-bottom sits behind the slide's opaque background and would never show.
 // So in Slidev it lies over the slide's content (a slide with hideMaster: true has none); the class brings the theme's colours and fonts
 const masterVue = master => layerComment('master', { elements: strip(master)}) + `<template>
@@ -310,6 +259,7 @@ ${master.map(layerHtml).filter(s => s.trim()).join('\n')}
   </div>
 </template>
 `
+
 // a decorated layout: its Slidev layout as class (centred ones centre their content like Slidev's), the decorations behind the slide's content
 const layoutVue = l => layerComment('layout', { id: l.id, name: l.name, layout: l.layout, elements: strip(l.elements) }) + `<template>
   <div class="slidev-layout ${l.layout}">
@@ -318,16 +268,9 @@ ${decorations(l).map(layerHtml).filter(s => s.trim()).join('\n')}
   </div>
 </template>
 `
-// master and layouts from a Slidev export of Slidecko: { master, layouts: [{ ...layout, slug }] } (slug: the file name slides use)
-export function readLayers(files = {}) {
-  const read = p => { try { return JSON.parse(files[p].match(/^<!-- slidecko-\w+ (.*) -->/)[1]) } catch { return undefined } }
-  const paths = Object.keys(files)
-  const layouts = paths.filter(p => /(^|\/)layouts\/[\w-]+\.vue$/.test(p)).map(p => ({ ...read(p), slug: p.match(/([\w-]+)\.vue$/)[1] })).filter(l => Array.isArray(l.elements))
-  const master = read(paths.find(p => /(^|\/)global-(top|bottom)\.vue$/.test(p)))?.elements
-  return { master: Array.isArray(master) ? master : undefined, layouts }
-}
 
 export const COLORED = ':is(h1, h2, h3, h4, h5, h6, p, li, blockquote, strong, em)'
+
 // CSS a changed slide needs beyond the theme (scoped to the slide by Slidev)
 function slideStyle(slide) {
   const presets = [...new Set(slide.elements.filter(e => e.type === 'table' && e.preset !== 'theme').map(e => e.preset))]
@@ -345,6 +288,7 @@ function slideStyle(slide) {
 // Fenced and inline code (Slidev adds v-pre there) and HTML tags are skipped; text gets Slidev's documented v-pre span.
 // (an entity like &#123; would not help: markdown-it decodes it back to "{" before Vue sees it)
 const VUE_SAFE = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(?<!\\)(`+)(?!`)[\s\S]*?[^`]\2(?!`)|<\/?[a-zA-Z][^>]*>|\{\{/gm
+
 export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<span v-pre>{{</span>' : m))
 
 // appear on click: Slidev's v-click attribute on the element's box, with its step (list items shown one by one take a step each)
@@ -356,8 +300,10 @@ function withClick(el, md, steps) {
   if (el.click && EFFECTS[el.effect]) attr += ` v-motion :initial="${EFFECTS[el.effect]}" :click-${at(el.click)}="{ x: 0, y: 0, scale: 1 }"`
   return attr ? md.replace(/^<(div|img)\b/, `<$1 ${attr}`) : md
 }
+
 // a shape or picture that jumps to a slide: Slidev's $nav.go on its box, data-to brings it back on import
 const withTo = (el, md) => (el.to && curNums.get(el.to) ? md.replace(/^<(div|img)\b/, `<$1 data-to="${curNums.get(el.to)}" @click="$nav.go(${curNums.get(el.to)})"`) : md)
+
 // an unchanged slide's links (<Link to="n">, [x](/n), [x](#n)) get the numbers their slides have now, in order of appearance
 // shortcut: assumes the Markdown lists its slide links in the order of the slide's elements; data-to on boxes keeps its number
 function relink(slide, md) {
@@ -368,9 +314,12 @@ function relink(slide, md) {
     return !no ? m : a ? a + no + b : c + no + d
   }) : md
 }
+
 // notes edited on an otherwise unchanged slide: its last comment (Slidev's notes) is replaced, or added
 const LAST_NOTE = /<!--((?:(?!<!--)[\s\S])*?)-->\s*$/
+
 const noteBlock = n => `<!--\n${n.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->`
+
 function withNotes(md, notes) {
   if (notes == null) return md
   const old = md.match(LAST_NOTE)?.[1].trim() || ''
@@ -378,6 +327,7 @@ function withNotes(md, notes) {
   const rest = old || LAST_NOTE.test(md) ? md.replace(LAST_NOTE, '').trimEnd() : md.trimEnd()
   return notes.trim() ? `${rest}\n\n${noteBlock(notes)}\n` : rest + '\n'
 }
+
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return relink(slide, withNotes(slide.md, slide.notes))
   const flow = slide.flow != null && slide.flow === flowHash(slide)
@@ -405,6 +355,7 @@ function withTransition(fm, v) {
   if (cur !== to) fm = cur ? fm.replace(/^transition:.*(\n|$)/m, to ? `transition: ${to}$1` : '').trim() : [fm, `transition: ${to}`].filter(Boolean).join('\n')
   return fm
 }
+
 // first: the deck's first slide, which Slidev shows as a cover when it names no layout
 function slideFm(slide, first) {
   let fm = slide.fm || ''
@@ -424,32 +375,11 @@ function slideFm(slide, first) {
   return slide.layout === 'default' && !fmGet(fm, 'layout') && !first ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
 }
 
-// one frontmatter key set to v (removed when v is empty), unchanged when it already says so
-export const fmSet = (fm, key, v) => ((fmGet(fm, key) ?? '') === String(v ?? '') ? fm : [fm.replace(new RegExp(`^${key}:.*\\n?`, 'm'), '').trim(), v != null && v !== '' && `${key}: ${v}`].filter(Boolean).join('\n'))
-
 // slides: all of the project's, for the numbers of slide links (one slide's Markdown in the editor)
 export function slideToMarkdown(slide, slides) {
   curNums = slides ? slideNumbers(slides) : new Map()
   const fm = slideFm(slide)
   return (fm ? `---\n${fm}\n---\n\n` : '') + slideMd(slide).trim() + '\n'
-}
-
-// returns { files: { path: text }, images: { path: assetId } }
-// projectFiles: the project's other files (theme, package.json …), written back unchanged
-// shapeFont: element id -> font size the editor shrank its shape text to
-// fonts: what the project files need from the app, zip path -> 'fonts/…' (a bundled file) or an asset id (an uploaded font)
-// image path in the Markdown -> asset id, for every image of these slides
-export function imageMap(slides) {
-  const images = {}
-  for (const s of slides) if (s.bg) images[imagePath(s.bg.src)] = s.bg.asset // a slide's background picture
-  for (const s of slides) for (const el of s.elements) {
-    if ((el.type === 'image' || el.type === 'media') && el.src) images[imagePath(el.src)] = el.asset // pictures, video and sound files
-    for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
-      const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]
-      if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id
-    }
-  }
-  return images
 }
 
 export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canvasWidth, transition, duration, master = [], layouts = [], fonts: ownFonts = {} }, projectFiles = {}, { shapeFont = {}, assets = {} } = {}) {

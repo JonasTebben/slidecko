@@ -1,6 +1,6 @@
 import { marked } from 'marked'
 import { parseSlidev, headFormat, stripNonContent, slots, slidevComponents, snippets, snippetPath, SNIPPET, clickOf, clickAttrs, fmGet, codeEl, slidevTags } from './parseSlidev.js'
-import { imagePath, readLayers } from '../export/toSlidev.js'
+import { imagePath, readLayers } from '../slide/slidevModel.js'
 import { uid, clean, readDataUrl, webUrl } from '../core/store.js'
 import { parseRatio, formatSize } from '../slide/format.js'
 import { CENTERED, themeStyle, fontKey, SHADOWS } from '../slide/themes.js'

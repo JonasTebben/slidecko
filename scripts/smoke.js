@@ -261,6 +261,12 @@ await step('dev: project files: a newer version and unreadable elements are repo
   if (JSON.stringify(r.theme) !== '[true,"#111111","#222222"]') throw new Error('theme: ' + JSON.stringify(r.theme))
   if (r.history[0] === 'Edited' || !r.history[1] || r.history[2] !== 'Edited') throw new Error('undo/redo: ' + JSON.stringify(r.history))
 })
+await step('dev: "Edit this slide\'s Markdown" opens at once and fills in the slide (the Markdown writer loads on first use)', async () => {
+  await palette(page, 'Edit this slide’s Markdown')
+  await page.waitForFunction(() => /\S/.test(document.querySelector('dialog[open] textarea')?.value || ''), null, { timeout: 10000 })
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => !document.querySelector('dialog[open] textarea'), null, { timeout: 5000 })
+})
 await step('dev: a photo larger than 2560 px is scaled down on insert, a small one stays as it is', async () => {
   const r = await page.evaluate(async () => {
     const S = await import('/src/core/store.js')

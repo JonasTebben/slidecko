@@ -37,7 +37,7 @@ import { resetLive, setLines } from './present/run.js'
 import { BUNDLED, fontCss } from './slide/fonts.js'
 import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme, fetchTheme } from './slide/themes.js'
 import { PALETTE, FILLS } from './slide/presets.js'
-import { shapeSvg } from './export/toSlidev.js'
+import { shapeSvg } from './slide/slidevModel.js'
 import { slideHref, linkTarget } from './slide/links.js'
 import { applyUno } from './slide/uno.js'
 import { morphSlides } from './present/morph.js'
@@ -456,12 +456,13 @@ function doImport() {
   else A.appendDecks(importFiles.value, importPick.value)
 }
 
-function openMarkdown(target = 'slide') {
+async function openMarkdown(target = 'slide') {
   mdTarget.value = target
-  mdText.value = target === 'slide' ? A.currentSlideMarkdown() : t('---\nlayout: cover\n---\n\n# Title\n\n## Subtitle\n\n---\n\n# First slide\n\n- Item one\n- Item two\n')
+  mdText.value = ''
   mdOpen.value = true
+  openDlg(mdDialog.value) // inside the tap; the slide's Markdown follows once the writer has loaded
+  mdText.value = target === 'slide' ? await A.currentSlideMarkdown() : t('---\nlayout: cover\n---\n\n# Title\n\n## Subtitle\n\n---\n\n# First slide\n\n- Item one\n- Item two\n')
   mdStart = mdText.value
-  openDlg(mdDialog.value)
 }
 let mdStart = '' // the text the Markdown dialog opened with: Esc after edits asks first
 function mdCancel(e) {

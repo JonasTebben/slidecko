@@ -3,11 +3,13 @@ import { freeSpot } from '../editor/spacing.js'
 import { computed, nextTick, ref } from 'vue'
 import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, storeMedia, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
 import { ELEMENTS, SLIDE_PRESETS } from '../slide/presets.js'
-import { importSlidev } from '../import/importSlidev.js'
+// the Markdown reader (marked) and writer (Turndown) load on first use, not with the app
+const importSlidev = async (...a) => (await import('../import/importSlidev.js')).importSlidev(...a)
+const writer = () => import('../export/toSlidev.js')
 import { formatSize, parseRatio } from '../slide/format.js'
 import { THEMES, DEFAULT_THEME } from '../slide/themes.js'
 import { t, lang } from './i18n.js'
-import { fmSet, toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf, imageMap } from '../export/toSlidev.js'
+import { fmSet, slideHash, flowHash, flowable, imagePath, layoutOf, imageMap } from '../slide/slidevModel.js'
 import { withSolutions } from '../present/quiz.js'
 import { perClick } from '../present/clicks.js'
 import { slideTitle, slideNumbers } from '../slide/links.js'
@@ -754,6 +756,7 @@ export const exportAs = (format, file, clicks, notes, range) => {
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
 // the Slidev project as { path: text or bytes }: entry file, deck files, images, fonts (and style.css for generic themes)
 async function slidevFiles(data, assets, shapeFont = {}) {
+  const { toSlidev } = await writer()
   const { files, images, fonts } = toSlidev({ ...data, slides: data.slides.map(withoutPrompts) }, deck.files, { shapeFont, assets })
   const out = {}
   // bundled font files come from the app itself, uploaded ones from the project
@@ -822,4 +825,4 @@ export const exportAllProjects = () => run(async () => {
 })
 // id + time: loading the file again updates this project instead of adding a copy (restoreProject)
 export const saveFile = () => download(new Blob([JSON.stringify({ ...JSON.parse(deckFile()), id: deck.id, updated: Date.now() })], { type: 'application/json' }), safe(deck.title) + '.slides.json')
-export const currentSlideMarkdown = () => slideToMarkdown(deckData().slides[ui.slide], deck.slides)
+export const currentSlideMarkdown = async () => (await writer()).slideToMarkdown(deckData().slides[ui.slide], deck.slides)

@@ -1,5 +1,5 @@
 import { reactive, watch, toRaw, computed } from 'vue'
-import { slideHash, layoutOf, decorations, readLayers } from '../export/toSlidev.js'
+import { slideHash, layoutOf, decorations, readLayers } from '../slide/slidevModel.js'
 import { TRANSITIONS } from '../import/parseSlidev.js'
 import { THEMES, FONTS, fontStack, setOwnFonts, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts, cleanTheme } from '../slide/themes.js'
 import { SLIDE_PRESETS } from '../slide/presets.js'

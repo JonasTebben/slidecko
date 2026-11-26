@@ -136,6 +136,7 @@ The hosted site deploys a version of this repository's `main`; when it is live, 
 | `src/import/importSlidev.js` | renders each slide like Slidev does and measures its elements |
 | `src/import/importOffice.js` | PowerPoint and OpenDocument import |
 | `src/export/toSlidev.js` | slides → Slidev project files |
+| `src/slide/slidevModel.js` | what the editor needs of the Slidev model (shapes, fields, layouts, slide hashes, image paths); `toSlidev.js` (Turndown) and `importSlidev.js` (marked) load on first use |
 | `src/slide/marks.js` | hand-drawn marks (`v-mark`): directive parsing and writing, seeded strokes |
 | `src/export/exportPptx.js` | PPTX and ODP from the rendered slides (one layout pass) |
 | `src/export/pptxFix.js` | schema fixes for the slide XML pptxgenjs writes |
