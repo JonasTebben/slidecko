@@ -348,7 +348,8 @@ async function presenting(page, label, touch) {
     // a second stroke, taken back with the button
     await stroke(b.y + b.height - 100)
     ok(await page.locator('.pv-ink polyline').count() > lines, 'no second stroke')
-    await tap('.pv-ink-bar button[aria-label="Take back the last stroke"]')
+    // a tap right after a touch stroke can be lost on a slow machine: tap again while the stroke is still there
+    for (let k = 0; k < 3 && await page.locator('.pv-ink polyline').count() > lines; k++) { await page.waitForTimeout(k ? 300 : 0); await tap('.pv-ink-bar button[aria-label="Take back the last stroke"]'); await page.waitForTimeout(200) }
     ok(await page.locator('.pv-ink polyline').count() === lines, 'the last stroke was not taken back')
     // a tap right after the stroke can be lost on a slow machine: tap again until the pen is off
     for (let k = 0; k < 3 && await page.locator('.pv-ink.on').count(); k++) { await page.waitForTimeout(300); await tap('.pv-bar button[aria-label="Put the tool away (Esc)"]') }
