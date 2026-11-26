@@ -575,11 +575,11 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       </template>
       <div v-else-if="el.type === 'icon'" class="icon-box" v-html="iconSvg(el)" />
       <!-- a web page: nothing is loaded until a tap while presenting (or in the HTML file), as the page's site sees the viewer -->
-      <div v-else-if="el.type === 'video' && el.url" class="video web" :data-offline="t('Offline: the web page appears with an internet connection.')">
+      <div v-else-if="el.type === 'video' && el.url" class="video web" :data-offline="t('Offline: the web page needs an internet connection.')">
         <iframe v-if="live && webOn[el.id]" :src="el.url" :title="hostOf(el.url)" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer" allow="fullscreen" />
         <button v-else class="web-load" :data-url="el.url" :data-host="hostOf(el.url)" @pointerdown="live && $event.stopPropagation()" @click="live && (online && (webOn[el.id] = true), $event.stopPropagation())">{{ hostOf(el.url) }}<small>{{ t('Web page: tap to load it (this sends data to its site)') }}</small></button>
       </div>
-      <div v-else-if="el.type === 'video'" class="video" :data-offline="t('Offline: the video appears with an internet connection.')" :style="{ backgroundImage: ui.yt && !live && online ? `url(${ytThumb(el.youtube)})` : null }">
+      <div v-else-if="el.type === 'video'" class="video" :data-offline="t('Offline: the video needs an internet connection.')" :style="{ backgroundImage: ui.yt && !live && online ? `url(${ytThumb(el.youtube)})` : null }">
         <iframe v-if="live && ui.yt && online" :src="`https://www.youtube-nocookie.com/embed/${el.youtube}`" :title="t('YouTube video')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen />
         <i v-else class="play" />
         <button v-if="!ui.yt && online" class="yt-consent" @pointerdown.stop @click.stop="ui.yt = true">{{ t('Load YouTube content') }}<small>{{ t('This sends data to Google.') }}</small></button>

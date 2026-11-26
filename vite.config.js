@@ -8,17 +8,19 @@ import { join, relative, sep } from 'node:path'
 // changes with any of them (the start page's showcase pictures and videos stay out: the app does not use them)
 function offline() {
   let out
+  const lazy = new Set() // the icon set chunks (@iconify-json), cached by the worker when first used
   return {
     name: 'slidecko-offline',
     apply: 'build',
     configResolved: c => { out = c.build.outDir },
+    generateBundle(_, bundle) { for (const c of Object.values(bundle)) if (c.type === 'chunk' && c.moduleIds.some(m => m.includes('@iconify-json/'))) lazy.add(c.fileName) },
     closeBundle() {
       const files = readdirSync(out, { recursive: true, withFileTypes: true }).filter(d => d.isFile())
         .map(d => relative(out, join(d.parentPath ?? d.path, d.name)).split(sep).join('/'))
-        .filter(f => !f.startsWith('showcase/') && f !== 'sw.js' && !f.endsWith('.map')).sort()
+        .filter(f => !f.startsWith('showcase/') && f !== 'sw.js' && !f.endsWith('.map') && !lazy.has(f)).sort()
       const hash = createHash('sha256')
       for (const f of files) hash.update(f).update(f.startsWith('assets/') ? '' : readFileSync(join(out, f))) // hashed names say it all
-      const sw = readFileSync('sw.template.js', 'utf8').replace('__VERSION__', JSON.stringify(hash.digest('hex').slice(0, 12))).replace('__FILES__', JSON.stringify(files))
+      const sw = readFileSync('sw.template.js', 'utf8').replace('__VERSION__', JSON.stringify(hash.digest('hex').slice(0, 12))).replace('__FILES__', JSON.stringify(files)).replace('__LAZY__', JSON.stringify([...lazy].sort()))
       writeFileSync(join(out, 'sw.js'), sw)
     },
   }

@@ -14,7 +14,7 @@ export const offlineReady = ref(false) // set once, when the app has just become
 
 export async function registerOffline() {
   const sw = navigator.serviceWorker
-  if (!sw) return
+  if (!sw || (navigator.connection?.saveData && !sw.controller)) return // data saver: no 5 MB download nobody asked for
   const first = !sw.controller // no earlier version: nothing to update, the app becomes offline-ready
   const reg = await sw.register('sw.js').catch(() => null)
   if (!reg) return

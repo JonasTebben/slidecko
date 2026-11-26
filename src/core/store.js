@@ -632,6 +632,7 @@ globalThis.addEventListener?.('beforeunload', e => { if (pending) e.preventDefau
 // after a release an open page asks for code files that are gone (new names): save, then reload once to get the
 // new ones; false when it just did (within a minute), so a real outage does not reload forever
 export function reloadForUpdate() {
+  if (navigator.onLine === false) return false // offline a part is missing because of the connection, not a release
   try {
     if (+sessionStorage.getItem('slides-builder:reloaded') > Date.now() - 60000) return false
     sessionStorage.setItem('slides-builder:reloaded', Date.now())

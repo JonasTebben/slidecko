@@ -1,6 +1,7 @@
 <script setup>
 // Icon picker (loaded on first open): search the bundled Iconify sets by name or alias, pick with mouse or keyboard.
 // Inserts an icon element, or changes the one in picker.target. Only the first results are drawn: a few hundred SVGs stay quick.
+import { online } from '../core/offline.js'
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ICON_SETS, picker, loadSet, searchIcons, iconIn, iconSvg, iconSet } from '../slide/icons.js'
 import { cleanEl, W, H } from '../core/store.js'
@@ -22,7 +23,7 @@ watch(set, async v => {
   loading.value = true
   try {
     for (const k of v === 'all' ? Object.keys(ICON_SETS) : [v]) if (!loaded.value[k]) loaded.value = { ...loaded.value, [k]: await loadSet(k) }
-  } catch (e) { toast(t('Error: {0}', e.message)) } finally { loading.value = false }
+  } catch (e) { toast(online.value ? t('Error: {0}', e.message) : t('Offline: this icon set needs an internet connection. Icons already on slides stay.')) } finally { loading.value = false }
 }, { immediate: true })
 
 // [{ id: 'set:name', body, view }] of the chosen set(s)

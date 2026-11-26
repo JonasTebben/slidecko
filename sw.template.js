@@ -1,9 +1,10 @@
 // Slidecko's service worker: keeps the app's own files in the browser, so it starts and works without a connection.
-// The build (vite.config.js) fills in VERSION and FILES, every file of the app except the start page's showcase.
+// The build (vite.config.js) fills in VERSION, FILES (cached on install: everything the app needs) and LAZY (the
+// icon sets, 11 MB, only for the icon picker: icons on slides keep their own SVG), cached when first used.
 // Files with a hash in their name are copied from the previous version's cache instead of being downloaded again.
 // A new version waits until the user updates (the app shows a button) or every tab is closed: a page keeps the files
 // it started with. Other sites (YouTube, embedded web pages) are not touched.
-const VERSION = __VERSION__, FILES = __FILES__, CACHE = 'slidecko-' + VERSION
+const VERSION = __VERSION__, FILES = __FILES__, LAZY = new Set(__LAZY__), CACHE = 'slidecko-' + VERSION
 const at = f => new URL(f, self.registration.scope).href
 
 self.addEventListener('install', e => e.waitUntil((async () => {
@@ -15,6 +16,7 @@ self.addEventListener('install', e => e.waitUntil((async () => {
     if (!res.ok) throw new Error(`${f}: ${res.status}`)
     await cache.put(at(f), res)
   }))
+  for (const f of LAZY) { const old = await caches.match(at(f)); if (old) await cache.put(at(f), old) } // sets used before stay offline
 })()))
 
 self.addEventListener('activate', e => e.waitUntil((async () => {
@@ -30,6 +32,11 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE)
     // the app's address (/app/, /app/?x, /app/#12) is its start page
-    return await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' && await cache.match(at('index.html'))) || fetch(req)
+    const hit = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' && await cache.match(at('index.html')))
+    if (hit) return hit
+    const res = await fetch(req)
+    const f = req.url.slice(self.registration.scope.length)
+    if (res.ok && LAZY.has(f)) await cache.put(req, res.clone())
+    return res
   })())
 })
