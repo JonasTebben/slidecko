@@ -1,4 +1,4 @@
-import { uid } from '../core/store.js'
+import { uid } from '../core/uid.js'
 import { CALLOUTS } from './themes.js'
 import { t } from '../core/i18n.js'
 
