@@ -1,4 +1,6 @@
 <script setup>
+import { promptInstall, installed, iosSafari } from './core/install.js'
+import { offlineReady } from './core/offline.js'
 import { parseRange } from './export/range.js'
 import { plainNotes } from './present/clicks.js'
 import { openAudience } from './present/audience.js'
@@ -675,6 +677,13 @@ async function present(from = ui.slide) {
 // a timer of its own while presenting, not saved: ± sets the minutes (0: a stopwatch) until it starts, a click starts it
 const extra = ref(null)
 const toggleExtra = () => { resetRun('pv-extra'); extra.value = extra.value ? null : reactive({ id: 'pv-extra', type: 'timer', seconds: 300 }) }
+// Slidecko as an app: the browser's install dialog, or how to add it to the home screen
+async function installApp() {
+  if (installed()) return A.toast(t('Slidecko is already installed as an app.'))
+  if (await promptInstall()) return
+  A.toast(iosSafari() ? t('Slidecko as an app: tap Share, then “Add to Home Screen”.') : t('In the browser menu choose “Install” or “Add to Home Screen”. On iPhone and iPad this works in Safari.'), 10000)
+}
+watch(offlineReady, v => { if (v) A.toast(t('Slidecko is now ready to work offline.'), 6000) })
 watch(presenting, v => { stayAwake(v); if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
 function stopPresenting() {
   closeAudience()
@@ -912,7 +921,7 @@ const commands = computed(() => [
   [t('Save project as file'), A.saveFile, 'saveFile'], [t('Go to project overview'), () => { ui.home = true }, 'home'],
   [t('Save snapshot'), snapNow, 'snapshot'], [t('Version history …'), openSnaps, 'versions'],
   [t('All commands and shortcuts'), openPalette, 'palette'], [t('Keyboard shortcuts …'), openKeys, 'shortcuts'],
-  [t('Take the tour'), () => begin(false), 'tour'], [t('Full tour incl. Markdown (~5 min)'), () => begin(true), 'tourFull'],
+  [t('Install as app'), installApp, 'install'], [t('Take the tour'), () => begin(false), 'tour'], [t('Full tour incl. Markdown (~5 min)'), () => begin(true), 'tourFull'],
   [t('Revert this slide to imported version'), () => A.revertSlides([slide.value]), 'revertSlide'],
   [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert')), 'revertAll'],
   ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),

@@ -72,6 +72,8 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 @media (max-width: 1023px) { .topbar { flex-wrap: wrap; } }
 .app-foot { padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: var(--ui-panel); border-top: 1px solid var(--ui-line); color: var(--ui-muted); font-size: 12.5px; text-align: center; }
 /* language and light/dark: quiet selects in the footer line */
+.app-foot .offline-badge { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; background: var(--ui-text); color: var(--ui-panel); font-weight: 600; cursor: help; }
+.app-foot .update-btn { margin-right: 8px; padding: 1px 8px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; }
 .app-foot :is(.lang, .scheme) { padding: 1px 4px; font-size: inherit; border-color: transparent; background: none; color: inherit; cursor: pointer; }
 .app-foot .scheme-pick { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; vertical-align: middle; }
 .app-foot.in-home { margin-top: 48px; padding: 16px 0 0; background: none; }

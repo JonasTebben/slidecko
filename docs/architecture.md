@@ -102,6 +102,10 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 - `slides-builder` is the storage prefix (existing user data), not a leftover name.
 - Slides keep their theme colours in dark mode; only the app chrome follows `src/core/scheme.js`.
 
+## Offline
+
+`vite.config.js` writes `dist/sw.js` after each build from `sw.template.js`: the list of every file of the app (without `public/showcase/`, which only the start page of the site uses) and a version from their contents. The worker caches them all on install (all or nothing) and answers the app's own requests from that cache; files with a hash in their name are copied from the previous version instead of downloaded again. A new version waits until the footer's "Update Slidecko" (`src/core/offline.js`) or until every tab is closed, so a running page never loses its lazily loaded parts. It is registered only in the build, not in the dev server. Content from other sites (YouTube, web pages) is never cached; it shows an offline note through the `offline-net` class on `<html>`.
+
 ## Releases
 
 The hosted site deploys a version of this repository's `main`; when it is live, that commit gets a tag `v<date>` and `.github/workflows/release.yml` turns the tag into a GitHub release listing the commits since the previous one. So commit subjects are the changelog: say what changed for the user.

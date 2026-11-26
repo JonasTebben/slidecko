@@ -279,6 +279,20 @@ await step('prod: open the project file on the start page', async () => {
   await page.waitForSelector('.stage .slide', { timeout: 20000 })
 })
 await editor(page, 'prod')
+await step('prod: offline the app starts again, loads its parts and says what needs a connection', async () => {
+  await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 60000 }) // all files cached
+  await page.context().setOffline(true)
+  try {
+    await page.reload(); await page.waitForSelector('.stage .slide, .home', { timeout: 20000 })
+    await page.waitForSelector('.app-foot .offline-badge')
+    if (!(await page.evaluate(() => document.documentElement.classList.contains('offline-net')))) throw new Error('no offline class')
+    if (!(await page.locator('.home').count())) { await page.evaluate(() => { location.hash = '' }) }
+    await page.waitForSelector('.stage .slide', { timeout: 20000 }).catch(async () => { await page.locator('.home .project, .home [class*=project] button').first().click() })
+    const note = await page.evaluate(() => { const v = document.querySelector('.slide .el.video .video[data-offline]'); return v && getComputedStyle(v, '::after').content })
+    if (!note?.includes('internet')) throw new Error(`no offline note on a video: ${note}`)
+    await palette(page, 'Edit all Markdown'); await page.waitForSelector('.cm-editor', { timeout: 20000 }); await page.keyboard.press('Escape') // a part loaded later, from the cache
+  } finally { await page.context().setOffline(false) }
+})
 await page.context().close()
 
 // 3. presenting with a mouse and with iPad touch (taps, double taps): timers, draws, notes boxes, drawings, the bar's timer

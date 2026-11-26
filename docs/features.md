@@ -151,6 +151,12 @@ While presenting: type a slide number and Enter to jump there, B or . turns the 
 
 The letters follow what they do: **L**aser, **D**raw, **A**rrow, **E**rase, **B**lack, **W**hite, **R**eset, **Q**uiz, **P**resenter, **O**verview, **G**o to.
 
+## Offline and as an app
+
+- After the first visit Slidecko works **completely offline**: a service worker keeps all of the app's files (editing, presenting, every import and export). Projects are saved in the browser anyway. A new version loads in the background; "Update Slidecko" in the footer switches to it (the page reloads), otherwise it comes with the next start.
+- While offline the footer shows **Offline** (its tooltip explains what still works). YouTube videos and web pages on slides need a connection: they show "Offline: the video appears with an internet connection" (also while presenting and in the HTML presentation), and nothing is loaded until the connection is back. Pictures and PDF pages exported meanwhile do not get the note.
+- **Install as an app** (on the home screen or the desktop, opens without the browser bar): on touch devices the start page offers it once, where the browser can do it: Chrome, Edge and Samsung Internet with their install dialog, iPhone and iPad in Safari with the steps (Share → "Add to Home Screen"). Closing the hint is remembered. The command "Install as app" (⌘K) is always there.
+
 ## Phone and tablet
 
 - Up to 760 px wide the app becomes one column that fills the screen without page scrolling: menus and one toolbar row (undo/redo stay at the left, Present at the right, the other tools scroll in between), the slide at full width, a horizontal slide strip (New slide and New deck fixed at its left, the strip fades out where more thumbnails follow; several decks show as compact headers), and the properties as a panel below that scrolls on its own. "Properties" folds the panel away so the slide gets the room; selecting an element opens it again at the top. Language and light/dark are on the start page there.

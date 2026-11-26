@@ -273,9 +273,13 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
 let wake = null
 const awake = () => { if ((!wake || wake.released) && document.visibilityState === 'visible') navigator.wakeLock?.request('screen').then(l => { wake = l }, () => {}) }
 awake(); addEventListener('click', awake); document.addEventListener('visibilitychange', awake)
-// web pages: loaded on a tap only
+// offline: YouTube and web pages say why they stay empty (the note is in the slide CSS)
+const net = () => document.documentElement.classList.toggle('offline-net', !navigator.onLine)
+net(); addEventListener('online', net); addEventListener('offline', net)
+// web pages: loaded on a tap only, and only online
 for (const b of document.querySelectorAll('.web-load[data-url]')) b.addEventListener('click', e => {
   e.stopPropagation()
+  if (!navigator.onLine) return
   const f = document.createElement('iframe')
   Object.assign(f, { src: b.dataset.url, title: b.dataset.host, referrerPolicy: 'no-referrer' })
   f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups')

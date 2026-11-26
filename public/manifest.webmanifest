@@ -1,0 +1,14 @@
+{
+  "name": "Slidecko",
+  "short_name": "Slidecko",
+  "description": "Presentation editor in the browser. Works offline; your slides stay on your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon.png", "sizes": "256x256", "type": "image/png" }
+  ]
+}

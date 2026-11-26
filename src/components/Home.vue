@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import Icon from './Icon.vue'
 import AppFooter from './AppFooter.vue'
 import Menu from './Menu.vue'
@@ -11,6 +11,7 @@ import { t, lang } from '../core/i18n.js'
 import { TOUR_KEY, begin } from '../editor/tour.js'
 import { openTutorial } from '../editor/tutorial.js'
 import { HOME_URL } from '../core/support.js'
+import { canPrompt, iosSafari, installed, installDismissed, dismissInstall, promptInstall } from '../core/install.js'
 
 const emit = defineEmits(['import'])
 const error = ref('')
@@ -24,6 +25,8 @@ const blank = go(theme => createProject({
 const open = go(openProject)
 // first visit (no flag, no projects): offer the tour once; starting or dismissing it stores the flag
 const offerTour = ref((() => { try { return !localStorage.getItem(TOUR_KEY) } catch { return false } })())
+// "Slidecko as an app", once, on touch devices whose browser can do it (a dismissal is remembered); not next to the tour
+const offerInstall = computed(() => !installDismissed.value && !(offerTour.value && !library.list.length) && !installed() && matchMedia('(pointer: coarse)').matches && (canPrompt.value || iosSafari()))
 const noTour = () => { offerTour.value = false; try { localStorage.setItem(TOUR_KEY, 'done') } catch {} }
 // a sample project named "Tour", so the editor steps have something to point at (removed again on an immediate skip)
 const takeTour = go(async full => {
@@ -96,6 +99,11 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
         <button class="tb small primary" @click="takeTour(false)">{{ t('1-minute tour') }}</button>
         <button class="tb small" @click="takeTour(true)">{{ t('Full tour incl. Markdown (~5 min)') }}</button>
         <button class="tb icon small" :aria-label="t('No thanks')" :title="t('No thanks')" @click="noTour"><Icon name="x" :size="14" /></button>
+      </div>
+      <div v-if="offerInstall" class="tour-prompt" role="region" :aria-label="t('Install as app')">
+        <b>{{ canPrompt ? t('Slidecko as an app: on the home screen, also offline.') : t('Slidecko as an app: tap Share, then “Add to Home Screen”.') }}</b>
+        <button v-if="canPrompt" class="tb small primary" @click="promptInstall">{{ t('Install') }}</button>
+        <button class="tb icon small" :aria-label="t('Don’t show again')" :title="t('Don’t show again')" @click="dismissInstall"><Icon name="x" :size="14" /></button>
       </div>
       <div class="start-grid">
         <button class="start-card primary" @click="blank(DEFAULT_THEME)"><Icon name="plus" :size="28" /><b>{{ t('New presentation') }}</b><small>{{ t('Blank presentation in the current default theme') }}</small></button>
