@@ -19,6 +19,8 @@ jobs:
           # the first release lists the last 30 commits
           if [ -n "$prev" ]; then range="$prev..$GITHUB_REF_NAME"; else range="-30 $GITHUB_REF_NAME"; fi
           git log --no-merges --format='- %s' $range > notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          # an existing release only gets its notes written
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          else gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md; fi
         env:
           GH_TOKEN: ${{ github.token }}
