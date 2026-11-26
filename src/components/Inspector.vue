@@ -43,6 +43,7 @@ const setBorder = mode => { const b = border.value; tbl(table.toggleBorder, mode
 const onSelection = () => { listKind.value = listAt(getSelection().anchorNode) }
 onMounted(() => document.addEventListener('selectionchange', onSelection))
 onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelection))
+const EFFECT_NAMES = { 'fly-left': 'Fly in from left', 'fly-right': 'Fly in from right', 'fly-up': 'Fly in from bottom', zoom: 'Zoom' }
 const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-right': 'Slide right', 'slide-up': 'Slide up', 'slide-down': 'Slide down', morph: 'Magic move' } // Slidev's names and Slidecko's morph (store.js keeps only these)
 // plays Magic move on the canvas, from this slide into the next (the copy keeps the old slide's look once the canvas shows the next one)
 async function previewMorph() {
@@ -824,6 +825,9 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button class="ib wide" :class="{ on: el.click }" :aria-pressed="!!el.click" :title="t('Hidden while presenting until a click or → reveals it; elements with the same number appear together')" @click="setClick(el, el.click ? undefined : nextClick())"><Icon name="pointer" /> {{ t('Appear on click') }}</button>
           <input v-if="el.click" type="number" class="click-num" min="1" max="99" :aria-label="t('Click order')" :title="t('Click order')" :value="el.click" @change="setClick(el, clickNum($event.target.value))" />
         </div>
+        <label v-if="el.click" class="field">{{ t('Entrance') }}
+          <select class="effect" :value="el.effect || ''" @change="el.effect = $event.target.value || undefined"><option value="">{{ t('Fade in') }}</option><option v-for="(name, k) in EFFECT_NAMES" :key="k" :value="k">{{ t(name) }}</option></select>
+        </label>
         <div class="btn-row">
           <button class="ib wide" :class="{ on: el.clickUntil }" :aria-pressed="!!el.clickUntil" :title="t('Hidden from this click on while presenting; with “Appear on click” the element is visible only in between')" @click="setUntil(el, el.clickUntil ? undefined : nextClick(el.click))"><Icon name="pointer" /> {{ t('Disappear on click') }}</button>
           <input v-if="el.clickUntil" type="number" class="click-num" :min="(el.click || 0) + 1" max="99" :aria-label="t('Disappear at click')" :title="t('Disappear at click')" :value="el.clickUntil" @change="setUntil(el, clickNum($event.target.value))" />

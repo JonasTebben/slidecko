@@ -475,7 +475,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
     // appear / disappear on click (data-click, data-until: the steps SlideView wrote): every object the element becomes
     const count = () => (slide._slideObjects || slide.items).length, marks = []
     for (const el of node.querySelectorAll('.el')) {
-      marks.push({ at: count(), click: +el.dataset.click || 0, until: +el.dataset.until || 0 })
+      marks.push({ at: count(), click: +el.dataset.click || 0, until: +el.dataset.until || 0, effect: el.dataset.effect })
       const m = model.get(el.dataset.el) || {}
       const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'media', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points

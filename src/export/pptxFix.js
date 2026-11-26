@@ -25,24 +25,31 @@ export const decorative = xml => xml.replace(/(<p:cNvPr [^>]*?)descr="(?:\.\.\/m
 // objects of an element fade in (entrance "Fade") or out (exit "Fade") together.
 // clicks: [{ objs: object indexes, click, until }] (steps); the n-th <p:cNvPr> after the slide's group is the n-th
 // object pptxgenjs added. Steps where nothing appears or goes (further list items, code stages) are no click here
+// entrance effect -> PowerPoint [presetID, presetSubtype] (officeClicks reads them back)
+export const PPT_EFFECTS = { 'fly-left': [2, 8], 'fly-right': [2, 2], 'fly-up': [2, 4], zoom: [53, 16] }
 export function clickTiming(xml, clicks = []) {
   if (!clicks.length) return ''
   const ids = [...xml.matchAll(/<p:cNvPr id="(\d+)"/g)].slice(1).map(m => m[1])
   const steps = [...new Set(clicks.flatMap(c => [c.click, c.until]).filter(Boolean))].sort((a, b) => a - b)
   let n = 3
   const cond = d => `<p:stCondLst><p:cond delay="${d}"/></p:stCondLst>`
-  // "Fade" (preset 10): the visibility switch plus a short fade, shown first or hidden after the fade
-  const set = (id, show, first) => {
+  // "Fade" (preset 10): the visibility switch plus a short fade, shown first or hidden after the fade;
+  // an entrance effect instead: "Fly in" (2) from the left, right or bottom, or "Zoom" (53) from the centre
+  const set = (id, show, first, effect) => {
     const a = n++, b = n++, c = n++, tgt = `<p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>`
     const vis = `<p:set><p:cBhvr><p:cTn id="${show ? b : c}" dur="1" fill="hold">${cond(show ? 0 : 299)}</p:cTn>${tgt}<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="${show ? 'visible' : 'hidden'}"/></p:to></p:set>`
     const fade = `<p:animEffect transition="${show ? 'in' : 'out'}" filter="fade"><p:cBhvr><p:cTn id="${show ? c : b}" dur="300"/>${tgt}</p:cBhvr></p:animEffect>`
-    return `<p:par><p:cTn id="${a}" presetID="10" presetClass="${show ? 'entr' : 'exit'}" presetSubtype="0" fill="hold" nodeType="${first ? 'clickEffect' : 'withEffect'}">${cond(0)}<p:childTnLst>${show ? vis + fade : fade + vis}</p:childTnLst></p:cTn></p:par>`
+    const anim = (attr, from, to) => `<p:anim calcmode="lin" valueType="num"><p:cBhvr additive="base"><p:cTn id="${n++}" dur="400" fill="hold"/>${tgt}<p:attrNameLst><p:attrName>${attr}</p:attrName></p:attrNameLst></p:cBhvr><p:tavLst><p:tav tm="0"><p:val><p:strVal val="${from}"/></p:val></p:tav><p:tav tm="100000"><p:val><p:strVal val="${to}"/></p:val></p:tav></p:tavLst></p:anim>`
+    const fx = show && PPT_EFFECTS[effect]
+    const kids = !show ? fade + vis : !fx ? vis + fade : vis + (effect === 'zoom' ? anim('ppt_w', '0', '#ppt_w') + anim('ppt_h', '0', '#ppt_h') + fade
+      : anim('ppt_x', { 'fly-left': '0-#ppt_w/2', 'fly-right': '1+#ppt_w/2' }[effect] || '#ppt_x', '#ppt_x') + anim('ppt_y', effect === 'fly-up' ? '1+#ppt_h/2' : '#ppt_y', '#ppt_y'))
+    return `<p:par><p:cTn id="${a}" presetID="${fx ? fx[0] : 10}" presetClass="${show ? 'entr' : 'exit'}" presetSubtype="${fx ? fx[1] : 0}" fill="hold" nodeType="${first ? 'clickEffect' : 'withEffect'}">${cond(0)}<p:childTnLst>${kids}</p:childTnLst></p:cTn></p:par>`
   }
   const step = k => {
     const fx = clicks.flatMap(c => [c.click === k && [c, true], c.until === k && [c, false]].filter(Boolean))
-      .flatMap(([c, show]) => c.objs.map(o => [ids[o], show])).filter(([id]) => id)
+      .flatMap(([c, show]) => c.objs.map(o => [ids[o], show, c.effect])).filter(([id]) => id)
     const a = n++, b = n++
-    return `<p:par><p:cTn id="${a}" fill="hold">${cond('indefinite')}<p:childTnLst><p:par><p:cTn id="${b}" fill="hold">${cond(0)}<p:childTnLst>${fx.map(([id, show], i) => set(id, show, !i)).join('')}</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>`
+    return `<p:par><p:cTn id="${a}" fill="hold">${cond('indefinite')}<p:childTnLst><p:par><p:cTn id="${b}" fill="hold">${cond(0)}<p:childTnLst>${fx.map(([id, show, effect], i) => set(id, show, !i, effect)).join('')}</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>`
   }
   const body = steps.map(step).join('')
   const slideCond = (k, e) => `<p:${k}CondLst><p:cond evt="${e}" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:${k}CondLst>`

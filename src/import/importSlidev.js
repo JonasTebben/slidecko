@@ -358,8 +358,9 @@ function measure(slide, parsed) {
     clicks = c.last
     if (c.click) el.click = c.click
     if (c.clickUntil) el.clickUntil = c.clickUntil
+    if (c.click && c.effect) el.effect = c.effect
     // now the element's own: kept in its text it would count twice in a Slidev export
-    if (src === n && el.html && (c.click || c.clickUntil)) el.html = el.html.replace(/^<[^>]+>/, tag => tag.replace(/\s(v-click(\.hide)?|v-after)(="[^"]*")?/g, ''))
+    if (src === n && el.html && (c.click || c.clickUntil)) el.html = el.html.replace(/^<[^>]+>/, tag => tag.replace(/\s(v-click(\.hide)?|v-after|v-motion|:initial|:click-\d+)(="[^"]*")?/g, ''))
     if (el.clickItems) clicks = Math.max(clicks, (el.click || clicks + 1) + listItems(el.html) - 1)
     if (codeStages(el) > 1) clicks += codeStages(el) - 1 // code line steps are relative clicks in Slidev
     if (box) fromBox(box, el)

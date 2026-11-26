@@ -100,9 +100,17 @@ export function clickAnimations(clicks, id) {
   if (!steps.length) return ''
   const vis = (o, show) => `<anim:set smil:begin="${show ? 0 : 0.3}s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:attributeName="visibility" smil:to="${show ? 'visible' : 'hidden'}"/>`
   const fade = (o, show) => `<anim:transitionFilter smil:dur="0.3s" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:type="fade" smil:subtype="crossfade"${show ? '' : ' smil:mode="out"'}/>`
-  const set = (o, show, first) => `<anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="${first ? 'on-click' : 'with-previous'}" presentation:preset-class="${show ? 'entrance' : 'exit'}" presentation:preset-id="ooo-${show ? 'entrance-fade-in' : 'exit-fade-out'}">${show ? vis(o, true) + fade(o, true) : fade(o, false) + vis(o, false)}</anim:par>`
+  const move = (o, attr, from, to) => `<anim:animate smil:dur="0.4s" smil:fill="hold" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:attributeName="${attr}" smil:values="${from};${to}" smil:keyTimes="0;1" presentation:additive="base"/>`
+  // an entrance effect: Impress's "Fly in" from the left, right or bottom, or "Zoom" (officeClicks reads them back)
+  const fly = { 'fly-left': ['x', '0-width/2', 'from-left'], 'fly-right': ['x', '1+width/2', 'from-right'], 'fly-up': ['y', '1+height/2', 'from-bottom'] }
+  const enter = (o, effect) => (fly[effect] ? ['fly-in', fly[effect][2], vis(o, true) + move(o, fly[effect][0], fly[effect][1], fly[effect][0])]
+    : effect === 'zoom' ? ['zoom', 'in', vis(o, true) + move(o, 'width', 0, 'width') + move(o, 'height', 0, 'height') + fade(o, true)] : ['fade-in', '', vis(o, true) + fade(o, true)])
+  const set = (o, show, first, effect) => {
+    const [name, sub, body] = show ? enter(o, effect) : ['fade-out', '', fade(o, false) + vis(o, false)]
+    return `<anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="${first ? 'on-click' : 'with-previous'}" presentation:preset-class="${show ? 'entrance' : 'exit'}" presentation:preset-id="ooo-${show ? 'entrance' : 'exit'}-${name}"${sub ? ` presentation:preset-sub-type="${sub}"` : ''}>${body}</anim:par>`
+  }
   const step = k => `<anim:par smil:begin="next"><anim:par smil:begin="0s">${clicks.flatMap(c => [c.click === k && [c, true], c.until === k && [c, false]].filter(Boolean))
-    .flatMap(([c, show]) => c.objs.map(o => [o, show])).map(([o, show], j) => set(o, show, !j)).join('')}</anim:par></anim:par>`
+    .flatMap(([c, show]) => c.objs.map(o => [o, show, c.effect])).map(([o, show, effect], j) => set(o, show, !j, effect)).join('')}</anim:par></anim:par>`
   return `<anim:par presentation:node-type="timing-root"><anim:seq presentation:node-type="main-sequence">${steps.map(step).join('')}</anim:seq></anim:par>`
 }
 // a click on a picture or shape jumps to a slide (pptxgenjs' hyperlink: { slide })

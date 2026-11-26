@@ -1,6 +1,6 @@
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
-import { fmGet, fmHidden, TRANSITIONS, trOf } from '../import/parseSlidev.js'
+import { fmGet, fmHidden, TRANSITIONS, EFFECTS, trOf } from '../import/parseSlidev.js'
 import { parseDuration, slidevDuration } from '../present/rehearse.js'
 import { parseRatio } from '../slide/format.js'
 import { clock } from '../present/timer.js'
@@ -348,7 +348,9 @@ export const escapeMustache = md => md.replace(VUE_SAFE, m => (m === '{{' ? '<sp
 // disappear on click as v-click.hide="n", both as the range v-click="[from, to]" (visible from, gone at)
 function withClick(el, md, steps) {
   const at = k => steps.indexOf(k) + 1
-  const attr = el.click && el.clickUntil ? `v-click="[${at(el.click)}, ${at(el.clickUntil)}]"` : el.click ? `v-click="${at(el.click)}"` : el.clickUntil ? `v-click.hide="${at(el.clickUntil)}"` : ''
+  let attr = el.click && el.clickUntil ? `v-click="[${at(el.click)}, ${at(el.clickUntil)}]"` : el.click ? `v-click="${at(el.click)}"` : el.clickUntil ? `v-click.hide="${at(el.clickUntil)}"` : ''
+  // an entrance effect: v-motion moves it from its start state into place on its click (v-click fades it in)
+  if (el.click && EFFECTS[el.effect]) attr += ` v-motion :initial="${EFFECTS[el.effect]}" :click-${at(el.click)}="{ x: 0, y: 0, scale: 1 }"`
   return attr ? md.replace(/^<(div|img)\b/, `<$1 ${attr}`) : md
 }
 // a shape or picture that jumps to a slide: Slidev's $nav.go on its box, data-to brings it back on import

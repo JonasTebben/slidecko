@@ -25,8 +25,16 @@ export const clickOf = (v, last) => (v = String(v).trim().replace(/^['"]|['"]$/g
 // an element's Slidev click attributes (attr(name): value or null) -> { click, clickUntil, last: the new last step }:
 // v-click="2" or "'+1'", v-click="[2, 4]" (visible from 2, gone at 4; a relative end counts from the start),
 // v-click.hide="3" (gone at 3), v-after (with the previous click)
+// entrance effects of an element that appears on click (fade, the default, has no name): Slidev's v-motion start state
+export const EFFECTS = { 'fly-left': '{ x: -120 }', 'fly-right': '{ x: 120 }', 'fly-up': '{ y: 120 }', zoom: '{ scale: 0.6 }' }
+const effectOf = init => init && Object.keys(EFFECTS).find(k => {
+  const x = +init.match(/\bx:\s*(-?[\d.]+)/)?.[1] || 0, y = +init.match(/\by:\s*(-?[\d.]+)/)?.[1] || 0
+  return { 'fly-left': x < 0, 'fly-right': x > 0, 'fly-up': !x && y > 0, zoom: !x && !y && /\bscale:/.test(init) }[k]
+})
 export function clickAttrs(attr, last) {
   const out = {}, vc = attr('v-click'), hide = attr('v-click.hide')
+  const fx = effectOf(attr(':initial'))
+  if (fx) out.effect = fx
   const range = vc?.trim().match(/^\[(.*),(.*)\]$/)
   if (range) {
     out.click = clickOf(range[1], last)

@@ -115,6 +115,11 @@ test('snapshots are stored apart from the project: a full disk fails only the sn
   S.deck.id = ''
 })
 
+test('entrance effect: kept for an element that appears on click, if known', () => {
+  const el = e => S.cleanEl({ type: 'shape', shape: 'rect', x: 0, y: 0, w: 9, h: 9, ...e }).effect
+  assert.deepEqual([el({ click: 1, effect: 'zoom' }), el({ effect: 'zoom' }), el({ click: 1, effect: 'spin' }), el({ click: 1, effect: 'toString' })], ['zoom', undefined, undefined, undefined])
+})
+
 test('cleanSlides keeps only the transitions the editor offers', async () => {
   const { cleanSlides } = await import('./store.js')
   assert.deepEqual(cleanSlides([{ transition: 'fade' }, { transition: 'none' }, { transition: 'slide-right' }, { transition: 'zoom' }, { transition: '<x>' }]).map(s => s.transition), ['fade', 'none', 'slide-right', undefined, undefined])

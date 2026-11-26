@@ -65,7 +65,7 @@ const DECK = {
     { layout: 'default', elements: [
       { type: 'text', title: true, x: 56, y: 20, w: 868, h: 40, html: '<h1>Everything else</h1>' },
       { type: 'text', x: 56, y: 70, w: 400, h: 50, html: '<div data-callout="tip"><p><strong>Tip:</strong> water.</p></div>' },
-      { type: 'text', x: 56, y: 130, w: 400, h: 30, click: 1, html: '<p>Some <span data-mark="circle" data-mark-color="orange">marked</span> words, slide <span data-field="page">#</span></p>' },
+      { type: 'text', x: 56, y: 130, w: 400, h: 30, click: 1, effect: 'fly-up', html: '<p>Some <span data-mark="circle" data-mark-color="orange">marked</span> words, slide <span data-field="page">#</span></p>' },
       { type: 'shape', shape: 'ellipse', fill: '#2563eb', stroke: 'none', strokeWidth: 0, radius: 0, x: 480, y: 70, w: 120, h: 80 },
       { type: 'table', header: true, rows: [['A', 'B'], ['1', '2']], x: 620, y: 70, w: 300, h: 90 },
       { type: 'shape', shape: 'line', slope: 'up', head: 'end', fill: 'none', stroke: '#334155', strokeWidth: 4, radius: 0, x: 170, y: 370, w: 160, h: 60 },
@@ -246,6 +246,17 @@ await step('dev: a sound file goes onto the slide; video and sound play while pr
   if ((await page.locator('.presenter .el.media video').count()) !== 1) throw new Error('the tap turned the slide')
   await page.keyboard.press('Escape'); await page.waitForSelector('.presenter', { state: 'detached' })
 })
+await step('dev: an element with an entrance effect waits below its place and flies in on its click; the inspector names the effect', async () => {
+  await go(page, 5)
+  await page.evaluate(async () => { const S = await import('/src/core/store.js'); S.ui.sel = [S.deck.slides[S.ui.slide].elements.find(e => e.effect).id] })
+  await page.waitForFunction(() => document.querySelector('.inspector select.effect')?.value === 'fly-up')
+  await page.locator('.right .tb.primary').click(); await page.waitForSelector('.pv-slide .el[data-effect="fly-up"][data-unshown]', { state: 'attached' })
+  const before = await page.locator('.pv-slide .el[data-effect="fly-up"]').evaluate(e => getComputedStyle(e).translate)
+  if (before !== '0px 120px') throw new Error(`waits at ${before}`)
+  await page.keyboard.press('ArrowRight')
+  await page.waitForFunction(() => { const e = document.querySelector('.pv-slide .el[data-effect="fly-up"]'); return e && !e.hasAttribute('data-unshown') && getComputedStyle(e).translate === 'none' })
+  await page.keyboard.press('Escape'); await page.waitForSelector('.presenter', { state: 'detached' })
+})
 await step('dev: the agent skill example imports with every element it describes', async () => {
   const md = readFileSync(new URL('../skills/slidecko/SKILL.md', import.meta.url), 'utf8').match(/````markdown\n([\s\S]*?)\n````/)[1]
   const types = await page.evaluate(async md => {
@@ -281,15 +292,15 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   await p.close()
 })
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
-const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'media', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video', 'video+web']
-const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click'] }
+const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'media', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click-fly-up', 'text+board', 'timer', 'toc', 'video', 'video+web']
+const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click-fly-up'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click-fly-up'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
     const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
     // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
-    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.url ? '+web' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
+    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.url ? '+web' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' + (e.effect ? '-' + e.effect : '') : '')))
     return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
   const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))

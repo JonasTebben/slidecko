@@ -118,6 +118,15 @@ test('a quiz is written as text, the correct answer boxed on the next click, and
   assert.match(md, /- \*\*B\*\* No$/m)
 })
 
+test('entrance effect: v-motion from its start state into place on its click; read back from :initial', async () => {
+  const { clickAttrs } = await import('../import/parseSlidev.js')
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'a', type: 'shape', shape: 'rect', ...box, fill: '#000', click: 2, effect: 'fly-left' }] })
+  assert.match(md, /v-click="1" v-motion :initial="\{ x: -120 \}" :click-1="\{ x: 0, y: 0, scale: 1 \}"/)
+  const attrs = { ':initial': '{ x: -120 }', 'v-click': '1' }
+  assert.equal(clickAttrs(k => attrs[k] ?? null, 0).effect, 'fly-left')
+  for (const [init, fx] of [['{ x: 80, opacity: 0 }', 'fly-right'], ['{ y: 50 }', 'fly-up'], ['{ scale: 0.5 }', 'zoom'], ['{ y: -50 }', undefined]]) assert.equal(clickAttrs(k => ({ ':initial': init, 'v-click': '' })[k] ?? null, 0).effect, fx)
+})
+
 test('appear on click: the box gets Slidev’s v-click with its step, which the import reads back', async () => {
   const { clickOf } = await import('../import/parseSlidev.js')
   const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'a', type: 'text', ...box, html: '<p>x</p>', click: 2 }, { id: 'b', type: 'image', ...box, src: '/a.png', click: 1 }, { id: 'c', type: 'shape', shape: 'rect', ...box }] })

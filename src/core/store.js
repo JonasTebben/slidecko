@@ -1,7 +1,7 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { slideHash, layoutOf, decorations, readLayers } from '../export/toSlidev.js'
-import { TRANSITIONS, fmGet } from '../import/parseSlidev.js'
+import { TRANSITIONS, EFFECTS, fmGet } from '../import/parseSlidev.js'
 import { THEMES, FONTS, fontStack, setOwnFonts, SHADOWS, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from '../slide/themes.js'
 import { SLIDE_PRESETS } from '../slide/presets.js'
 import { parseRatio, formatSize } from '../slide/format.js'
@@ -61,7 +61,8 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 let markLast = 0
 DOMPurify.addHook?.('beforeSanitizeAttributes', n => { if (n.attributes?.length) markLast = vmarkToData(n, markLast) })
 DOMPurify.addHook?.('afterSanitizeAttributes', n => { if (n.hasAttribute?.('data-mark') || n.hasAttribute?.('data-mark-at') || n.hasAttribute?.('data-mark-color')) checkMark(n) })
-export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'hide', 'v-click', 'v-click.hide', 'v-after'], FORBID_TAGS: ['style'] }))
+// :initial: the start state of a v-motion entrance effect, which the import reads
+export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'hide', 'v-click', 'v-click.hide', 'v-after', ':initial'], FORBID_TAGS: ['style'] }))
 // a rendered diagram (Mermaid SVG, labels may be HTML in foreignObject) -> sanitized <body> holding it
 export const cleanSvg = svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true, html: true }, ADD_TAGS: ['foreignObject'], RETURN_DOM: true })
 
@@ -137,6 +138,7 @@ export function cleanEl(e) {
   if (e.click >= 1) base.click = Math.min(99, Math.round(e.click)) // Slidev v-click: hidden while presenting until this step
   // Slidev v-click.hide or the end of a range v-click="[2, 4]": gone from this step on (after it appeared)
   if (e.clickUntil >= 1 && Math.round(e.clickUntil) > (base.click || 0)) base.clickUntil = Math.min(99, Math.round(e.clickUntil))
+  if (base.click && Object.hasOwn(EFFECTS, e.effect ?? '')) base.effect = e.effect // how it enters on its click (none: fade)
   switch (e.type) {
     case 'text': return {
       ...base, html: clean(e.html), ...(e.title && { title: true }), ...(ALIGN.includes(e.align) && { align: e.align }), ...(['middle', 'bottom'].includes(e.valign) && { valign: e.valign }),

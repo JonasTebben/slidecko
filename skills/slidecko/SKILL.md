@@ -79,6 +79,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 - `<v-click>` … `</v-click>` (blank lines inside) shows a block on the next click; `<v-click at="3">` on click 3; `<v-after>` together with the previous click; `<v-click hide>` hides it from that click on.
 - `<v-clicks>` around a list shows its items one by one.
 - `<div v-click>` around several blocks also works: they all appear on its one click.
+- An entrance effect instead of the plain fade: add `v-motion :initial="{ x: -120 }" :click-1="{ x: 0 }"` to a `<div v-click>` (`x` below 0 flies in from the left, above 0 from the right, `y` above 0 from the bottom, `scale` zooms).
 
 ## Slidecko's own elements
 

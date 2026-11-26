@@ -16,3 +16,12 @@ test('effects before the first click and emphasis are left out; group ids reach 
   expect(officeClicks(xml, 'pptx')).toEqual({ 7: { click: 1 } })
   expect(applyClicks([{ type: 'text', ids: ['9', '7'] }, { type: 'shape', ids: ['8'] }], { 7: { click: 1 } })).toEqual([{ type: 'text', click: 1 }, { type: 'shape' }])
 })
+test('entrance effects (fly in from left, right, bottom, zoom) go out as PowerPoint and Impress presets and come back', () => {
+  const fx = ['fly-left', 'fly-right', 'fly-up', 'zoom']
+  const withFx = fx.map((effect, k) => ({ objs: [k], click: k + 1, effect }))
+  const xml = clickTiming('<p:cNvPr id="1"/>' + fx.map((_, k) => `<p:cNvPr id="${k + 2}"/>`).join(''), withFx)
+  expect(Object.values(officeClicks(xml, 'pptx')).map(o => o.effect)).toEqual(fx)
+  expect(Object.values(officeClicks(clickAnimations(withFx, k => `o${k}`), 'odp')).map(o => o.effect)).toEqual(fx)
+  const ids = [...xml.matchAll(/cTn id="(\d+)"/g)].map(m => m[1])
+  expect(new Set(ids).size).toBe(ids.length)
+})
