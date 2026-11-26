@@ -690,6 +690,7 @@ async function present(from = ui.slide) {
   unlock() // in the click that starts the presentation: a timer's sound can play later (iOS)
   await nextTick()
   presenter.value.focus()
+  fitPresenter() // right away, not only once full screen is granted (no frame at the last presentation's size)
   await presenter.value.requestFullscreen?.().catch(() => {}) // without fullscreen it fills the window
   fitPresenter()
 }

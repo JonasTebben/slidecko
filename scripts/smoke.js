@@ -463,6 +463,8 @@ await step('laptop: layout prompts stay out of the presentation, a new shape goe
   if (!/^Quarterly review$/.test((await title.innerText()).trim())) throw new Error(`title after typing: ${await title.innerText()}`)
   // presenter view: the notes sit below the slide on a 16:10 screen
   await palette(q, 'Presenter view'); await q.waitForSelector('.presenter.pv')
+  // the slide is scaled once the view has its size (slower on CI): wait for that, then measure
+  await q.waitForFunction(() => document.querySelector('.pv-main')?.getBoundingClientRect().width < 1200, null, { timeout: 10000 }).catch(() => {})
   const pv = await q.evaluate(() => { const m = document.querySelector('.pv-main').getBoundingClientRect(), n = document.querySelector('.pv-notes').getBoundingClientRect(); return { below: n.top >= m.bottom, w: m.width } })
   if (!pv.below || pv.w < 860) throw new Error(`presenter view: ${JSON.stringify(pv)}`)
   await q.keyboard.press('Escape'); await q.waitForSelector('.presenter', { state: 'detached' })
