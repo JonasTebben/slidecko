@@ -42,7 +42,7 @@ test('repeat: every draw takes from all names, the bag never empties', () => {
 })
 
 test('saved name lists: only named, non-empty lists of trimmed strings are kept', () => {
-  assert.deepEqual(cleanLists({ ' 7b ': [' Ana ', '', 3, 'Ben'], empty: [], bad: 'x', '': ['a'] }), { '7b': ['Ana', 'Ben'] })
+  assert.deepEqual(cleanLists({ ' Group A ': [' Ana ', '', 3, 'Ben'], empty: [], bad: 'x', '': ['a'] }), { 'Group A': ['Ana', 'Ben'] })
   assert.deepEqual(cleanLists(['a']), {})
   assert.deepEqual(cleanLists(null), {})
   assert.equal(saveList('  ', ['a']), false)

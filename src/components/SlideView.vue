@@ -597,7 +597,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         <span v-else class="label"><template v-if="!el.noIcon"><span v-if="el.body" class="pick-icon" v-html="iconSvg(el)" /><svg v-else class="die" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" /><circle cx="8.5" cy="8.5" r="1.4" /><circle cx="15.5" cy="15.5" r="1.4" /><circle cx="15.5" cy="8.5" r="1.4" /><circle cx="8.5" cy="15.5" r="1.4" /><circle cx="12" cy="12" r="1.4" /></svg></template>
           <strong v-if="el.heading !== ''">{{ el.heading ?? t('Who’s next?') }}</strong><small v-if="editable">{{ t('Click to draw · {0}', t(el.names.length === 1 ? '{0} name' : '{0} names', el.names.length)) }}</small></span>
       </div>
-      <!-- while presenting a click on a tile marks it (the class's vote), the button shows the solution; the labels are for the HTML export -->
+      <!-- while presenting a click on a tile marks it (the group's vote), the button shows the solution; the labels are for the HTML export -->
       <div v-else-if="el.type === 'quiz'" class="content quiz" :class="[el.look && 'look-' + el.look, { revealed: el.solved || (live && quiz.shown[el.id]) }]" :data-reveal="t('Reveal')" :data-hide="t('Hide')">
         <p class="quiz-q">{{ el.question }}</p>
         <div class="quiz-a">

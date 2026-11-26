@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-// Quiz elements while presenting: picked tiles (e.g. the class's vote) and revealed solutions.
+// Quiz elements while presenting: picked tiles (e.g. the group's vote) and revealed solutions.
 // Not part of the project: every presentation starts fresh.
 export const LETTERS = 'ABCDEF'
 export const quiz = reactive({ picks: {}, shown: {} })

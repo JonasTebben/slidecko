@@ -1236,7 +1236,7 @@ export default {
   "Saved name lists": "Listes de noms enregistrées",
   "Use a saved list": "Utiliser une liste enregistrée",
   "Use a saved list …": "Utiliser une liste enregistrée …",
-  "List name, e.g. class 7b": "Nom de la liste, p. ex. classe 7b",
+  "List name, e.g. Workshop group A": "Nom de la liste, p. ex. groupe d’atelier A",
   "List name": "Nom de la liste",
   "Save these names as a list in this browser": "Enregistrer ces noms comme liste dans ce navigateur",
   "Update": "Mettre à jour",

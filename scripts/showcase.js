@@ -16,14 +16,14 @@ mkdirSync(TMP, { recursive: true })
 // the sample talk, in both languages
 const TEXT = {
   en: {
-    title: 'Solar for our school', sub: 'Project update 2026', chart: 'Solar yield per month', chartNote: ['Spring brings the most sun', 'Summer holidays: the roof still delivers', 'Goal for next year: +20 %'],
+    title: 'Solar for our office', sub: 'Project update 2026', chart: 'Solar yield per month', chartNote: ['Spring brings the most sun', 'Holiday season: the roof still delivers', 'Goal for next year: +20 %'],
     cats: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'], s1: 'kWh 2025', s2: 'kWh 2026', flow: 'How a panel gets on the roof',
     mer: 'flowchart LR\n  A[Idea] --> B{Budget?}\n  B -->|Yes| C[Order panels]\n  B -->|No| D[Find sponsors]\n  D --> B\n  C --> E[Install]',
     formula: 'Output per panel', q: 'Which direction should the panels face?', a: ['North', 'South', 'East', 'Straight up'],
     groups: 'Who presents next?', g: ['Group 1', 'Group 2', 'Group 3', 'Group 4'], timer: 'Group work', notes: 'Start with the spring peak, then look ahead to next year’s goal.',
   },
   de: {
-    title: 'Solarstrom für unsere Schule', sub: 'Projekt-Update 2026', chart: 'Solarertrag pro Monat', chartNote: ['Im Frühling scheint am meisten Sonne', 'Sommerferien: das Dach liefert weiter', 'Ziel fürs nächste Jahr: +20 %'],
+    title: 'Solarstrom fürs Büro', sub: 'Projekt-Update 2026', chart: 'Solarertrag pro Monat', chartNote: ['Im Frühling scheint am meisten Sonne', 'Urlaubszeit: das Dach liefert weiter', 'Ziel fürs nächste Jahr: +20 %'],
     cats: ['Jan', 'Mär', 'Mai', 'Jul', 'Sep', 'Nov'], s1: 'kWh 2025', s2: 'kWh 2026', flow: 'Wie ein Modul aufs Dach kommt',
     mer: 'flowchart LR\n  A[Idee] --> B{Budget?}\n  B -->|Ja| C[Module bestellen]\n  B -->|Nein| D[Sponsoren suchen]\n  D --> B\n  C --> E[Montage]',
     formula: 'Leistung pro Modul', q: 'Wohin sollen die Module zeigen?', a: ['Norden', 'Süden', 'Osten', 'Senkrecht nach oben'],
@@ -40,7 +40,7 @@ const CAPTIONS = {
     diagram: { title: 'Diagrams and formulas', text: 'Mermaid and LaTeX, right on the slide' },
     markdown: { title: 'Prefer Markdown?', text: 'Edit the whole talk as Slidev Markdown' },
     presenter: { title: 'Present with confidence', text: 'Notes, next slide and timer' },
-    quiz: { title: 'Made for the classroom', text: 'Quizzes, timers and random draws' },
+    quiz: { title: 'Made for workshops and talks', text: 'Quizzes, timers and random draws' },
     export: { title: 'Opens and saves it all', text: 'PowerPoint, OpenDocument, PDF, HTML and Slidev' },
   },
   de: {
@@ -51,7 +51,7 @@ const CAPTIONS = {
     diagram: { title: 'Diagramme und Formeln', text: 'Mermaid und LaTeX, direkt auf der Folie' },
     markdown: { title: 'Lieber Markdown?', text: 'Den ganzen Vortrag als Slidev-Markdown bearbeiten' },
     presenter: { title: 'Sicher präsentieren', text: 'Notizen, nächste Folie und Timer' },
-    quiz: { title: 'Gemacht für den Unterricht', text: 'Quiz, Timer und Zufallsauswahl' },
+    quiz: { title: 'Gemacht für Workshops und Vorträge', text: 'Quiz, Timer und Zufallsauswahl' },
     export: { title: 'Öffnet und speichert alles', text: 'PowerPoint, OpenDocument, PDF, HTML und Slidev' },
   },
 }

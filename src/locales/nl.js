@@ -1257,7 +1257,7 @@ export default {
   "Saved name lists": "Opgeslagen namenlijsten",
   "Use a saved list": "Opgeslagen lijst gebruiken",
   "Use a saved list …": "Opgeslagen lijst gebruiken …",
-  "List name, e.g. class 7b": "Lijstnaam, bijv. klas 7b",
+  "List name, e.g. Workshop group A": "Lijstnaam, bijv. workshopgroep A",
   "List name": "Lijstnaam",
   "Save these names as a list in this browser": "Deze namen als lijst in deze browser opslaan",
   "Update": "Bijwerken",

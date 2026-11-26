@@ -707,7 +707,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             </select>
           </div>
           <div class="btn-row">
-            <input v-model="listName" class="grow" maxlength="100" :placeholder="t('List name, e.g. class 7b')" :aria-label="t('List name')" @keydown.enter="saveList(listName, el.names)" />
+            <input v-model="listName" class="grow" maxlength="100" :placeholder="t('List name, e.g. Workshop group A')" :aria-label="t('List name')" @keydown.enter="saveList(listName, el.names)" />
             <button class="ib" :disabled="!listName.trim() || !el.names.length" :title="t('Save these names as a list in this browser')" @click="saveList(listName, el.names)">{{ lists[listName.trim()] ? t('Update') : t('Save') }}</button>
             <button v-if="lists[listName.trim()]" class="ib" :title="t('Delete list')" :aria-label="t('Delete list')" @click="removeList(listName.trim()); listName = ''"><Icon name="trash" /></button>
           </div>

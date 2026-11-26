@@ -45,7 +45,7 @@ export const ELEMENTS = {
     fill: shape === 'line' ? 'none' : '#3b82f6', stroke: shape === 'line' ? '#334155' : 'none', strokeWidth: shape === 'line' ? 4 : 0, radius: 0,
   }),
   video: (youtube, url) => ({ type: 'video', ...(youtube ? { youtube } : { url }), x: 240, y: 120, w: 500, h: 281 }), // a YouTube id or a web page
-  // notes box for the class: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
+  // notes box for the audience: typed into while presenting, Enter adds a bullet; no fill, so the theme's text colour stays readable
   board: () => T(`<p><strong>${t('Collected ideas …')}</strong></p><ul><li><br></li></ul>`, { board: true, x: 120, y: 110, w: 720, h: 360, stroke: '#94a3b8', strokeWidth: 2, strokeStyle: 'dashed' }),
   math: () => ({ type: 'math', tex: FORMULAS.quadratic[1], fontSize: 40, x: 230, y: 200, w: 520, h: 130 }),
   diagram: () => ({ type: 'diagram', code: DIAGRAMS.flowchart[1](), x: 180, y: 110, w: 620, h: 340 }),

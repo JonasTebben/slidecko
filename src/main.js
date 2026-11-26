@@ -15,4 +15,4 @@ addEventListener('unhandledrejection', e => { if (staleChunk(e.reason) && reload
 app.config.errorHandler = (e, _, info) => { if (!(staleChunk(e) && reloadForUpdate())) console.error(e, info) }
 app.mount('#app')
 // offline use (service worker, not in the dev server: it would keep old files while editing)
-if (import.meta.env.PROD) registerOffline()
+if (import.meta.env.PROD) addEventListener('load', registerOffline, { once: true }) // after the page: its ~23 MB first download must not slow the start

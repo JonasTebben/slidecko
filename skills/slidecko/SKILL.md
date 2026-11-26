@@ -1,6 +1,6 @@
 ---
 name: slidecko
-description: Write presentations as Slidev Markdown that Slidecko (slidecko.de, a presentation editor in the browser) opens with all its features — layouts, speaker notes, click steps, code, Mermaid diagrams, formulas, charts, icons, callouts, hand-drawn marks, YouTube, table of contents, and the classroom tools timer, quiz and random name picker — and exports to PowerPoint, Google Slides, PDF, OpenDocument, HTML and Slidev. Use when the user wants slides, a talk, a lesson or a workshop for Slidecko, or a deck they can finish in a visual editor instead of in code.
+description: Write presentations as Slidev Markdown that Slidecko (slidecko.de, a presentation editor in the browser) opens with all its features — layouts, speaker notes, click steps, code, Mermaid diagrams, formulas, charts, icons, callouts, hand-drawn marks, YouTube, table of contents, and the audience tools timer, quiz and random name picker — and exports to PowerPoint, Google Slides, PDF, OpenDocument, HTML and Slidev. Use when the user wants slides, a talk, a workshop, a lecture or a lesson for Slidecko, or a deck they can finish in a visual editor instead of in code.
 ---
 
 # Writing slides for Slidecko
@@ -71,7 +71,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 - **Icon**: `<lucide-sprout />` on a line of its own. Sets: `lucide`, `tabler`, `mdi`, `carbon`, `ph` (Phosphor), names as on [icones.js.org](https://icones.js.org). Unknown names are dropped, so use common ones.
 - **Arrow** pointing at something: `<Arrow x1="620" y1="300" x2="760" y2="220" />` in slide coordinates (980 × 552 at 16:9, from the top left corner); optional `two-way`, `width="4"`, `color="#dc2626"`. Use sparingly, the layout may move text.
 - **YouTube**: `<Youtube id="VIDEO_ID_11" />` with the 11-character id from the video link.
-- **Web page** (a live demo, a tool for the class): `<iframe src="https://example.org" />`, or a slide with `layout: iframe` (also `iframe-left`, `iframe-right` beside the content) and `url: https://example.org`. https only; it loads after a tap while presenting, and many sites refuse to be framed.
+- **Web page** (a live demo, a tool for the group): `<iframe src="https://example.org" />`, or a slide with `layout: iframe` (also `iframe-left`, `iframe-right` beside the content) and `url: https://example.org`. https only; it loads after a tap while presenting, and many sites refuse to be framed.
 - **Pictures**: `![What the picture shows](images/plant.jpg)` with a path inside the project folder (or its `public/`), and the same kind of path for `background: images/plant.jpg` in a slide's frontmatter (`backgroundDim: 40` darkens it). Pictures from the web are not downloaded: without files, leave pictures out and tell the user where one would help (Insert → Image in the editor).
 
 ## Click steps
@@ -86,8 +86,8 @@ They are not part of Slidev, so they are written as `data-*` blocks. JSON goes i
 
 - **Table of contents**: `<Toc />` lists the slide titles. With a style: `<div data-toc='{"look":"cards","columns":2}'></div>`, `look` `numbered`, `cards` or `lines`.
 - **Timer**: `<div data-timer="300"></div>`, seconds to count down (`0`: a stopwatch). Optional `data-face="ring"` or `"bar"`, `data-warn="1"` (warning colour in the last minute), `data-auto="1"` (starts when the slide appears; otherwise a tap starts it), `data-silent="1"` (no sound at the end).
-- **Random name picker** ("who's next?"): `<div data-picks='["Ana","Ben","Cem"]' data-heading="Who answers?"></div>`. Optional `data-repeat="1"` (a name may come up again), `data-look="outline"` (`solid`, `outline`, `plain`), `data-heading=""` (no text above). For classes and workshops; the user can also keep name lists in the app.
-- **Quiz**: `<div data-quiz='{"question":"What do roots need?","answers":[{"text":"Light"},{"text":"Air and water","correct":true}],"look":"colors"}'></div>`. 2 to 6 answers, one or more `correct`; `look` `list`, `colors` or `plain`. While presenting, taps mark the class's vote and Q reveals the answer.
+- **Random name picker** ("who's next?"): `<div data-picks='["Ana","Ben","Cem"]' data-heading="Who answers?"></div>`. Optional `data-repeat="1"` (a name may come up again), `data-look="outline"` (`solid`, `outline`, `plain`), `data-heading=""` (no text above). For workshops, seminars and lessons; the user can also keep name lists in the app.
+- **Quiz**: `<div data-quiz='{"question":"What do roots need?","answers":[{"text":"Light"},{"text":"Air and water","correct":true}],"look":"colors"}'></div>`. 2 to 6 answers, one or more `correct`; `look` `list`, `colors` or `plain`. While presenting, taps mark the group's vote and Q reveals the answer.
 - **Chart**: `<div data-chart='{"kind":"column","categories":["2023","2024"],"series":[{"name":"Sales","values":[12,19]}],"title":"Sales"}'></div>`. `kind`: `column`, `bar`, `line`, `pie`, `donut` (one series for pie and donut); optional `"legend":true`, `"stacked":true`, `"percent":true`.
 - Made only in the editor: live notes boxes (answers typed while presenting), shapes, the slide master (logo, footer, slide numbers). Suggest them where they help.
 
@@ -96,7 +96,7 @@ They are not part of Slidev, so they are written as `data-*` blocks. JSON goes i
 - One idea per slide, a title that says it, at most five short bullets. The explanation goes into the speaker notes.
 - Open with `cover`, mark chapters with `section`, close with a summary or `end`. A `<Toc />` slide after the cover helps longer talks.
 - `fact` for one striking number, `quote` for a quotation with its source below, a chart instead of a table of numbers.
-- Lessons and workshops: a timer for exercises, a quiz to check understanding, the name picker for who answers.
+- Workshops, seminars and lessons: a timer for exercises, a quiz to check understanding, the name picker for who answers.
 - Write in the user's language. Keep code under about 15 lines. Describe every picture in its alt text.
 
 ## Example
