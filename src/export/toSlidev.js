@@ -105,6 +105,7 @@ function boxStyle(el, extra = '') {
   if (el.stroke && el.type === 'text') s += `;border:${el.strokeWidth}px ${el.strokeStyle || 'solid'} ${el.stroke}`
   if ((el.fill || el.stroke) && el.type === 'text') s += ';padding:12px 16px;border-radius:10px'
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
+  if (el.title && el.type === 'text') s += ';--title:1' // the slide's title (outline, accessibility check), likewise
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
   if (el.morph) s += `;--morph:${el.morph}` // Magic move name, likewise
   if (curMorph.has(el.id)) s += `;view-transition-name:${curMorph.get(el.id)}`

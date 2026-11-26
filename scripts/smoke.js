@@ -379,16 +379,31 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
 const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'media', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click-fly-up', 'text+board', 'timer', 'toc', 'video', 'video+web']
 const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click-fly-up'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click-fly-up'] }
+// the fields a format may change on its way back (ids and asset ids are new; Slidev measures boxes and table columns and rewrites text as Markdown)
+const FIELDS = { json: ['id'], html: ['id'], git: ['id', 'x', 'y', 'w', 'h', 'html', 'asset', 'widths'], slidev: ['id', 'x', 'y', 'w', 'h', 'html', 'asset', 'widths'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
-  const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
+  const [opened, slides, kinds, back] = await page.evaluate(async ({ b64, name }) => {
     const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
     // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
     const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.url ? '+web' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' + (e.effect ? '-' + e.effect : '') : '')))
-    return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
+    return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)], S.deck.slides.flatMap(s => s.elements)]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
   const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))
+  // field by field: every element of the saved project comes back with the same fields (FIELDS: what a format may change)
+  if (FIELDS[key]) {
+    const strip = e => JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !FIELDS[key].includes(k)).sort(([a], [b]) => a.localeCompare(b))))
+    const pool = back.map(strip), diff = []
+    for (const e of JSON.parse(readFileSync(files.json.path, 'utf8')).slides.flatMap(s => s.elements)) {
+      const i = pool.indexOf(strip(e))
+      if (i >= 0) { pool.splice(i, 1); continue }
+      const twin = back.find(b => b.type === e.type)
+      const keys = [...new Set([...Object.keys(e), ...Object.keys(twin || {})])].filter(k => !FIELDS[key].includes(k) && JSON.stringify(e[k]) !== JSON.stringify(twin?.[k]))
+      diff.push(`${e.type}: ${keys.map(k => `${k} ${JSON.stringify(e[k])?.slice(0, 60)} → ${JSON.stringify(twin?.[k])?.slice(0, 60)}`).join(', ')}`)
+    }
+    if (diff.length) throw new Error(`fields changed on the way: ${diff.join(' | ')}`)
+  }
   if (lost.length) throw new Error(`lost on the way: ${lost.join(', ')} (came back: ${kinds.sort().join(' ')})`)
   // the project file restores the project it was saved from (same id); every other import opens a new project
   if (!opened && key !== 'json') throw new Error('no new project opened')

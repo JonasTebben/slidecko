@@ -58,7 +58,7 @@ For a new element type, field or style:
 3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA ("Themes" below).
 4. `src/components/Inspector.vue` – the controls; every string in `t()` and in all `src/locales/*.js` ("Translations" below).
 5. Presenting behaviour in `src/present/` with a test, the same behaviour in the HTML presentation script.
-6. Exports and imports: check each format, add `data-*` for the Slidev round trip (test in `toSlidev.test.js`).
+6. Exports and imports: check each format, add `data-*` for the Slidev round trip (test in `toSlidev.test.js`). The smoke test imports every export again and compares each element field by field with the saved project: a field a format cannot carry is named in `FIELDS` in `scripts/smoke.js`, anything else lost fails.
 7. `docs/features.md`; [privacy.md](privacy.md) if browser storage changes.
 8. `bun test`, `bun run build`, `bun run smoke`.
 
