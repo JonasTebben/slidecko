@@ -8,6 +8,7 @@ import { chartSvg } from '../slide/chart.js'
 import { hlLines, codeOpts } from '../slide/hl.js'
 import { pasteLook, startCrop, endCrop, cropFull, cropRatioValue, applyCrop } from '../core/actions.js'
 import { shapeSvg, fillFields } from '../slide/slidevModel.js'
+import { mediaUrl } from '../slide/media.js'
 import { slideHref, tocEntries, tocHtml } from '../slide/links.js'
 import TableEl from './TableEl.vue'
 import { pasteHtml } from '../editor/paste.js'
@@ -581,8 +582,8 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       <!-- a web page: nothing is loaded until a tap while presenting (or in the HTML file), as the page's site sees the viewer -->
       <!-- a video or sound file of the project: plays while presenting (its own controls, a tap there does not turn the slide); a still face in the editor and in exported pictures -->
       <div v-else-if="el.type === 'media'" class="media" :data-kind="el.kind" :data-asset="el.asset" :title="el.name">
-        <video v-if="live && el.kind === 'video'" :src="deck.assets[el.asset]" controls playsinline preload="metadata" @pointerdown.stop @click.stop />
-        <audio v-else-if="live" :src="deck.assets[el.asset]" controls preload="metadata" @pointerdown.stop @click.stop />
+        <video v-if="live && el.kind === 'video'" :src="mediaUrl(deck.assets[el.asset])" controls playsinline preload="metadata" @pointerdown.stop @click.stop />
+        <audio v-else-if="live" :src="mediaUrl(deck.assets[el.asset])" controls preload="metadata" @pointerdown.stop @click.stop />
         <span v-else class="media-face"><i class="media-icon" />{{ el.name }}</span>
       </div>
       <div v-else-if="el.type === 'video' && el.url" class="video web" :data-offline="t('Offline: the web page needs an internet connection.')">
