@@ -1,7 +1,6 @@
 <script setup>
 import { promptInstall, installed, iosSafari } from './core/install.js'
 import { offlineReady, online } from './core/offline.js'
-import { parseRange } from './export/range.js'
 import { plainNotes } from './present/clicks.js'
 import { openAudience } from './present/audience.js'
 import { stayAwake } from './present/wake.js'
@@ -46,7 +45,8 @@ import * as A from './core/actions.js'
 import { insertRow, insertCol, deleteRow, deleteCol, area, setAlign, clearCells } from './editor/tableOps.js'
 import { toggleMarked, codeOpts, highlight } from './slide/hl.js'
 import { useFind } from './editor/find.js'
-import * as R from './present/rehearse.js'
+import { useExport } from './editor/exportDialog.js'
+import { useRehearsal } from './present/rehearsal.js'
 import { keyOf, kbd, comboOf, GLOBAL, PRESENT_LABELS, format as fmtKey } from './core/keys.js'
 import KeysDialog from './components/KeysDialog.vue'
 import { clock, face, done, warning, toggle as toggleTimer, reset as resetRun, runs as timerRuns, holdAll, unlock, second } from './present/timer.js'
@@ -102,36 +102,9 @@ watch(panels, v => { try { localStorage.setItem(PANELS, JSON.stringify(v)) } cat
 // --- find & replace (src/editor/find.js) ---
 const { mdOpen, findDialog, findOpt, rx, findScope, KINDS, filtered_, hitsOn, deckHits, findKey, occ, openFind, closeFind, step, replaceOne, replaceAll, findInput, findQ, findR, findAt, findOpen, replacing, filtering } = useFind({ mdText, presenting, presenterView, collapsed })
 
-// --- export dialog: one place for every format, for the whole project or one deck ---
-// sorted by purpose: editable office formats, web, picture-exact copies, developer project
-const EXPORTS = [
-  { id: 'pdf', icon: 'fileText', name: 'PDF', ext: '.pdf', apps: 'For sharing, printing and archiving', note: 'Vector PDF, selectable text', exact: true },
-  { id: 'pptx', icon: 'presentation', name: 'PowerPoint', ext: '.pptx', apps: 'PowerPoint · Keynote · LibreOffice', note: 'Text, tables and shapes stay editable. Not for Google Slides – text shifts there; use its own variant instead.', editable: true },
-  { id: 'pptx-google', icon: 'cloud', name: 'Google Slides', ext: '.pptx', apps: 'Google Slides (File → Import)', note: 'Editable; line spacing written the way Google reads it', editable: true },
-  { id: 'odp', icon: 'slides', name: 'OpenDocument', ext: '.odp', apps: 'LibreOffice Impress · OpenOffice · Collabora', note: 'Open format, editable', editable: true },
-  { id: 'html', icon: 'globe', name: 'HTML presentation', ext: '.html', apps: 'Any browser, also offline', note: 'A single file. Present with the arrow keys, F for fullscreen.', exact: true },
-  { id: 'html-zip', icon: 'archive', name: 'HTML presentation (ZIP)', ext: '.zip', apps: 'Web servers, learning platforms, any browser', note: 'index.html with images as separate files – smaller than the single file', exact: true },
-  { id: 'png', icon: 'image', name: 'Images', ext: '.png (ZIP)', apps: 'Web, learning platforms, social media', note: 'One PNG file per slide, 1960 × 1104 px', exact: true },
-  { id: 'pptx-image', icon: 'images', name: 'PowerPoint as images', ext: '.pptx', apps: 'PowerPoint · Keynote · Google Slides · LibreOffice', note: 'Each slide as a high-resolution image – looks exactly like here everywhere. Notes are kept.', exact: true },
-  { id: 'slidev', icon: 'markdown', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
-  { id: 'git', icon: 'git', name: 'Git project', ext: '.zip', apps: 'Git · GitHub · GitLab', note: 'The Slidev project, with every saved version as a commit', editable: true, project: true },
-]
-const MAIN_EXPORTS = ['pdf', 'pptx', 'pptx-google', 'html']
-const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
-const exportClicks = ref(false) // PDF and images: one page per click step
-const exportWithNotes = ref(false) // PDF: a handout with the speaker notes
-const exportRange = ref('') // "1, 6-8": only these slides (empty: all)
-const exportPicked = computed(() => parseRange(exportRange.value, A.scopeList(exportScope.value || undefined).length))
-function openExport(scope = '', format) {
-  exportScope.value = scope
-  if (format) exportFormat.value = format
-  openDlg(exportDialog.value)
-}
-function doExport() {
-  if (exportDialog.value.returnValue !== 'ok') return
-  try { localStorage.setItem('slides-builder:export', exportFormat.value) } catch { /* private mode */ }
-  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value, exportWithNotes.value, !EXPORTS.find(f => f.id === exportFormat.value)?.project && exportPicked.value || [])
-}
+// --- export dialog: one place for every format, for the whole project or one deck --- (editor/exportDialog.js)
+const { EXPORTS, MAIN_EXPORTS, exportDialog, exportClicks, exportWithNotes, exportRange, exportPicked, openExport, doExport, exportScope, exportFormat } = useExport({ openDlg })
+
 const THUMB = computed(() => 176 / format.w)
 // one style object for all thumbnails: a new object per render would re-render every thumbnail
 const thumbStyle = computed(() => ({ transform: `scale(${THUMB.value})` }))
@@ -751,50 +724,8 @@ function presentClick(e, width = innerWidth) {
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
-// --- rehearsal: presenter view against the clock (rehearse.js); the result is kept with the project ---
-const rehearsal = ref(null), rhDialog = ref(), rhResult = ref(null)
-const rhPlan = computed(() => R.plan(deck.slides, deck.duration))
-const sumOf = list => list.reduce((a, b) => a + (b || 0), 0)
-const rhTotal = computed(() => (rehearsal.value ? Math.floor(R.total(rehearsal.value, now.value) / 1000) : 0))
-const rhSlide = computed(() => (rehearsal.value ? Math.floor(R.onSlide(rehearsal.value, now.value) / 1000) : 0))
-const rhPace = computed(() => R.pace(rhPlan.value, ui.slide, rhTotal.value))
-const rhState = computed(() => R.status(rhSlide.value, rhPlan.value[ui.slide]))
-const tick = () => (now.value = Date.now())
-async function rehearse() {
-  presenterView.value = true
-  await present(0)
-  rehearsal.value = R.start(ui.slide, tick())
-}
-watch(() => ui.slide, i => { if (rehearsal.value) R.visit(rehearsal.value, i, tick()) })
-const rhPause = () => { const r = rehearsal.value; r.since == null ? R.resume(r, tick()) : R.pause(r, tick()) }
-const rhRestart = () => { presentGo(deck.slides[0]?.hidden ? nextShown(deck.slides, 0, 1) : 0); rehearsal.value = R.start(ui.slide, tick()) }
-// Esc, the end button or leaving full screen: the run is kept and its summary shown
-watch(presenting, v => {
-  const r = rehearsal.value
-  if (v || !r) return
-  rehearsal.value = null
-  R.pause(r, Date.now())
-  if (!r.ms.some(Boolean)) return
-  const rec = R.record(r, rhPlan.value, Date.now())
-  rhResult.value = { rec, prev: deck.rehearsals[0] }
-  deck.rehearsals = R.addRehearsal(deck.rehearsals, rec)
-  nextTick(() => openDlg(rhDialog.value))
-})
-const slideName = s => { const e = s?.elements.find(e => e.title && e.html); return e ? new DOMParser().parseFromString(e.html, 'text/html').body.textContent.trim() : '' }
-const rhSum = computed(() => { const x = rhResult.value; return x && { time: sumOf(x.rec.times), plan: sumOf(x.rec.planned), prev: x.prev && sumOf(x.prev.times) } })
-const rhRows = computed(() => {
-  const x = rhResult.value
-  if (!x) return []
-  const rows = x.rec.times.map((time, i) => ({ i, name: slideName(deck.slides[i]), time, plan: x.rec.planned[i], prev: x.prev?.times[i] })).filter(r => r.time != null || r.plan)
-  const max = Math.max(1, ...rows.map(r => Math.max(r.time || 0, r.plan || 0)))
-  return rows.map(r => ({ ...r, bar: ((r.time || 0) / max) * 100 + '%', mark: r.plan && (r.plan / max) * 100 + '%', diff: r.plan && r.time != null ? r.time - r.plan : null }))
-})
-const signed = d => (d > 0 ? '+' : d < 0 ? '−' : '±') + clock(Math.abs(d))
-function rhUseTimes() {
-  rhResult.value.rec.times.forEach((v, i) => { if (v > 0 && deck.slides[i]) deck.slides[i].duration = v })
-  A.toast(t('The rehearsed times are now the planned times.'))
-}
-const rhAgain = () => { rhDialog.value.close(); rehearse() }
+// --- rehearsal: presenter view against the clock (rehearse.js); the result is kept with the project --- (present/rehearsal.js)
+const { rehearsal, rhPlan, sumOf, rhTotal, rhSlide, rhPace, rhState, rehearse, rhPause, rhRestart, rhSum, rhRows, signed, rhUseTimes, rhAgain, rhDialog, rhResult } = useRehearsal({ now, presenterView, present, presentGo, presenting, openDlg })
 
 // --- command palette ---
 // [label, action, shortcut]: shortcuts are spelled 'mod+shift+alt+key' (mod = ⌘ on Mac, Strg elsewhere);
