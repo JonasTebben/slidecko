@@ -1214,7 +1214,7 @@ export default {
   "Bar": "Balken",
   "Accent": "Akzent",
   "Colour of the ring or bar": "Farbe von Ring oder Balken",
-  "Click to draw · {0}": "Klicken zum Ziehen · {0}",
+  "Click to draw · {0}": "Klicken zum Auslosen · {0}",
   "{0} name": "{0} Name",
   "{0} names": "{0} Namen",
   // chart values in percent, slice colours

@@ -15,6 +15,16 @@ export function morphPairs(a = [], b = []) {
   // a named element only pairs by its name
   const c = [...left].filter(x => !x.morph).flatMap(x => b.filter(y => !used.has(y) && !y.morph && kind(x) === kind(y)).map(y => [far(x, y), x, y]))
   for (const [, x, y] of c.sort((p, q) => p[0] - q[0])) if (left.has(x) && !used.has(y)) take(x, y)
+  // what is left: the slide titles, then an element whose kind is on each slide only once, even with other content
+  // (a title or a picture that changed fly over cross-fading instead of only fading); other text boxes say too little
+  const free = b.filter(y => !used.has(y) && !y.morph), x0 = [...left].filter(x => !x.morph)
+  const tx = x0.find(x => x.title), ty = free.find(y => y.title)
+  if (tx && ty) take(tx, ty)
+  const sort = e => e.type + (e.type === 'shape' ? ':' + e.shape : '') + (e.title ? ':title' : '')
+  for (const x of [...left].filter(x => !x.morph && x.type !== 'text')) {
+    const ys = b.filter(y => !used.has(y) && !y.morph && sort(y) === sort(x))
+    if (ys.length === 1 && [...left].filter(z => !z.morph && sort(z) === sort(x)).length === 1) take(x, ys[0])
+  }
   return pairs
 }
 

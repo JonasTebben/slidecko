@@ -22,3 +22,10 @@ test('the HTML export can embed the functions as source', () => {
   const copy = new Function(`return ${morphPairs}`)()
   assert.deepEqual(copy([el('a', { html: 'x' })], [el('b', { html: 'x' })]), [['a', 'b']])
 })
+
+test('a changed title and an element that is on each slide once pair even with other content', () => {
+  const a = [el('t', { title: true, html: '<h1>Intro</h1>' }), el('p', { type: 'image', asset: 'x' }), el('s1', { html: 'one' }), el('s2', { html: 'two' })]
+  const b = [el('t2', { title: true, html: '<h1>Agenda</h1>', y: 300 }), el('p2', { type: 'image', asset: 'y' }), el('s3', { html: 'three' })]
+  // two text boxes against one: no guess which one it is
+  assert.deepEqual(morphPairs(a, b).sort(), [['p', 'p2'], ['t', 't2']])
+})

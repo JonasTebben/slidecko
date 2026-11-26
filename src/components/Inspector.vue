@@ -694,7 +694,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <div class="field">{{ t('Icon') }}
           <div class="seg" role="group" :aria-label="t('Icon')">
             <button class="ib grow" :class="{ on: !el.noIcon && !el.body }" :aria-pressed="!el.noIcon && !el.body" @click="Object.assign(el, { noIcon: undefined, icon: undefined, body: undefined, view: undefined })">{{ t('Die') }}</button>
-            <button class="ib grow" :class="{ on: !!el.body }" :aria-pressed="!!el.body" :title="el.icon" @click="el.noIcon = undefined; Object.assign(iconPicker, { open: true, target: el.id })"><Icon name="search" /> {{ t('Choose …') }}</button>
+            <button class="ib grow" :class="{ on: !!el.body }" :aria-pressed="!!el.body" :title="el.icon" @click="el.noIcon = undefined; Object.assign(iconPicker, { open: true, target: el.id })">{{ t('Choose …') }}</button>
             <button class="ib grow" :class="{ on: !!el.noIcon }" :aria-pressed="!!el.noIcon" @click="el.noIcon = true">{{ t('None') }}</button>
           </div>
         </div>

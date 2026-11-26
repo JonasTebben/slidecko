@@ -768,7 +768,7 @@ export async function restoreProject(d) {
 }
 
 // --- snapshots (version history): s:<id> = { list: [{ at, slides, json }] newest first, assets: the images they use } ---
-export const SNAP_MAX = 20, SNAP_EVERY = 10 * 60e3
+export const SNAP_MAX = 30, SNAP_EVERY = 5 * 60e3
 let lastSnap = 0
 // newest first, at most max; the same content as the newest one is not kept twice
 export const addSnap = (list, s, max = SNAP_MAX) => (list[0]?.json === s.json ? list : [s, ...list]).sort((a, b) => b.at - a.at).slice(0, max)
