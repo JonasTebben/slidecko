@@ -15,4 +15,4 @@ YouTube loads only after a click on "Load YouTube content" (thumbnails from `i.y
 
 The service worker (`sw.template.js`) caches only the app's own files and never touches requests to other sites.
 
-When this changes (`src/core/session.js`, `src/core/install.js`, `sw.template.js`, `src/core/store.js`, `src/slide/themes.js`, `src/core/i18n.js`, `src/core/scheme.js`, `src/App.vue`), update this page (and the privacy policy of any public copy).
+When this changes (`src/core/session.js`, `src/core/install.js`, `src/core/offline.js`, `sw.template.js`, `src/core/keys.js`, `src/present/picker.js`, `src/editor/tour.js`, `src/components/Recorder.vue`, `src/components/IconPicker.vue`, `src/components/Home.vue`, `src/core/store.js`, `src/slide/themes.js`, `src/core/i18n.js`, `src/core/scheme.js`, `src/App.vue`), update this page (and the privacy policy of any public copy).

@@ -13,7 +13,7 @@ Everything below is what Slidecko's import reads. Do not invent other syntax: un
 
 Write one file, `slides.md`, then tell the user how to open it:
 
-- **New project**: on the start page of [slidecko.de](https://slidecko.de) choose "Open Markdown" (or "Open Slidecko / Slidev project" for a folder with `slides.md` and its pictures).
+- **New project**: on the start page of [slidecko.de](https://slidecko.de) choose "Open Markdown files" (or "Open Slidecko / Slidev project" for a folder with `slides.md` and its pictures).
 - **Into an open project**: Insert → "Markdown / AI slides …" (⇧M), paste, "Insert slides".
 
 Nothing is uploaded; the deck stays in the user's browser.
@@ -78,7 +78,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 
 - `<v-click>` … `</v-click>` (blank lines inside) shows a block on the next click; `<v-click at="3">` on click 3; `<v-after>` together with the previous click; `<v-click hide>` hides it from that click on.
 - `<v-clicks>` around a list shows its items one by one.
-- `<div v-click>` is not read; use the tags.
+- `<div v-click>` around several blocks also works: they all appear on its one click.
 
 ## Slidecko's own elements
 

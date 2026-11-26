@@ -75,7 +75,7 @@ For a new element type, field or style:
 
 English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/locales/de.js` (German), `fr.js`, `nl.js` and `es.js` map it to the other languages. A missing entry shows the English text.
 
-- Put every new interface string in `t()` and add it to `src/locales/de.js`. Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
+- Put every new interface string in `t()` and add it to every file in `src/locales/` (`src/core/i18n.test.js` fails otherwise). Labels in constants (`presets.js`, `themes.js`) are English and are translated when shown, with `t(x.name)`.
 - Another language: add `src/locales/<code>.js` (English → translation) and register it in `LOCALES` in `src/core/i18n.js`.
 - Tests always run in English, because they check English text.
 
@@ -120,11 +120,11 @@ The hosted site deploys a version of this repository's `main`; when it is live, 
 
 | Folder | Holds |
 | --- | --- |
-| `src/core/` | project state, persistence, commands, view session, translations, light/dark, shortcuts |
+| `src/core/` | project state, persistence, commands, view session, translations, light/dark, shortcuts, long press, offline and updates, the install hint |
 | `src/slide/` | what a slide is made of: themes, fonts, format, presets, charts, diagrams, formulas, icons, marks, links |
 | `src/editor/` | editing helpers: lists, tables, paste, spacing, search, accessibility check, source editor, tutorial, tour |
-| `src/present/` | presenting: clicks, magic move, drawing, rehearsal, recording, quiz, picker, timer, runnable code |
-| `src/import/`, `src/export/` | reading other formats into slides, writing slides out (Slidev, PPTX, ODP, images, HTML, Git) |
+| `src/present/` | presenting: clicks, magic move, drawing, rehearsal, recording, quiz, picker, timer, notes boxes, runnable code, audience window, screen wake lock |
+| `src/import/`, `src/export/` | reading other formats into slides, writing slides out (Slidev, PPTX, ODP, images, HTML, Git, slide ranges) |
 | `src/components/` | Vue components |
 | `src/locales/` | interface translations |
 
@@ -145,6 +145,14 @@ The hosted site deploys a version of this repository's `main`; when it is live, 
 | `src/slide/themes.js`, `src/slide/slide.css` | theme loading and own themes, table and callout styles (shared by the editor and the Slidev export) |
 | `src/components/ThemeEditor.vue`, `src/components/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
 | `src/core/store.js`, `src/core/actions.js` | project state, persistence, commands |
+| `src/core/keys.js`, `src/components/KeysDialog.vue` | keyboard shortcuts: defaults, user changes, the dialog |
+| `src/core/offline.js`, `sw.template.js`, `public/manifest.webmanifest` | offline use: the service worker (filled in by `vite.config.js`), connection state, updates; the app manifest |
+| `src/core/install.js` | "Slidecko as an app": the browser's install dialog, Safari's steps, the one-time hint |
+| `src/present/audience.js` | the audience window: a second window for the projector, with the presenter view in the first |
+| `src/present/wake.js` | keeps the screen on while presenting (Screen Wake Lock) |
+| `src/export/range.js` | the export dialog's slide range ("1-3, 5, 8-") |
+| `src/export/git.js` | Git project export and import (versions as commits) |
+| `src/editor/a11yCheck.js`, `src/components/A11yPanel.vue` | accessibility check and its fixes |
 | `src/slide/icons.js`, `src/components/IconPicker.vue` | icons: bundled Iconify sets (one lazy chunk each), search, SVG, Slidev tags; the picker dialog |
 | `src/slide/diagram.js` | Mermaid diagrams: rendering (Mermaid loaded on first use), sanitizing, cache per code and theme |
 | `src/slide/math.js`, `src/slide/katexCss.js` | formulas: `$…$`/`$$…$$` in text and Markdown, KaTeX rendering (loaded on first use, fonts served by the app) |
