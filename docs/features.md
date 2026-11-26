@@ -105,7 +105,7 @@ Colours, fonts and your own CSS (`&` is the slide) with a live preview. CSS that
 
 ## Presenting
 
-Full screen (P or F5) and a presenter view with notes, the next slide and a timer (⌥P). Links are clickable and videos play.
+Full screen (P or F5) and a presenter view with notes, the next slide and a timer (⌥P). Links are clickable and videos play. The screen stays on while presenting (also in the HTML presentation), where the browser allows it (Safari from 16.4, Chrome, Edge).
 
 **Slide transitions**: none, fade, slide left or slide up (Slidev's `fade`, `slide-left`, `slide-up`). With nothing selected, the inspector sets a project default and a slide's own transition ("Project default" follows it). As in Slidev, a slide's transition plays between it and the next slide, reversed when going back. Used in full screen, the presenter view and the HTML presentation export; off when the system asks for reduced motion. The Slidev export writes `transition:` in the headmatter (project default) and in the slide frontmatter (own transition), and the import reads both; Slidev transitions the editor does not offer (such as `slide-right`) stay in the frontmatter as written. Slide 1's frontmatter is the headmatter, so in the Slidev export slide 1 always uses the project default. PowerPoint gets fade or push as the next slide's entrance; ODP, PDF and images have no transitions.
 

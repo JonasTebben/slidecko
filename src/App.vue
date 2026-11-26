@@ -1,4 +1,5 @@
 <script setup>
+import { stayAwake } from './present/wake.js'
 import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defineAsyncComponent } from 'vue'
 import Icon from './components/Icon.vue'
 import AppFooter from './components/AppFooter.vue'
@@ -653,7 +654,7 @@ async function present(from = ui.slide) {
 // a timer of its own while presenting, not saved: ± sets the minutes (0: a stopwatch) until it starts, a click starts it
 const extra = ref(null)
 const toggleExtra = () => { resetRun('pv-extra'); extra.value = extra.value ? null : reactive({ id: 'pv-extra', type: 'timer', seconds: 300 }) }
-watch(presenting, v => { if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
+watch(presenting, v => { stayAwake(v); if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
 function stopPresenting() {
   presenting.value = false
   tool.value = null

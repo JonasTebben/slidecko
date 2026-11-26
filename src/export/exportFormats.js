@@ -269,6 +269,10 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
   q.append(b)
   for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
 }
+// the screen stays on while the file is shown (taken again after the tab was hidden)
+let wake = null
+const awake = () => { if ((!wake || wake.released) && document.visibilityState === 'visible') navigator.wakeLock?.request('screen').then(l => { wake = l }, () => {}) }
+awake(); addEventListener('click', awake); document.addEventListener('visibilitychange', awake)
 // web pages: loaded on a tap only
 for (const b of document.querySelectorAll('.web-load[data-url]')) b.addEventListener('click', e => {
   e.stopPropagation()
