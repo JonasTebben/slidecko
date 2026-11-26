@@ -19,7 +19,8 @@ Run `bun test` and `bun run build` before you call a change done. Also run `bun 
 ## Conventions
 
 - Match the surrounding code: no semicolons, single quotes, compact functions, one-line comments that explain the why.
-- Tests sit next to the source as `src/<folder>/<name>.test.js` (Bun test globals, no import). Add one for new parser, import/export or state logic.
+- Tests sit next to the source as `src/<folder>/<name>.test.js` (Bun test globals, no import). Add one for new parser, import/export or state logic. They must pass in any order: CI also runs `bun test --randomize --seed=1` (and 2, 3), so stubs (`globalThis.document`, `indexedDB`, DOMPurify without a DOM) go at the top of the file, and no test may assume what another one stored.
+- Smoke steps must not depend on speed: CI runners are slower than a laptop, so wait for the state you check (`waitForSelector`, `waitForFunction`) instead of measuring right after an action. CI reruns a failed smoke once and marks it as a warning: fix such a step, do not rely on the rerun.
 - Dependencies are pinned to exact versions. Do not add one for a few lines of code. Heavy import/export code is loaded lazily with `import()`; keep it that way.
 - Coordinates are in logical slide units (`W`/`H` in `src/core/store.js`); views only scale them.
 - Sanitize HTML from imports or paste with DOMPurify, through the existing sanitizing in `src/core/store.js`.

@@ -7,7 +7,7 @@ test('JBT is no built-in theme, its file imports with id, layouts and Slidev pac
   assert.equal(isBuiltin('jbt'), false)
   const id = importTheme(JSON.parse(readFileSync(new URL('../../themes/jbt.theme.json', import.meta.url), 'utf8')))
   assert.equal(id, 'jbt')
-  assert.deepEqual(themeIds(true), ['jbt'])
+  assert.ok(themeIds(true).includes('jbt')) // other tests may have added own themes before
   assert.ok(!themeIds(false).includes('jbt'))
   assert.equal(THEMES.jbt.pkg, 'github:JonasTebben/jbt-theme#v1.1.4')
   assert.ok(themeLayouts('jbt').some(l => l[0] === 'quiz'))

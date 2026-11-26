@@ -40,7 +40,7 @@ bun run build     # the production build
 bun run smoke     # the whole app in a browser, takes a few minutes
 ```
 
-All three also run automatically on every pull request. If a new piece of logic has no test yet, add one next to its file (`name.test.js`).
+All three also run automatically on every pull request, the unit tests also in three shuffled orders (`bun test --randomize --seed=1`, `2`, `3`): a test must not rely on one that ran before it, so set up stubs such as `globalThis.document` at the top of the file, not inside one test. If a new piece of logic has no test yet, add one next to its file (`name.test.js`).
 
 ## Send a pull request
 

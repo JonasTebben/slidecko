@@ -2,6 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { FONTS, fontKey, fontStack } from './themes.js'
 
+// the store wants a browser: just enough of one, for every test (they may run in any order)
+globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
+globalThis.indexedDB ??= { open: () => ({}) }
+
 test('font stacks map back to their key, also as the browser serializes them', () => {
   for (const [k, [, stack]] of Object.entries(FONTS)) {
     assert.equal(fontKey(stack), k)
@@ -12,9 +16,6 @@ test('font stacks map back to their key, also as the browser serializes them', (
 })
 
 test('text styles from a file join the browser ones, are cleaned and never replace a local one', async () => {
-  // the store wants a browser: just enough of one (as in tableOps.test.js)
-  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
-  globalThis.indexedDB ??= { open: () => ({}) }
   const { textStyles, saveTextStyles, mergeTextStyles } = await import('../core/store.js')
   saveTextStyles([{ name: 'Merksatz', tag: 'p', color: '#ff0000' }])
   mergeTextStyles([{ name: 'Merksatz', tag: 'h2' }, { name: 'Zitat groß', tag: 'script', font: 'serif', fontSize: 9999, color: 'url(x)', valign: 'middle' }, { tag: 'p' }])
@@ -46,8 +47,6 @@ test('toggleMarked adds, merges and removes highlighted code lines', async () =>
 })
 
 test('cleanCrop keeps a valid crop, clamps it into the picture and drops "no crop"', async () => {
-  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
-  globalThis.indexedDB ??= { open: () => ({}) }
   const { cleanCrop } = await import('../core/store.js')
   assert.deepEqual(cleanCrop({ x: 0.1, y: 0.2, w: 0.5, h: 0.5 }), { x: 0.1, y: 0.2, w: 0.5, h: 0.5 })
   assert.deepEqual(cleanCrop({ x: 0.5, y: 0, w: 0.9, h: 1 }), { x: 0.5, y: 0, w: 0.5, h: 1 }) // never past the right edge
@@ -57,8 +56,6 @@ test('cleanCrop keeps a valid crop, clamps it into the picture and drops "no cro
 })
 
 test('shapes keep text colour and alignment; lines and blank text get no text', async () => {
-  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
-  globalThis.indexedDB ??= { open: () => ({}) }
   const { cleanEl } = await import('../core/store.js')
   // (text with content goes through DOMPurify, which needs a browser: checked in the editor)
   const rect = cleanEl({ type: 'shape', shape: 'rect', x: 0, y: 0, w: 100, h: 50, color: '#ff0000', align: 'left' })
@@ -68,8 +65,6 @@ test('shapes keep text colour and alignment; lines and blank text get no text', 
 })
 
 test('slide files and project file keys cannot climb out of the project; real names survive', async () => {
-  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
-  globalThis.indexedDB ??= { open: () => ({}) }
   const { cleanSlides, safePath } = await import('../core/store.js')
   const files = ['....//evil.md', '../x.md', 'a/%2e%2e/x.md', 'a\\..\\x.md', 'a/./x.md', 'x\0.md', 'Größe (1).md', '/pages/my%20deck.md']
   assert.deepEqual(cleanSlides(files.map(file => ({ file }))).map(s => s.file),
@@ -132,8 +127,6 @@ test('the Slidev export brings the fonts its slides use, and only those', async 
 })
 
 test("font references: bundled and the project's own are kept, unknown ones fall back to the theme font", async () => {
-  globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
-  globalThis.indexedDB ??= { open: () => ({}) }
   const { deck, deckFile } = await import('../core/store.js')
   const { cleanFonts } = await import('./fonts.js')
   const { fontStack } = await import('./themes.js')

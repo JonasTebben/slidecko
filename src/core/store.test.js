@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 // the store wants a browser: just enough of one
 globalThis.document ??= { activeElement: null, createElement: () => ({}), querySelector: () => null }
 globalThis.indexedDB ??= { open: () => ({}) }
+// no DOM here, so DOMPurify has no sanitize: plain strings for every test (the sanitizing is checked in the browser smoke test)
+const { default: DOMPurify } = await import('dompurify')
+DOMPurify.sanitize ??= String
 const { mergeList } = await import('./store.js')
 
 const p = (id, updated, title = id) => ({ id, title, updated })
