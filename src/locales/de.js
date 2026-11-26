@@ -1311,4 +1311,11 @@ export default {
   "Tab name": "Name des Tabs",
   "Add tab": "Tab hinzufügen",
   "Remove tab": "Tab entfernen",
+  "YouTube video or web page": "YouTube-Video oder Webseite",
+  "YouTube link or web address (https://…)": "YouTube-Link oder Webadresse (https://…)",
+  "A web page is shown in a frame while presenting, after a tap. Many sites do not allow that.": "Eine Webseite erscheint beim Präsentieren in einem Rahmen, nach einem Tippen. Viele Websites erlauben das nicht.",
+  "Web page …": "Webseite …",
+  "Web page": "Webseite",
+  "Not a YouTube link or web address (https://…).": "Kein YouTube-Link und keine Webadresse (https://…).",
+  "Web page: tap to load it (this sends data to its site)": "Webseite: zum Laden tippen (das sendet Daten an ihre Website)",
 }

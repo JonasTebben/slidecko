@@ -269,6 +269,14 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
   q.append(b)
   for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
 }
+// web pages: loaded on a tap only
+for (const b of document.querySelectorAll('.web-load[data-url]')) b.addEventListener('click', e => {
+  e.stopPropagation()
+  const f = document.createElement('iframe')
+  Object.assign(f, { src: b.dataset.url, title: b.dataset.host, referrerPolicy: 'no-referrer' })
+  f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups')
+  b.replaceWith(f)
+})
 // code groups: a tab shows its code
 for (const b of document.querySelectorAll('.code-tabs [data-tab]')) b.addEventListener('click', e => {
   e.stopPropagation()

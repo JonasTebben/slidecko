@@ -149,14 +149,20 @@ function boxOf(attrs) {
   return box
 }
 
-// Slidev's <Link to="n">, <Toc> and <Youtube> as HTML the editor reads (outside code): a link to "#n", a box with data-toc
+// Slidev's <Link to="n">, <Toc>, <Youtube> and <iframe> as HTML the editor reads (outside code): a link to "#n", a box with data-toc
 // (filled with a few lines, so a bare <Toc /> gets a height when measured)
 const attrOf = (a, k) => a?.match(new RegExp(`(?:^|\\s):?${k}=["']([^"']*)["']`, 'i'))?.[1]
-const TAGS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<Link\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Link>)|<Toc\b([^>]*?)(?:\/>|>\s*<\/Toc>)|(<div[^>]*\bdata-video=[^>]*>\s*)?<Youtube\b([^>]*?)(?:\/>|>\s*<\/Youtube>)/gm
-export const slidevTags = (md, lines = 4) => md.replace(TAGS, (m, f, c, la, text, ta, wrapped, ya) => {
+const TAGS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<Link\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Link>)|<Toc\b([^>]*?)(?:\/>|>\s*<\/Toc>)|(<div[^>]*\bdata-video=[^>]*>\s*)?<Youtube\b([^>]*?)(?:\/>|>\s*<\/Youtube>)|(<div[^>]*\bdata-web=[^>]*>\s*)?<iframe\b([^>]*?)(?:\/>|>[\s\S]*?<\/iframe>)/gm
+export const slidevTags = (md, lines = 4) => md.replace(TAGS, (m, f, c, la, text, ta, wrapped, ya, webWrapped, ia) => {
   if (la != null) return `<a href="#${attrOf(la, 'to') || ''}">${text ?? attrOf(la, 'title') ?? ''}</a>`
   // Slidev's <Youtube id>: a video box (inside the data-video box Slidecko's export writes, that box is the video)
   if (ya != null) return wrapped || (/^[\w-]{11}$/.test(attrOf(ya, 'id') || '') ? `<div data-video="${attrOf(ya, 'id')}"></div>` : m)
+  // an <iframe>: a web page box (https only); never left in the HTML that is measured, where it would load
+  if (ia != null) {
+    if (webWrapped) return webWrapped
+    const src = attrOf(ia, 'src')
+    return /^https:\/\/[^\s"'<>]+$/.test(src || '') ? `<div data-web="${src.replace(/&/g, '&amp;')}" style="aspect-ratio:16/9"></div>` : ''
+  }
   if (ta == null) return m
   const o = Object.fromEntries(['minDepth', 'maxDepth', 'columns'].map(k => [k, +attrOf(ta, k) || undefined]))
   return `<div data-toc="${JSON.stringify(o).replace(/"/g, '&quot;')}"><ul>${'<li>&nbsp;</li>'.repeat(lines)}</ul></div>`

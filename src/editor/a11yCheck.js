@@ -262,7 +262,7 @@ export function checkDeck(d, { underlay = () => [] } = {}) {
         else if (/\.(png|jpe?g|gif|svg|webp|avif|bmp)$/i.test(alt) || /^(image|picture|bild|foto|photo|grafik)\s*\d*$/i.test(alt)) add(el, 'alt', 'warning', 'The alt text “{0}” does not describe the picture.', [alt])
         return
       }
-      if (el.type === 'video') return add(el, 'captions', 'tip', 'Video: make sure it has captions (they are set on YouTube).')
+      if (el.type === 'video' && el.youtube) return add(el, 'captions', 'tip', 'Video: make sure it has captions (they are set on YouTube).')
       if (el.type === 'table' && !el.header) add(el, 'table-header', 'warning', 'Table without a header row. Screen readers use it to name the columns.', [], 'header')
       if (el.type === 'text' && !el.board && !el.fill && !el.stroke && !plainText(el.html) && !/<img\b/i.test(el.html || '')) return add(el, 'empty', 'tip', 'Empty text box. Screen readers announce it anyway.', [], 'delete')
       for (const x of [el.html, ...(el.rows || []).flat()].flatMap(vagueLinks)) add(el, 'link', 'warning', 'The link text “{0}” does not say where it leads.', [x])

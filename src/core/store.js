@@ -82,6 +82,7 @@ export const deckOfSlide = i => decks.value.find(d => i >= d.start && i < d.star
 
 // --- validation of untrusted data (files, IndexedDB, clipboard, import) ---
 const str = v => (typeof v === 'string' ? v : undefined)
+export const webUrl = v => { try { const u = new URL(String(v).trim()); return u.protocol === 'https:' && !u.username && !u.password ? u.href : undefined } catch { return undefined } }
 // a project-relative path (deck file, project file) or undefined: no empty or dots-only segment ('.', '..', also %2e%2e;
 // Windows drops trailing dots, so '....' counts too), no backslash or NUL
 export function safePath(v) {
@@ -202,7 +203,8 @@ export function cleanEl(e) {
     case 'diagram': return { ...base, code: (str(e.code) || '').slice(0, 20000) }
     // TeX source of a formula, rendered by KaTeX (math.js, no trust: no links or pictures); capped like typed code
     case 'math': return { ...base, tex: (str(e.tex) || '').slice(0, 5000), ...(color(e.color) && { color: color(e.color) }) }
-    case 'video': return /^[\w-]{6,20}$/.test(e.youtube) ? { ...base, youtube: e.youtube } : null
+    // a YouTube video, or a web page (https only) shown in a frame while presenting
+    case 'video': return /^[\w-]{6,20}$/.test(str(e.youtube) ?? '') ? { ...base, youtube: e.youtube } : webUrl(e.url) ? { ...base, url: webUrl(e.url) } : null
     // countdown length in seconds (0: a stopwatch), started by a click while presenting; face: ring or bar around the digits
     // in accent (default: the theme's), fill: its background, warn: a countdown's last minute in red, auto, silent
     case 'timer': return {

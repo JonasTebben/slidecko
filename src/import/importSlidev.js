@@ -1,7 +1,7 @@
 import { marked } from 'marked'
 import { parseSlidev, headFormat, stripNonContent, slots, slidevComponents, snippets, snippetPath, SNIPPET, clickOf, clickAttrs, fmGet, codeEl, slidevTags } from './parseSlidev.js'
 import { imagePath, readLayers } from '../export/toSlidev.js'
-import { uid, clean, readDataUrl } from '../core/store.js'
+import { uid, clean, readDataUrl, webUrl } from '../core/store.js'
 import { parseRatio, formatSize } from '../slide/format.js'
 import { CENTERED, themeStyle, fontKey, SHADOWS } from '../slide/themes.js'
 import { applyUno } from '../slide/uno.js'
@@ -37,7 +37,7 @@ const clicky = el => ['v-click', 'v-click.hide', 'v-after'].some(a => el.hasAttr
 const soleIn = (p, n) => /^V-(CLICK|AFTER)$/.test(p?.tagName) && p.children.length === n
 const compAttr = c => k => (c.tagName === 'V-AFTER' ? (k === 'v-after' ? '' : null)
   : k === (c.hasAttribute('hide') ? 'v-click.hide' : 'v-click') ? c.getAttribute('at') ?? '' : null)
-const special = el => el.dataset.toc || el.dataset.shape || el.dataset.video || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
+const special = el => el.dataset.toc || el.dataset.shape || el.dataset.video || el.dataset.web || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -114,7 +114,7 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
       Object.assign(slide.style, { width: size.w + 'px', height: size.h + 'px' })
       slide.innerHTML = `<div class="flow${centered ? ' center' : ''}">${centered ? `<div class="center-wrap">${htmls[i]}</div>` : htmls[i]}</div>`
       // Slidev's image-left/-right: the picture (frontmatter image:) takes one half, the content the other
-      const half = { 'image-left': 'left', 'image-right': 'right' }[baseOf(s.layout)]
+      const half = { 'image-left': 'left', 'image-right': 'right', 'iframe-left': 'left', 'iframe-right': 'right' }[baseOf(s.layout)]
       if (half) Object.assign(slide.firstChild.style, half === 'left' ? { left: '50%' } : { right: '50%' })
       host.replaceChildren(slide)
 
@@ -139,6 +139,9 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
       const pic = /^image(-left|-right)?$/.test(baseOf(s.layout)) && bgPath(fmGet(s.fm, 'image')), picId = pic && await asset(pic)
       if (pic && !picId) missing++
       if (picId) elements.unshift({ id: uid(), type: 'image', asset: picId, src: pic, x: half === 'right' ? size.w / 2 : 0, y: 0, w: half ? size.w / 2 : size.w, h: size.h, decorative: true })
+      // the page of Slidev's iframe layouts (url:) as a web page element
+      const page = /^iframe(-left|-right)?$/.test(baseOf(s.layout)) && webUrl(fmGet(s.fm, 'url'))
+      if (page) elements.unshift({ id: uid(), type: 'video', url: page, x: half === 'right' ? size.w / 2 : 0, y: 0, w: half ? size.w / 2 : size.w, h: size.h })
       const bg = bgPath(fmGet(s.fm, 'background')), bgId = bg && await asset(bg)
       slides.push({ id: uid(), layout: s.layout, elements,
         ...(bgId && { bg: { asset: bgId, src: bg, fit: fmGet(s.fm, 'backgroundSize'), dim: +fmGet(s.fm, 'backgroundDim') || undefined } }),
@@ -231,6 +234,8 @@ function measure(slide, parsed) {
       Object.assign(el, { type: 'shape', shape: n.dataset.shape, fill: n.dataset.fill || 'none', stroke: n.dataset.stroke || 'none', strokeWidth: +n.dataset.sw || 0, radius: +n.dataset.radius || 0, ...(n.dataset.alpha && { fillAlpha: +n.dataset.alpha }), ...(n.dataset.slope && { slope: n.dataset.slope }), ...(n.dataset.head && { head: n.dataset.head }) })
       const text = n.querySelector('.shape-text > div') || n.querySelector('.shape-text') // written by toSlidev for text in shapes
       if (text?.textContent.trim()) el.html = text.innerHTML
+    } else if (n.dataset.web) {
+      Object.assign(el, { type: 'video', url: n.dataset.web })
     } else if (n.dataset.video) {
       Object.assign(el, { type: 'video', youtube: n.dataset.video })
     } else if (n.dataset.icon) {

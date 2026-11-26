@@ -23,7 +23,7 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./components/A11yPanel.vue'))
 import { checkDeck } from './editor/a11yCheck.js'
 import { t, lang } from './core/i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid } from './core/store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid , webUrl } from './core/store.js'
 import { parseRatio } from './slide/format.js'
 import { slidePoint, arrowHead, inkSvg } from './present/draw.js'
 import { toggleSolution, resetQuiz } from './present/quiz.js'
@@ -612,7 +612,10 @@ function applyDeck() {
 function addVideo() {
   if (ytDialog.value.returnValue !== 'ok') return
   const id = ytUrl.value.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{6,20})/)?.[1] || (/^[\w-]{6,20}$/.test(ytUrl.value.trim()) ? ytUrl.value.trim() : null)
-  id ? A.insert('video', id) : A.toast(t('Not a valid YouTube link.'))
+  const url = !id && webUrl(ytUrl.value) // any other https address: a web page
+  if (id) A.insert('video', id)
+  else if (url) A.insert('video', null, url)
+  else A.toast(t('Not a YouTube link or web address (https://…).'))
 }
 
 // --- presenting ---
@@ -1125,6 +1128,7 @@ function onClipboard(e) {
             <!-- media · data and formulas · for presenting with the audience · structure -->
             <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
             <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ kbd('insertVideo') }}</kbd></button>
+            <button class="mi" @click="ytUrl = 'https://'; openDlg(ytDialog)"><Icon name="globe" />{{ t('Web page …') }}</button>
             <hr />
             <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
             <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
@@ -1213,6 +1217,7 @@ function onClipboard(e) {
           <!-- media · data and formulas · for presenting with the audience · structure -->
           <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
+          <button class="mi" @click="ytUrl = 'https://'; openDlg(ytDialog)"><Icon name="globe" />{{ t('Web page …') }}</button>
           <hr />
           <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
           <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
@@ -1640,8 +1645,9 @@ function onClipboard(e) {
 
     <dialog ref="ytDialog" @close="addVideo">
       <form method="dialog">
-        <h2>{{ t('YouTube video') }}</h2>
-        <input v-model="ytUrl" :aria-label="t('YouTube link')" placeholder="https://www.youtube.com/watch?v=…" autofocus />
+        <h2>{{ t('YouTube video or web page') }}</h2>
+        <input v-model="ytUrl" :aria-label="t('YouTube link or web address (https://…)')" placeholder="https://www.youtube.com/watch?v=…" autofocus />
+        <p class="hint">{{ t('A web page is shown in a frame while presenting, after a tap. Many sites do not allow that.') }}</p>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok">{{ t('Insert') }}</button></menu>
       </form>
     </dialog>

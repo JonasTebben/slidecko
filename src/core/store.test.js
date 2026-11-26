@@ -289,3 +289,8 @@ test('code groups: cleanEl keeps tabs with their code, language and label', () =
   expect(el.tabs).toEqual([{ code: 'pnpm i', lang: 'shx', label: 'pnpm' }, { code: '1', lang: 'plaintext' }])
   expect(S.cleanEl({ type: 'code', code: 'x', label: 'a' }).label).toBeUndefined() // a label only in a group
 })
+
+test('a web page element keeps only an https address', () => {
+  expect(S.cleanEl({ type: 'video', url: ' https://example.org/a?b=1 ' }).url).toBe('https://example.org/a?b=1')
+  for (const url of ['http://example.org', 'javascript:alert(1)', 'https://u:p@example.org', 'nope']) expect(S.cleanEl({ type: 'video', url })).toBeNull()
+})

@@ -5,7 +5,7 @@
 // same type and content (text, image, shape kind …), the nearest first
 export function morphPairs(a = [], b = []) {
   const text = e => String(e.html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
-  const kind = e => e.type + ':' + ({ text: text(e), image: e.asset, shape: e.shape, code: e.code, video: e.youtube, table: JSON.stringify(e.rows), quiz: e.question }[e.type] ?? '')
+  const kind = e => e.type + ':' + ({ text: text(e), image: e.asset, shape: e.shape, code: e.code, video: e.youtube || e.url, table: JSON.stringify(e.rows), quiz: e.question }[e.type] ?? '')
   const pairs = [], left = new Set(a), used = new Set()
   const take = (x, y) => { pairs.push([x.id, y.id]); left.delete(x); used.add(y) }
   for (const key of [e => e.morph, e => e.mid]) {

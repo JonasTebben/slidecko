@@ -280,3 +280,9 @@ test("Slidev's <Arrow> becomes a positioned line with arrowheads in its directio
   assert.equal(box('<Arrow :x1="300" :y1="80" :x2="100" :y2="80" />'), 'data-head="start" left:100px;top:70px;width:200px;height:20px')
   assert.match(slidevComponents('<Arrow x1="1" y1="1" x2="9" y2="9" color="#f00" width="4" />'), /data-stroke="#f00" data-sw="4"/)
 })
+
+test('an <iframe> becomes a web page box, https only, and is never kept as a frame', () => {
+  assert.equal(slidevTags('<iframe src="https://example.org/a?b=1&c=2" width="600" />'), '<div data-web="https://example.org/a?b=1&amp;c=2" style="aspect-ratio:16/9"></div>')
+  assert.equal(slidevTags('<iframe src="http://example.org"></iframe>'), '')
+  assert.equal(slidevTags('<div data-web="https://x.org" style="left:1px">\n<iframe src="https://x.org" class="w-full h-full" />\n</div>'), '<div data-web="https://x.org" style="left:1px">\n\n</div>')
+})

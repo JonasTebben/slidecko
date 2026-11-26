@@ -541,6 +541,9 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         if (format === 'odp' || !m.series?.length || !m.categories?.length) { const data = svg && await svgImage(svg, el.offsetWidth, el.offsetHeight); if (data) slide.addImage({ data, ...box(el), ...sh }); continue }
         const [kind, data, opts] = nativeChart(pptx, svg, m, color)
         slide.addChart(kind, data, { ...opts, ...box(el) })
+      } else if (type === 'video' && m.url) { // a web page: its address as a link (Office files cannot show one)
+        slide.addText([{ text: new URL(m.url).host, options: { bold: true, fontSize: 18, color: '0F172A', breakLine: true } }, { text: m.url, options: { hyperlink: { url: m.url }, fontSize: 12, color: '1D4ED8' } }],
+          { ...box(el), align: 'center', valign: 'middle', fill: { color: 'F1F5F9' }, line: { color: '94A3B8', width: 0.75 } })
       } else if (type === 'video') {
         const link = `https://www.youtube.com/watch?v=${m.youtube}`
         slide.addText([{ text: '▶  ' + t('Watch the YouTube video'), options: { hyperlink: { url: link }, color: 'FFFFFF', bold: true, fontSize: 16 } }],

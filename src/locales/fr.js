@@ -1290,4 +1290,11 @@ export default {
   "Tab name": "Nom de l’onglet",
   "Add tab": "Ajouter un onglet",
   "Remove tab": "Supprimer l’onglet",
+  "YouTube video or web page": "Vidéo YouTube ou page web",
+  "YouTube link or web address (https://…)": "Lien YouTube ou adresse web (https://…)",
+  "A web page is shown in a frame while presenting, after a tap. Many sites do not allow that.": "Une page web s’affiche dans un cadre pendant la présentation, après un toucher. Beaucoup de sites ne le permettent pas.",
+  "Web page …": "Page web …",
+  "Web page": "Page web",
+  "Not a YouTube link or web address (https://…).": "Ni un lien YouTube ni une adresse web (https://…).",
+  "Web page: tap to load it (this sends data to its site)": "Page web : touchez pour la charger (cela envoie des données à son site)",
 }

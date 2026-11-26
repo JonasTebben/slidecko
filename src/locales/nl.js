@@ -1311,4 +1311,11 @@ export default {
   "Tab name": "Naam van het tabblad",
   "Add tab": "Tabblad toevoegen",
   "Remove tab": "Tabblad verwijderen",
+  "YouTube video or web page": "YouTube-video of webpagina",
+  "YouTube link or web address (https://…)": "YouTube-link of webadres (https://…)",
+  "A web page is shown in a frame while presenting, after a tap. Many sites do not allow that.": "Een webpagina verschijnt tijdens het presenteren in een kader, na een tik. Veel sites staan dat niet toe.",
+  "Web page …": "Webpagina …",
+  "Web page": "Webpagina",
+  "Not a YouTube link or web address (https://…).": "Geen YouTube-link of webadres (https://…).",
+  "Web page: tap to load it (this sends data to its site)": "Webpagina: tik om te laden (dit stuurt gegevens naar de site)",
 }

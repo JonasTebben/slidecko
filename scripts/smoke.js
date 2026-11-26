@@ -71,6 +71,7 @@ const DECK = {
       { type: 'shape', shape: 'line', slope: 'up', head: 'end', fill: 'none', stroke: '#334155', strokeWidth: 4, radius: 0, x: 170, y: 370, w: 160, h: 60 },
       { type: 'icon', icon: 'lucide:sprout', x: 56, y: 180, w: 60, h: 60 },
       { type: 'video', youtube: 'VIDEO_ID_11', x: 140, y: 180, w: 320, h: 180 },
+      { type: 'video', url: 'https://example.org/', x: 760, y: 420, w: 200, h: 110 },
       { type: 'toc', x: 480, y: 180, w: 440, h: 160 },
       { type: 'image', asset: 'P1', src: '/images/p.png', alt: 'A dot', x: 56, y: 380, w: 100, h: 100 },
       { type: 'text', board: true, x: 480, y: 380, w: 440, h: 120, html: '<p>Notes box</p>' }] },
@@ -219,10 +220,13 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   // a code group's second tab replaces the first
   const tabs = await p.evaluate(() => { const b = document.querySelector('.code-tabs [data-tab="1"]'); b?.click(); return b && [...b.closest('.el').querySelectorAll(':scope > pre.code')].map(x => x.hidden).join() })
   if (tabs !== 'true,false') throw new Error(`code tab not switched: ${tabs}`)
+  // a web page is a button until it is tapped
+  const web = await p.evaluate(() => { const b = document.querySelector('.web-load[data-url]'); const box = b?.parentElement; b?.click(); return box?.querySelector('iframe')?.getAttribute('src') })
+  if (web !== 'https://example.org/') throw new Error(`web page not loaded: ${web}`)
   await p.close()
 })
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
-const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
+const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video', 'video+web']
 const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
@@ -230,7 +234,7 @@ for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[ke
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
     // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
-    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
+    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.url ? '+web' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
     return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
   const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))
@@ -258,6 +262,7 @@ const LIVE = { title: 'Live', theme: 'ozean', slides: [
     { type: 'picker', names: ['Ana', 'Ben'], repeat: true, look: 'solid', heading: 'Your turn', fontSize: 48, x: 40, y: 220, w: 400, h: 140 },
     { type: 'text', board: true, html: '<p>Kept</p>', x: 500, y: 200, w: 400, h: 120 },
     { type: 'text', board: true, liveTemp: true, html: '<p>Temp</p>', x: 500, y: 360, w: 400, h: 120 },
+    { type: 'video', url: 'https://example.org/', x: 740, y: 40, w: 200, h: 130 },
     { type: 'code', lang: 'sh', code: 'npm i', label: 'npm', tabs: [{ lang: 'sh', code: 'pnpm i', label: 'pnpm' }], x: 40, y: 400, w: 400, h: 110 }] },
   { layout: 'default', elements: [{ type: 'text', html: '<p>Two</p>', x: 40, y: 40, w: 400, h: 80 }] }] }
 async function presenting(page, label, touch) {
@@ -280,6 +285,10 @@ async function presenting(page, label, touch) {
   await step(`${label}: a tap on a code tab shows its code and does not turn the slide`, async () => {
     await tap('.pv-slide .code-tabs [data-tab="1"]'); await page.waitForTimeout(200)
     ok((await text('.pv-slide .el.code > pre.code:not([hidden])')).trim() === 'pnpm i', 'tab not shown'); ok((await shown()) === '1 / 2', 'slide turned')
+  })
+  await step(`${label}: a web page loads only after a tap, without turning the slide`, async () => {
+    ok(!(await page.locator('.pv-slide .web iframe').count()), 'loaded by itself')
+    await tap('.pv-slide .web-load'); await page.waitForSelector('.pv-slide .web iframe'); ok((await shown()) === '1 / 2', 'slide turned')
   })
   await step(`${label}: a double tap sets a timer back`, async () => { await page.waitForTimeout(400); await dbl(T1); await page.waitForTimeout(150); ok((await text(T1)) === '1:00' && !(await running(T1)), await text(T1)) })
   await step(`${label}: a draw shows its own text, then names without a count`, async () => {

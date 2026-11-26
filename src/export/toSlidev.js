@@ -226,6 +226,7 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       return `<div data-toc="${esc(JSON.stringify({ minDepth, maxDepth, columns, current, look }))}" style="${boxStyle(el)}">\n<Toc${props} />\n</div>`
     }
     case 'video':
+      if (el.url) return `<div data-web="${esc(el.url)}" style="${boxStyle(el)}">\n<iframe src="${esc(el.url)}" class="w-full h-full" />\n</div>`
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
     default: { // text
       listAt = el.clickItems ? at : 0
@@ -345,7 +346,10 @@ function slideMd(slide) {
   const flow = slide.flow != null && slide.flow === flowHash(slide)
   // the picture Slidev's image layouts draw from the frontmatter (image:) is not written twice
   const pic = /^image(-left|-right)?$/.test(slide.layout) && fmGet(slide.fm, 'image')
-  const own = pic ? slide.elements.filter(e => !(e.type === 'image' && e.src === pic)) : slide.elements
+  // so is the page of the iframe layouts (url:)
+  const href = u => { try { return new URL(u.trim()).href } catch { return u } }
+  const page = /^iframe(-left|-right)?$/.test(slide.layout) && fmGet(slide.fm, 'url')
+  const own = pic || page ? slide.elements.filter(e => !(e.type === 'image' && e.src === pic) && !(e.type === 'video' && page && e.url === href(page))) : slide.elements
   const els = flow ? [...own].sort((a, b) => a.y - b.y) : own
   const steps = clickSteps(slide)
   const body = escapeMustache(els.map(e => withClick(e, withTo(e, elementMd(e, flow, stepOf(slide, e, steps))), steps)).join('\n\n') + slideStyle(slide))

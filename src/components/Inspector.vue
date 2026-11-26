@@ -6,7 +6,7 @@ import Menu from './Menu.vue'
 import Sec from './InspectorSection.vue'
 import ChartPanel from './ChartPanel.vue'
 import FontOptions from './FontOptions.vue'
-import { deck, ui, SHAPES, LOOKS, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont } from '../core/store.js'
+import { deck, ui, SHAPES, LOOKS, deckOfSlide, clean, cleanEl, textStyles, saveTextStyles, STYLE_PROPS, blockTag, styleMatches, storeFont, removeFont , webUrl } from '../core/store.js'
 import { TABLE_PRESETS, themeStyle, FONTS, fontStack } from '../slide/themes.js'
 import { LANGS, codeOpts } from '../slide/hl.js'
 import { RUN_LANGS, isRun, autorun, withRun, withAutorun, setLines, runInto } from '../present/run.js'
@@ -148,8 +148,9 @@ const num = (key, v) => { const n = Math.round(+v); if (Number.isFinite(n)) el.v
 const tbl = (fn, ...a) => run(() => fn(el.value, ...a))
 const ytId = v => v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{6,20})/)?.[1] || (/^[\w-]{6,20}$/.test(v) ? v : null)
 function setVideo(v) {
-  const id = ytId(v.trim())
-  if (id) el.value.youtube = id
+  const id = ytId(v.trim()), url = !id && webUrl(v)
+  if (id) Object.assign(el.value, { youtube: id, url: undefined })
+  else if (url) Object.assign(el.value, { url, youtube: undefined })
 }
 const TYPO = [['text', 'Text', [12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28]], ['title', 'Title', [24, 26, 28, 30, 32, 36, 40, 44, 48]], ['code', 'Code', [8, 9, 10, 11, 12, 13, 14, 16, 18, 20]]]
 function setTypo(k, v) {
@@ -793,8 +794,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         </div>
       </Sec>
 
-      <Sec v-else-if="el.type === 'video'" id="video" icon="video" :title="t('Video')">
-        <label class="field">{{ t('YouTube link or ID') }} <input :value="el.youtube" @change="setVideo($event.target.value)" /></label>
+      <Sec v-else-if="el.type === 'video'" id="video" :icon="el.url ? 'globe' : 'video'" :title="t(el.url ? 'Web page' : 'Video')">
+        <label class="field">{{ t('YouTube link or web address (https://…)') }} <input :value="el.url || el.youtube" @change="setVideo($event.target.value)" /></label>
       </Sec>
 
       <Sec id="pos" icon="move" :title="t('Position & size')">

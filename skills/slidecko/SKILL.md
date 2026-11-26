@@ -71,6 +71,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 - **Icon**: `<lucide-sprout />` on a line of its own. Sets: `lucide`, `tabler`, `mdi`, `carbon`, `ph` (Phosphor), names as on [icones.js.org](https://icones.js.org). Unknown names are dropped, so use common ones.
 - **Arrow** pointing at something: `<Arrow x1="620" y1="300" x2="760" y2="220" />` in slide coordinates (980 × 552 at 16:9, from the top left corner); optional `two-way`, `width="4"`, `color="#dc2626"`. Use sparingly, the layout may move text.
 - **YouTube**: `<Youtube id="VIDEO_ID_11" />` with the 11-character id from the video link.
+- **Web page** (a live demo, a tool for the class): `<iframe src="https://example.org" />`, or a slide with `layout: iframe` (also `iframe-left`, `iframe-right` beside the content) and `url: https://example.org`. https only; it loads after a tap while presenting, and many sites refuse to be framed.
 - **Pictures**: `![What the picture shows](images/plant.jpg)` with a path inside the project folder (or its `public/`), and the same kind of path for `background: images/plant.jpg` in a slide's frontmatter (`backgroundDim: 40` darkens it). Pictures from the web are not downloaded: without files, leave pictures out and tell the user where one would help (Insert → Image in the editor).
 
 ## Click steps

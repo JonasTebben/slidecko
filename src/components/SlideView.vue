@@ -484,6 +484,8 @@ const markShown = m => props.step == null || !m.at || revealed({ click: m.at }, 
 const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
 // runnable code while presenting: a click on the code edits it (the deck keeps its code until "Keep changes"), ⌘/Ctrl+Enter runs
 const runEdit = ref(null)
+const webOn = reactive({}) // web pages loaded while presenting (by a tap)
+const hostOf = u => { try { return new URL(u).host } catch { return u } }
 const shownTab = reactive({}) // the tab each code group shows while presenting
 const tabOf = el => (props.live && shownTab[el.id] <= (el.tabs?.length || 0) && shownTab[el.id]) || 0
 const runOf = el => (runs[el.id] ??= { code: el.code, out: el.output || [] })
@@ -571,6 +573,11 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         </div>
       </template>
       <div v-else-if="el.type === 'icon'" class="icon-box" v-html="iconSvg(el)" />
+      <!-- a web page: nothing is loaded until a tap while presenting (or in the HTML file), as the page's site sees the viewer -->
+      <div v-else-if="el.type === 'video' && el.url" class="video web">
+        <iframe v-if="live && webOn[el.id]" :src="el.url" :title="hostOf(el.url)" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer" allow="fullscreen" />
+        <button v-else class="web-load" :data-url="el.url" :data-host="hostOf(el.url)" @pointerdown="live && $event.stopPropagation()" @click="live && ((webOn[el.id] = true), $event.stopPropagation())">{{ hostOf(el.url) }}<small>{{ t('Web page: tap to load it (this sends data to its site)') }}</small></button>
+      </div>
       <div v-else-if="el.type === 'video'" class="video" :style="{ backgroundImage: ui.yt && !live ? `url(${ytThumb(el.youtube)})` : null }">
         <iframe v-if="live && ui.yt" :src="`https://www.youtube-nocookie.com/embed/${el.youtube}`" :title="t('YouTube video')" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen />
         <i v-else class="play" />

@@ -1311,4 +1311,11 @@ export default {
   "Tab name": "Nombre de la pestaña",
   "Add tab": "Añadir pestaña",
   "Remove tab": "Quitar pestaña",
+  "YouTube video or web page": "Vídeo de YouTube o página web",
+  "YouTube link or web address (https://…)": "Enlace de YouTube o dirección web (https://…)",
+  "A web page is shown in a frame while presenting, after a tap. Many sites do not allow that.": "Una página web se muestra en un marco al presentar, tras un toque. Muchos sitios no lo permiten.",
+  "Web page …": "Página web …",
+  "Web page": "Página web",
+  "Not a YouTube link or web address (https://…).": "No es un enlace de YouTube ni una dirección web (https://…).",
+  "Web page: tap to load it (this sends data to its site)": "Página web: toca para cargarla (esto envía datos a su sitio)",
 }
