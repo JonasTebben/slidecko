@@ -48,4 +48,6 @@ Describe what you changed and why, and how you tried it. A screenshot helps for 
 
 By contributing you agree that your work is licensed under the project's [Apache 2.0 licence](LICENSE).
 
+Everyone taking part follows our [Code of Conduct](CODE_OF_CONDUCT.md): be kind, be patient, assume good intent.
+
 Questions? Just open an issue. There are no silly questions.

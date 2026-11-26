@@ -1,0 +1,19 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "neon",
+  "name": "Neon",
+  "dark": true,
+  "vars": {
+    "bg": "#0b0b1a",
+    "fg": "#d6d6f5",
+    "title": "#22d3ee",
+    "accent": "#f472b6",
+    "accent-fg": "#0b0b1a",
+    "code-bg": "#15152e",
+    "code-fg": "#e0e0ff",
+    "font": "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
+    "cover-bg": "radial-gradient(circle at 70% 30%, #4c1d95, #0b0b1a 65%)",
+    "cover-fg": "#f0abfc"
+  }
+}

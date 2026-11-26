@@ -33,6 +33,17 @@ bun run smoke    # the whole app in a browser (Playwright): dialogs, every expor
 
 The full behaviour is described in [docs/features.md](docs/features.md).
 
+## Agent skill
+
+Let Claude Code (or another agent that reads skills) write decks for Slidecko: the skill in [skills/slidecko](skills/slidecko/SKILL.md) teaches it the Slidev Markdown that Slidecko reads.
+
+```
+/plugin marketplace add JonasTebben/slidecko
+/plugin install slidecko@slidecko
+```
+
+Other agents: copy `skills/slidecko` into their skills folder.
+
 ## Documentation
 
 | Topic | Where |
@@ -41,8 +52,9 @@ The full behaviour is described in [docs/features.md](docs/features.md).
 | Known limitations | [docs/limitations.md](docs/limitations.md) |
 | What the app stores in the browser (no cookies, no tracking) | [docs/privacy.md](docs/privacy.md) |
 | Hosting your own copy, footer links | [docs/hosting.md](docs/hosting.md) |
-| How the app is built, project layout | [docs/architecture.md](docs/architecture.md) |
-| Contributing, translations, theme rules | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| How the app is built, project layout, translation and theme rules | [docs/architecture.md](docs/architecture.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Code of conduct | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
 
 ## License

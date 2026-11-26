@@ -1,0 +1,18 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "wald",
+  "name": "Forest",
+  "vars": {
+    "bg": "#fbfdf8",
+    "fg": "#22311f",
+    "title": "#1f4d2b",
+    "accent": "#3f7d3a",
+    "code-bg": "#eef5e9",
+    "code-fg": "#1f2a1c",
+    "font": "'Gill Sans', 'Gill Sans MT', Optima, Candara, 'Segoe UI', sans-serif",
+    "cover-bg": "linear-gradient(160deg, #1f4d2b, #3f7d3a)",
+    "cover-fg": "#f1f8ec",
+    "rule": "#8fbc5a"
+  }
+}

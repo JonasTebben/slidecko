@@ -1,0 +1,18 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "dracula",
+  "name": "Dracula",
+  "dark": true,
+  "vars": {
+    "bg": "#282a36",
+    "fg": "#f8f8f2",
+    "title": "#ff79c6",
+    "accent": "#bd93f9",
+    "accent-fg": "#282a36",
+    "code-bg": "#1e1f29",
+    "code-fg": "#f8f8f2",
+    "font": "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "cover-bg": "linear-gradient(135deg, #282a36, #44475a)"
+  }
+}

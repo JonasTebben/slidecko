@@ -1,0 +1,19 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "business",
+  "name": "Business",
+  "vars": {
+    "bg": "#ffffff",
+    "fg": "#27303f",
+    "title": "#0b2545",
+    "accent": "#b91c1c",
+    "code-bg": "#f3f4f6",
+    "code-fg": "#111827",
+    "font": "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "bar": "#0b2545",
+    "bar-fg": "#ffffff",
+    "cover-bg": "linear-gradient(180deg, #0b2545 72%, #b91c1c 72%, #b91c1c 74%, #0b2545 74%)",
+    "cover-fg": "#ffffff"
+  }
+}

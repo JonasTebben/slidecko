@@ -52,6 +52,51 @@ export function headFormat(md) {
   return { ...(ar && { aspectRatio: ar }), ...(cw > 0 && { canvasWidth: cw }), ...(TRANSITIONS.includes(tr) && { transition: tr }), ...(dur && { duration: dur }) }
 }
 
+// Slidev components that would otherwise vanish (outside code): the slide number and count become Slidecko's fields,
+// <AutoFitText> its text, <LightOrDark> its light part (slides stay light), every <v-switch> step one after the other,
+// the ::code-group markers go (its code blocks stay, one below the other)
+const COMPS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<(SlideCurrentNo|SlidesTotal)\s*\/>|\{\{\s*\$(?:slidev\.)?(?:nav\.)?(currentPage|total|configs\.title)\s*\}\}|<AutoFitText\b([^>]*?)\/>|<LightOrDark>([\s\S]*?)<\/LightOrDark>|<template\s+(?:#|v-slot:)[\w-]+\s*>|<\/template>|^::code-group[ \t]*$|^::[ \t]*$/gm
+const FIELD_OF = { SlideCurrentNo: 'page', currentPage: 'page', SlidesTotal: 'total', total: 'total', 'configs.title': 'title' }
+export const slidevComponents = md => md.replace(COMPS, (m, f, c, no, nav, fit, lod) => {
+  if (f || c) return m
+  if (no || nav) return `<span data-field="${FIELD_OF[no || nav]}">#</span>`
+  if (fit != null) return `<p>${(fit.match(/modelValue=["']([^"']*)["']/)?.[1] ?? '')}</p>`
+  if (lod != null) return (lod.match(/<template\s+(?:#|v-slot:)light\s*>([\s\S]*?)<\/template>/)?.[1] ?? lod.replace(/<template\s+(?:#|v-slot:)dark\s*>[\s\S]*?<\/template>/, '')).trim()
+  if (m.startsWith('<template')) return '<div>'
+  if (m === '</template>') return '</div>'
+  return ''
+})
+
+// Slidev's code snippets: a line `<<< @/snippets/a.js` (from the project root) or `<<< ./a.ts {2,3}` (next to the deck),
+// optionally with a language and line options -> a fenced block with the file's code; get(path): its text or undefined
+// shortcut: `#region` parts are not cut out, the whole file is shown
+export const SNIPPET = /^<<<[ \t]+(\S+?)(?:#[\w-]+)?(?:[ \t]+([\w+-]+))?(?:[ \t]+(\{[^}\n]*\}))?[ \t]*$/gm
+export const snippetPath = (p, root, dir) => resolve(p.startsWith('@/') ? root : dir, p.replace(/^@\//, ''))
+export const snippets = (md, get, root = '', dir = '') => md.replace(SNIPPET, (m, p, lang, meta) => {
+  const code = get(snippetPath(p, root, dir))
+  if (code == null) return m
+  const fence = '`'.repeat(Math.max(3, ...(code.match(/`{3,}/g) || []).map(f => f.length + 1)))
+  return `${fence}${lang || p.split('.').pop()}${meta ? ' ' + meta : ''}\n${code.replace(/\n$/, '')}\n${fence}`
+})
+
+// Slidev's slots (`::right::` in two-cols, `::left::`/`::right::` below the header in two-cols-header) as the
+// two-column grid the import reads; the default slot is the left column (two-cols) or the header above the columns
+// shortcut: a line that is just `::name::` inside a code block would count too, rare enough to accept
+const SLOT = /^::([\w-]+)::[ \t]*$/m
+export function slots(md) {
+  if (!SLOT.test(md)) return md
+  const parts = { default: [] }
+  let cur = 'default'
+  for (const line of md.split('\n')) {
+    const m = line.match(/^::([\w-]+)::[ \t]*$/)
+    if (m) parts[cur = m[1]] ??= []
+    else parts[cur].push(line)
+  }
+  const col = k => `<div>\n\n${(parts[k] || []).join('\n').trim()}\n\n</div>`
+  const head = parts.left ? parts.default.join('\n').trim() + '\n\n' : ''
+  return `${head}<div class="grid grid-cols-2 gap-4">\n${col(parts.left ? 'left' : 'default')}\n${col('right')}\n</div>`
+}
+
 // at: index of the slide's first body line (the source editor maps lint results back with it)
 export function splitSlides(md) {
   const lines = md.split(/\r?\n/)
@@ -90,12 +135,14 @@ function boxOf(attrs) {
   return box
 }
 
-// Slidev's <Link to="n"> and <Toc> as HTML the editor reads (outside code): a link to "#n", a box with data-toc
+// Slidev's <Link to="n">, <Toc> and <Youtube> as HTML the editor reads (outside code): a link to "#n", a box with data-toc
 // (filled with a few lines, so a bare <Toc /> gets a height when measured)
 const attrOf = (a, k) => a?.match(new RegExp(`(?:^|\\s):?${k}=["']([^"']*)["']`, 'i'))?.[1]
-const TAGS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<Link\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Link>)|<Toc\b([^>]*?)(?:\/>|>\s*<\/Toc>)/gm
-export const slidevTags = (md, lines = 4) => md.replace(TAGS, (m, f, c, la, text, ta) => {
+const TAGS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<Link\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Link>)|<Toc\b([^>]*?)(?:\/>|>\s*<\/Toc>)|(<div[^>]*\bdata-video=[^>]*>\s*)?<Youtube\b([^>]*?)(?:\/>|>\s*<\/Youtube>)/gm
+export const slidevTags = (md, lines = 4) => md.replace(TAGS, (m, f, c, la, text, ta, wrapped, ya) => {
   if (la != null) return `<a href="#${attrOf(la, 'to') || ''}">${text ?? attrOf(la, 'title') ?? ''}</a>`
+  // Slidev's <Youtube id>: a video box (inside the data-video box Slidecko's export writes, that box is the video)
+  if (ya != null) return wrapped || (/^[\w-]{11}$/.test(attrOf(ya, 'id') || '') ? `<div data-video="${attrOf(ya, 'id')}"></div>` : m)
   if (ta == null) return m
   const o = Object.fromEntries(['minDepth', 'maxDepth', 'columns'].map(k => [k, +attrOf(ta, k) || undefined]))
   return `<div data-toc="${JSON.stringify(o).replace(/"/g, '&quot;')}"><ul>${'<li>&nbsp;</li>'.repeat(lines)}</ul></div>`
@@ -178,12 +225,12 @@ export function parseSlidev(md, read = () => undefined, path = '', seen = [path]
       return sub === undefined ? [] : parseSlidev(sub, read, target, [...seen, target])
     }
     const md = s.body.join('\n').trim()
-    if (!md) return []
+    if (!md && !fmGet(s.fm, 'image')) return [] // a picture slide (layout: image) has no text
     // blank lines before the next `---`, so that untouched slides are written back byte for byte
     const gap = s.body.length - 1 - s.body.findLastIndex(l => l.trim())
     // Slidev: the last comment of a slide is its speaker notes; comments are never content
     // (?!<!--): only the last comment, not everything from an earlier one up to it
     const notes = md.match(/<!--((?:(?!<!--)[\s\S])*?)-->\s*$/)?.[1].trim() || ''
-    return [{ layout: fmGet(s.fm, 'layout') || 'default', transition: trOf(s.fm), blocks: parseBody(stripNonContent(md)), fm: s.fm, md, file: path, notes, gap, ...(fmHidden(s.fm) && { hidden: true }) }]
+    return [{ layout: fmGet(s.fm, 'layout') || 'default', transition: trOf(s.fm), blocks: parseBody(slots(slidevComponents(stripNonContent(md)))), fm: s.fm, md, file: path, notes, gap, ...(fmHidden(s.fm) && { hidden: true }) }]
   })
 }

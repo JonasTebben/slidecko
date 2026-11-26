@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { parseSlidev, headFormat } from './parseSlidev.js'
+import { parseSlidev, headFormat, slidevTags, slots, slidevComponents, snippets } from './parseSlidev.js'
 import { toSlidev, slideHash, slideToMarkdown, escapeMustache } from '../export/toSlidev.js'
 import { importTheme } from '../slide/themes.js'
 
@@ -98,7 +98,7 @@ test('edited slides are written as positioned boxes that parse back identically'
   const { files, images } = toSlidev({ title: 'T', theme: 'hell', slides: [{ layout: 'default', elements }, { layout: 'cover', fm: 'layout: default\nclass: x', notes: 'Notiz', elements: [] }] })
   assert.deepEqual(images, { 'images/x.png': 'A1' })
   const md = files['slides.md']
-  assert.match(md, /^---\ntitle: "T"\ntheme: default\n---\n/)
+  assert.match(md, /^---\ntitle: "T"\ntheme: default\nlayout: default\n---\n/)
   assert.ok(files['style.css'].includes('.slidev-layout'))
   const [one, two] = parseSlidev(md)
   assert.deepEqual([two.fm, two.layout, two.notes], ['class: x\nlayout: cover', 'cover', 'Notiz'])
@@ -239,4 +239,36 @@ test('hidden slides: hide/disabled is read, written as hide: true and kept in th
   assert.deepEqual(back.map(x => !!x.hidden), [false, true, false, true])
   assert.equal(back[2].layout, 'cover') // other frontmatter stays
   assert.doesNotMatch(back[3].fm, /hide: false/)
+})
+
+test("Slidev's <Youtube> becomes a video box, also inside the box Slidecko's export writes", () => {
+  assert.equal(slidevTags('<Youtube id="VIDEO_ID_11" />'), '<div data-video="VIDEO_ID_11"></div>')
+  assert.equal(slidevTags('<div data-video="VIDEO_ID_11" style="left:0">\n<Youtube id="VIDEO_ID_11" width="100%" />\n</div>'), '<div data-video="VIDEO_ID_11" style="left:0">\n\n</div>')
+  assert.equal(slidevTags('`<Youtube id="VIDEO_ID_11" />`'), '`<Youtube id="VIDEO_ID_11" />`') // code stays code
+  assert.equal(slidevTags('<Youtube id="bad" />'), '<Youtube id="bad" />')
+})
+
+test("Slidev's two-cols slots become the two-column grid; two-cols-header keeps its header above", () => {
+  const two = parseSlidev('---\nlayout: two-cols\n---\n\n# T\n\nLeft\n\n::right::\n\nRight\n')[0].blocks
+  assert.deepEqual(two.map(b => [b.html.replace(/\s+/g, ''), b.col?.index]), [['<h1>T</h1>', 0], ['<p>Left</p>', 0], ['<p>Right</p>', 1]])
+  const head = parseSlidev('---\nlayout: two-cols-header\n---\n\n# T\n\n::left::\n\nL\n\n::right::\n\nR\n')[0].blocks
+  assert.deepEqual(head.map(b => [b.html.replace(/\s+/g, ''), b.col?.index]), [['<h1>T</h1>', undefined], ['<p>L</p>', 0], ['<p>R</p>', 1]])
+  assert.equal(slots('no slots'), 'no slots')
+})
+
+test('Slidev components that have no element of their own keep their content', () => {
+  assert.equal(slidevComponents('Slide <SlideCurrentNo /> of <SlidesTotal />'), 'Slide <span data-field="page">#</span> of <span data-field="total">#</span>')
+  assert.equal(slidevComponents('{{ $nav.currentPage }}'), '<span data-field="page">#</span>')
+  assert.equal(slidevComponents('<AutoFitText :max="200" modelValue="Fit me" />'), '<p>Fit me</p>')
+  assert.equal(slidevComponents('<LightOrDark>\n  <template #dark>D</template>\n  <template #light>L</template>\n</LightOrDark>'), 'L')
+  assert.equal(slidevComponents('<v-switch>\n<template #1>One</template>\n</v-switch>'), '<v-switch>\n<div>One</div>\n</v-switch>')
+  assert.equal(slidevComponents('::code-group\n\n```sh [a]\nx\n```\n\n::'), '\n\n```sh [a]\nx\n```\n\n')
+  assert.equal(slidevComponents('`<SlidesTotal />`'), '`<SlidesTotal />`')
+})
+
+test('code snippets (<<<) become fenced code from the project file', () => {
+  const files = { 'snippets/a.js': 'const a = 1\n', 'deck/b.ts': 'let b\n' }
+  assert.equal(snippets('<<< @/snippets/a.js {2}', p => files[p]), '```js {2}\nconst a = 1\n```')
+  assert.equal(snippets('<<< ./b.ts', p => files[p], '', 'deck'), '```ts\nlet b\n```')
+  assert.equal(snippets('<<< @/missing.js', p => files[p]), '<<< @/missing.js') // a missing file stays as written
 })

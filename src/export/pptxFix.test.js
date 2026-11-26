@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { onePPr, numberFont, decorative, DECORATIVE } from './pptxFix.js'
+import { onePPr, numberFont, decorative, DECORATIVE, uniqueIds, clickTiming } from './pptxFix.js'
 
 test('numbers follow the text font, bullets keep theirs', () => {
   assert.equal(numberFont('<a:buSzPct val="100000"/><a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabicPeriod" startAt="6"/><a:buSzPct val="100000"/><a:buChar char="•"/>'),
@@ -33,4 +33,10 @@ test('click animations: one PowerPoint click per step, appear and disappear on t
   assert.match(clicks[1], /presetClass="exit"[^]*spid="4"[^]*val="hidden"/)
   const ids = [...t.matchAll(/cTn id="(\d+)"/g)].map(m => m[1])
   assert.equal(new Set(ids).size, ids.length)
+})
+
+test('a repeated object id (pptxgenjs numbers tables apart) gets a new one; click targets follow the objects', () => {
+  const xml = '<p:cNvPr id="1"/><p:cNvPr id="2"/><p:cNvPr id="3"/><p:cNvPr id="2"/>'
+  assert.equal(uniqueIds(xml), '<p:cNvPr id="1"/><p:cNvPr id="2"/><p:cNvPr id="3"/><p:cNvPr id="4"/>')
+  assert.match(clickTiming(uniqueIds(xml), [{ objs: [2], click: 1 }]), /spid="4"/)
 })

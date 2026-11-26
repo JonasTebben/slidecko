@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { parseSlidev, headFormat, stripNonContent, clickOf, clickAttrs, fmGet, codeEl, slidevTags } from './parseSlidev.js'
+import { parseSlidev, headFormat, stripNonContent, slots, slidevComponents, snippets, snippetPath, SNIPPET, clickOf, clickAttrs, fmGet, codeEl, slidevTags } from './parseSlidev.js'
 import { imagePath, readLayers } from '../export/toSlidev.js'
 import { uid, clean, readDataUrl } from '../core/store.js'
 import { parseRatio, formatSize } from '../slide/format.js'
@@ -86,12 +86,21 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
   const ownLayouts = readLayers(vue).layouts
   const baseOf = l => ownLayouts.find(o => o.slug === l)?.layout || l
   const parsed = parseSlidev(texts.get(path), read, path)
+  // Slidev shows a whole deck's first slide without a layout as a cover (a fragment, with slideIds, is not a deck's start)
+  if (!slideIds && parsed[0] && !fmGet(parsed[0].fm, 'layout')) parsed[0].layout = 'cover'
   // measured at the deck's own size; createProject() applies the returned format
   const format = headFormat(texts.get(path))
   const size = formatSize(parseRatio(format.aspectRatio) || 16 / 9, format.canvasWidth || 980)
   // Slidev's markdown-it and marked agree on CommonMark + GFM + raw HTML
   // sanitized: the markdown may come from a pasted text or a downloaded project (raw HTML, onerror=…)
-  const htmls = parsed.map(s => clean(marked.parse(slidevTags(iconTags(stripNonContent(s.md)), Math.min(10, parsed.length)))))
+  // the code files that `<<<` snippets name, read now (the Markdown is turned into HTML synchronously)
+  const root = path.split('/').slice(0, -1).join('/'), dirOf = f => f.split('/').slice(0, -1).join('/'), code = new Map()
+  for (const s of parsed) for (const [, p] of s.md.matchAll(SNIPPET)) {
+    const full = snippetPath(p, root, dirOf(s.file)), f = files.get(full)
+    if (f && !code.has(full)) code.set(full, typeof f === 'string' ? f : await f.text())
+    else if (!f) missingFiles.push(full)
+  }
+  const htmls = parsed.map(s => clean(marked.parse(slidevTags(iconTags(slots(slidevComponents(snippets(stripNonContent(s.md), p => code.get(p), root, dirOf(s.file))))), Math.min(10, parsed.length)))))
   await applyUno(htmls.join('\n'))
 
   const host = document.body.appendChild(document.createElement('div'))
@@ -104,6 +113,9 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
       for (const [k, v] of Object.entries(themeStyle(theme))) slide.style.setProperty(k, v)
       Object.assign(slide.style, { width: size.w + 'px', height: size.h + 'px' })
       slide.innerHTML = `<div class="flow${centered ? ' center' : ''}">${centered ? `<div class="center-wrap">${htmls[i]}</div>` : htmls[i]}</div>`
+      // Slidev's image-left/-right: the picture (frontmatter image:) takes one half, the content the other
+      const half = { 'image-left': 'left', 'image-right': 'right' }[baseOf(s.layout)]
+      if (half) Object.assign(slide.firstChild.style, half === 'left' ? { left: '50%' } : { right: '50%' })
       host.replaceChildren(slide)
 
       for (const pre of slide.querySelectorAll('pre')) pre.classList.add('code')
@@ -123,6 +135,10 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
       }))
       // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them), a picker keeps its die
       const elements = (await Promise.all(measure(slide, s).map(async e => (e.type === 'icon' || (e.type === 'picker' && e.icon) ? Object.assign(e, await getIcon(e.icon).catch(() => null)) : e)))).filter(e => e.type !== 'icon' || e.body)
+      // the picture of Slidev's image layouts (image:) as an image element; toSlidev leaves it out while the layout shows it
+      const pic = /^image(-left|-right)?$/.test(baseOf(s.layout)) && bgPath(fmGet(s.fm, 'image')), picId = pic && await asset(pic)
+      if (pic && !picId) missing++
+      if (picId) elements.unshift({ id: uid(), type: 'image', asset: picId, src: pic, x: half === 'right' ? size.w / 2 : 0, y: 0, w: half ? size.w / 2 : size.w, h: size.h, decorative: true })
       const bg = bgPath(fmGet(s.fm, 'background')), bgId = bg && await asset(bg)
       slides.push({ id: uid(), layout: s.layout, elements,
         ...(bgId && { bg: { asset: bgId, src: bg, fit: fmGet(s.fm, 'backgroundSize'), dim: +fmGet(s.fm, 'backgroundDim') || undefined } }),
@@ -202,6 +218,7 @@ function measure(slide, parsed) {
 
   const elements = []
   let titled = false, clicks = 0
+  const wrapClicks = new Map() // <div v-click> around several elements: they all take its one step
   for (let i = 0; i < leaves.length; i++) {
     const n = leaves[i], box = boxOf(n), r = rect(n)
     if (r.r - r.x < 1 && r.b - r.y < 1) continue
@@ -296,7 +313,10 @@ function measure(slide, parsed) {
     if (+to) el.toNum = +to
     // Slidev's appear/disappear on click: toSlidev writes it on the box; a <v-click>/<v-after> around just this element counts too
     const comp = !box && soleIn(n.parentElement, span) && n.parentElement, src = box || img || n
-    const c = clickAttrs(comp ? compAttr(comp) : k => src.getAttribute(k), clicks)
+    // a plain element (a <div v-click> with Markdown inside) around this one gives it its click
+    const wrap = !box && !comp && !clicky(src) && n.parentElement?.closest('[v-click], [v-after], [v-click\\.hide]')
+    const c = wrap && wrapClicks.has(wrap) ? { ...wrapClicks.get(wrap), last: clicks } : clickAttrs(comp ? compAttr(comp) : k => (wrap || src).getAttribute(k), clicks)
+    if (wrap) wrapClicks.set(wrap, c)
     clicks = c.last
     if (c.click) el.click = c.click
     if (c.clickUntil) el.clickUntil = c.clickUntil

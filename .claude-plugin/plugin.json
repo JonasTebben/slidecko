@@ -1,0 +1,13 @@
+{
+  "name": "slidecko",
+  "version": "1.0.0",
+  "description": "Write Slidev Markdown that Slidecko opens, edits, presents and exports",
+  "author": {
+    "name": "Jonas Tebben",
+    "url": "https://github.com/JonasTebben"
+  },
+  "homepage": "https://slidecko.de",
+  "repository": "https://github.com/JonasTebben/slidecko",
+  "license": "Apache-2.0",
+  "keywords": ["presentations", "slides", "markdown", "slidev", "powerpoint"]
+}

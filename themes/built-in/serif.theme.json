@@ -1,0 +1,17 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "serif",
+  "name": "Paper",
+  "vars": {
+    "bg": "#fbf8f1",
+    "fg": "#3b342b",
+    "title": "#7c2d12",
+    "accent": "#a4452c",
+    "code-bg": "#f0e9da",
+    "code-fg": "#3b342b",
+    "font": "Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif",
+    "heading-weight": "400",
+    "cover-bg": "#f4ecdc"
+  }
+}

@@ -9,6 +9,13 @@ export const onePPr = xml => xml.replace(/<a:p>(.*?)<\/a:p>/gs, (m, body) => {
 
 // pictures: pptxgenjs writes the media path (or "preencoded.png" for data URLs) as the description when there is no
 // alt text; decorative ones (by their name, see altOf in exportPptx.js) get PowerPoint's "Mark as decorative" (Office 2019+)
+// pptxgenjs numbers a table's object apart from the others, so its id can repeat another one's on the slide: PowerPoint
+// then repairs the file and a click animation may reach the wrong object. A repeated id gets a new one past the largest.
+export function uniqueIds(xml) {
+  const seen = new Set()
+  let next = Math.max(0, ...[...xml.matchAll(/<p:cNvPr id="(\d+)"/g)].map(m => +m[1]))
+  return xml.replace(/<p:cNvPr id="(\d+)"/g, (m, id) => (seen.has(id) ? `<p:cNvPr id="${++next}"` : (seen.add(id), m)))
+}
 export const DECORATIVE = 'Decorative picture'
 const DECOR_EXT = '<a:extLst><a:ext uri="{C183D7F6-B498-43B3-948B-1728B52AA6E4}"><adec:decorative xmlns:adec="http://schemas.microsoft.com/office/drawing/2017/decorative" val="1"/></a:ext></a:extLst>'
 export const decorative = xml => xml.replace(/(<p:cNvPr [^>]*?)descr="(?:\.\.\/media\/[^"]*|preencoded\.\w+)"/g, '$1descr=""')

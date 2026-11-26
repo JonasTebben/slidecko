@@ -1,0 +1,18 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "pastell",
+  "name": "Pastel",
+  "vars": {
+    "bg": "#fffbfe",
+    "fg": "#4a4458",
+    "title": "#6d4c9f",
+    "accent": "#cb3f76",
+    "code-bg": "#f6eefc",
+    "code-fg": "#3b3049",
+    "font": "'Avenir Next', Avenir, 'Segoe UI', system-ui, sans-serif",
+    "heading-weight": "700",
+    "cover-bg": "linear-gradient(135deg, #fde2f3, #e0e7ff 55%, #ccfbf1)",
+    "rule": "#d9739b"
+  }
+}

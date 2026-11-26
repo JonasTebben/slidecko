@@ -1,0 +1,17 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "solarized",
+  "name": "Solarized",
+  "vars": {
+    "bg": "#fdf6e3",
+    "fg": "#586e75",
+    "title": "#cb4b16",
+    "accent": "#2076b2",
+    "code-bg": "#eee8d5",
+    "code-fg": "#073642",
+    "font": "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "cover-bg": "#073642",
+    "cover-fg": "#fdf6e3"
+  }
+}

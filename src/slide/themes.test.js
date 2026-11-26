@@ -66,3 +66,14 @@ test('own CSS that would leave its theme block is kept out of the editor, the pr
   assert.equal(THEMES[id].css, undefined)
   deleteTheme(id)
 })
+
+test('every file in themes/built-in is a built-in theme, and imports as an own theme too', () => {
+  const { readdirSync } = require('node:fs')
+  const files = readdirSync(new URL('../../themes/built-in', import.meta.url)).filter(f => f.endsWith('.theme.json'))
+  assert.equal(files.length, themeIds(false).length)
+  for (const f of files) {
+    const th = JSON.parse(readFileSync(new URL('../../themes/built-in/' + f, import.meta.url), 'utf8'))
+    assert.ok(isBuiltin(th.id) && f === `${th.id}.theme.json`, f)
+    assert.deepEqual(cleanTheme(th).vars, th.vars, f) // nothing a theme file may not hold
+  }
+})

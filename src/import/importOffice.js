@@ -2,12 +2,15 @@ import JSZip from 'jszip'
 import { uid } from '../core/store.js'
 import { formatSize, parseRatio } from '../slide/format.js'
 import { t } from '../core/i18n.js'
+import { officeClicks, applyClicks } from './officeClicks.js'
+import { officeChart } from './officeChart.js'
 
 // Imports presentations made elsewhere into editable slides: PowerPoint (.pptx, also Google Slides
 // and Keynote exports), OpenDocument (.odp, LibreOffice/Impress), PDF and plain images. Positions
 // are scaled to the canvas of a new project in the source's aspect ratio (slideFormat); text keeps its size, colour, weight and lists as inline styles.
 // Vertical anchoring becomes valign. Turned freeforms and pictures become SVGs (the editor has no rotation);
-// turned text, rectangles and ellipses keep their unturned box (quarter turns: width/height swapped). Not taken over: cropping, gradients, animations, charts/SmartArt (their fallback image is used when present).
+// turned text, rectangles and ellipses keep their unturned box (quarter turns: width/height swapped). Charts of the editor's kinds become editable charts, entrance/exit animations click steps (officeClicks.js).
+// Not taken over: cropping, gradients, other animations, other charts and SmartArt (their fallback image is used when present).
 
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', bmp: 'image/bmp' }
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -471,7 +474,11 @@ export async function importPptx(file) {
   // grot: rotation of enclosing groups in degrees (added to each child's own)
   async function shapes(p, layout, master, tree = p.tree, tf = (x, y) => [x, y], gs = [1, 1], onlyDecor = false, grot = 0) {
     const out = []
+    // the elements made from each object keep its id (and its groups'), for the slide's click animations
+    let at = 0, sid
+    const tag = () => { if (sid && !onlyDecor) for (const e of out.slice(at)) (e.ids ||= []).push(sid) }
     for (const n of kids(tree)) {
+      tag(); at = out.length; sid = all(n, 'cNvPr')[0]?.getAttribute('id')
       const ph = kid(n, n.localName === 'sp' ? 'nvSpPr' : n.localName === 'pic' ? 'nvPicPr' : 'nvGraphicFramePr', 'nvPr', 'ph')
       const phInfo = ph && { type: ph.getAttribute('type') || 'body', idx: ph.getAttribute('idx') }
       if (onlyDecor && ph) continue // layout/master placeholders are prompts, not content
@@ -500,6 +507,11 @@ export async function importPptx(file) {
       }
       const turned = turn.rot % 360 || turn.fh || turn.fv
       if (!ext && !phInfo) continue
+      // a chart of a kind the editor has: editable again (otherwise its fallback picture below)
+      const chartRef = n.localName === 'graphicFrame' && all(n, 'chart')[0]
+      const chartXml = chartRef && await zip.file(p.rels?.[chartRef.getAttributeNS(R, 'id')]?.target || '')?.async('text')
+      const chart = chartXml && officeChart(chartXml)
+      if (chart) { out.push({ type: 'chart', ...box, ...chart }); continue }
       // pictures, and shapes filled with a picture (icons are often freeforms with an SVG fill)
       if (n.localName === 'pic' || kid(spPr, 'blipFill') || (n.localName === 'graphicFrame' && all(n, 'blip').length && !all(n, 'tbl').length)) {
         const id = (all(n, 'svgBlip')[0] || all(n, 'blip')[0])?.getAttributeNS(R, 'embed')
@@ -598,6 +610,7 @@ export async function importPptx(file) {
         if (hasText(paras)) out.push({ type: 'text', ...tbox, html: parasHtml(paras), ...(VALIGN[anchor] && { valign: VALIGN[anchor] }), ...(phInfo && phKey(phInfo.type) === 'title' && { title: true }) })
       }
     }
+    tag()
     return out
   }
 
@@ -636,12 +649,12 @@ export async function importPptx(file) {
     const fallback = masterPath || Object.values(presRels).find(r => r.type === 'slideMaster')?.target
     const master = fallback ? await cached(masters, fallback) : { ph: [], rels: {} } // no master: nothing inherited
     const showMaster = p => p?.doc?.documentElement.getAttribute('showMasterSp') !== '0'
-    const elements = [
+    const elements = applyClicks([
       ...await background([s, layout, master].filter(Boolean)),
       ...(showMaster(s) && showMaster(layout) ? await shapes(master, layout, master, undefined, undefined, [1, 1], true) : []),
       ...(layout && showMaster(s) ? await shapes(layout, layout, master, undefined, undefined, [1, 1], true) : []),
       ...await shapes(s, layout, master),
-    ]
+    ], officeClicks(all(s.doc, 'timing')[0] && new XMLSerializer().serializeToString(all(s.doc, 'timing')[0]), 'pptx'))
     const notesPath = Object.values(s.rels).find(r => r.type === 'notesSlide')?.target
     const notesDoc = notesPath && await read(notesPath)
     const notes = notesDoc ? all(notesDoc, 'sp').filter(sp => all(sp, 'ph')[0]?.getAttribute('type') === 'body').map(sp => all(sp, 'p').map(p => all(p, 't').map(t => t.textContent).join('')).join('\n')).join('\n').trim() : ''
@@ -716,7 +729,10 @@ export async function importOdp(file) {
 
   async function shapes(parent, decor) {
     const out = []
+    let from = 0, sid // as in PowerPoint: the elements keep their object's id for the page's click animations
+    const tag = () => { if (sid && !decor) for (const e of out.slice(from)) (e.ids ||= []).push(sid) }
     for (const n of kids(parent)) {
+      tag(); from = out.length; sid = n.getAttribute('xml:id') || at(n, 'draw:id')
       if (n.localName === 'g') { out.push(...await shapes(n, decor)); continue }
       if (n.localName === 'notes' || n.localName === 'forms') continue
       if (decor && at(n, 'presentation:placeholder') === 'true') continue
@@ -763,6 +779,7 @@ export async function importOdp(file) {
       const va = VALIGN[gp('draw:textarea-vertical-align')]
       if (hasText(paras)) out.push({ type: 'text', ...box, html: parasHtml(paras), ...(va && { valign: va }), ...(cls === 'title' && { title: true }) })
     }
+    tag()
     return out
   }
   const bgOf = name => {
@@ -777,11 +794,11 @@ export async function importOdp(file) {
     const full = { x: Math.round(dx), y: Math.round(dy), w: Math.round(pw * k), h: Math.round(ph * k) }
     const notes = all(kid(page, 'notes'), 'frame').filter(f => at(f, 'presentation:class') === 'notes').flatMap(f => all(f, 'p').map(p => p.textContent)).join('\n').trim()
     slides.push({
-      layout: 'default', notes, elements: [
+      layout: 'default', notes, elements: applyClicks([
         ...(bg ? [{ type: 'shape', shape: 'rect', ...full, fill: bg, stroke: 'none', strokeWidth: 0, radius: 0 }] : []),
         ...(master ? await shapes(master, true) : []),
         ...await shapes(page, false),
-      ],
+      ], officeClicks(new XMLSerializer().serializeToString(page), 'odp')),
     })
   }
   const meta = zip.file('meta.xml') && xml(await zip.file('meta.xml').async('text'))

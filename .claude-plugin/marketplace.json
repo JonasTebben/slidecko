@@ -1,0 +1,17 @@
+{
+  "name": "slidecko",
+  "owner": {
+    "name": "Jonas Tebben",
+    "url": "https://github.com/JonasTebben"
+  },
+  "metadata": {
+    "description": "Agent skill for writing presentations that open in Slidecko"
+  },
+  "plugins": [
+    {
+      "name": "slidecko",
+      "source": "./",
+      "description": "Write Slidev Markdown that Slidecko opens, edits, presents and exports"
+    }
+  ]
+}

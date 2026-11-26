@@ -170,7 +170,7 @@ test('Slidev export: the master is global-top.vue, a decorated layout layouts/<n
   for (const s of slides) s.hash = slideHash(s)
   const { files } = toSlidev({ title: 'T', theme: 'hell', slides, master: [field], layouts }, { 'global-bottom.vue': '<!-- slidecko-master {} -->', 'layouts/old.vue': '<!-- slidecko-layout {} -->', 'layouts/mine.vue': '<template />' })
   const out = parseSlidev(files['slides.md'])
-  assert.deepEqual(out.map(s => s.layout), ['cover', 'brand-cover', 'cover-layout'])
+  assert.deepEqual(out.map((s, i) => (i || /^layout:/m.test(s.fm) ? s.layout : 'cover')), ['cover', 'brand-cover', 'cover-layout']) // slide 1 without a layout: Slidev's cover
   assert.equal(out[0].md.trim(), md.trim()) // unchanged slide: its Markdown as imported
   assert.match(files['slides.md'], /hideMaster: true/)
   assert.ok(!files['layouts/old.vue'] && !files['global-bottom.vue'] && files['layouts/mine.vue']) // an earlier export's file goes, the project's own stays
@@ -201,7 +201,7 @@ test('planned times: per slide in the frontmatter, the talk length as Slidev dur
   // values that mean the same stay as written
   const fm = 'theme: default\ntitle: T\nduration: 1200s\nplannedTime: 45'
   const again = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', duration: 1200, slides: [{ layout: 'default', fm, duration: 45, elements: [hi] }] }, {}).files['slides.md']
-  assert.ok(again.startsWith(`---\n${fm}\n---`))
+  assert.ok(again.startsWith(`---\n${fm}\nlayout: default\n---`)) // slide 1 names default, Slidev would show a cover
 })
 
 test('click variants: disappear as v-click.hide, ranges as v-click="[a, b]" with their steps; code steps and note markers stay', async () => {
@@ -235,4 +235,20 @@ test('a picker writes its style, heading and icon as data-* attributes', () => {
   const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'p', type: 'picker', ...box, names: ['a'], look: 'solid', heading: 'Next "one"', icon: 'mdi:star', body: '<path/>' }] })
   assert.match(md, / data-look="solid" data-heading="Next &quot;one&quot;" data-pick-icon="mdi:star" /)
   assert.match(slideToMarkdown({ layout: 'default', elements: [{ id: 'q', type: 'quiz', ...box, question: 'q', answers: [{ text: 'a' }, { text: 'b' }], look: 'list' }] }), /&quot;look&quot;:&quot;list&quot;/)
+})
+
+test('slide number and count in a slide are written as Slidev components and read back as fields', async () => {
+  const { slideToMarkdown } = await import('./toSlidev.js')
+  const { slidevComponents } = await import('../import/parseSlidev.js')
+  const md = slideToMarkdown({ layout: 'default', elements: [{ id: 'a', type: 'text', x: 0, y: 0, w: 300, h: 40, html: '<p>Slide <span data-field="page">3</span> of <span data-field="total">9</span>, <span data-field="title">T</span></p>' }] })
+  assert.match(md, /Slide <SlideCurrentNo \/> of <SlidesTotal \/>, T/)
+  assert.equal((slidevComponents(md).match(/data-field="(page|total)"/g) || []).length, 2)
+})
+
+test("the picture of Slidev's image layouts is not written twice; after a layout change it is an image of its own", async () => {
+  const { slideToMarkdown } = await import('./toSlidev.js')
+  const pic = { id: 'p', type: 'image', asset: 'A', src: '/pic.png', x: 490, y: 0, w: 490, h: 552 }
+  const text = { id: 't', type: 'text', x: 0, y: 0, w: 300, h: 40, html: '<p>Hi</p>' }
+  assert.doesNotMatch(slideToMarkdown({ layout: 'image-right', fm: 'layout: image-right\nimage: /pic.png', elements: [pic, text] }), /pic\.png\)|<img/)
+  assert.match(slideToMarkdown({ layout: 'default', fm: 'layout: image-right\nimage: /pic.png', elements: [pic, text] }), /pic\.png/)
 })

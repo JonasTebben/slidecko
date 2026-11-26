@@ -58,6 +58,12 @@ turndown.addRule('vmark', {
   filter: n => n.nodeName === 'SPAN' && MARKS.includes(n.getAttribute('data-mark')),
   replacement: (content, n) => `<span ${toVMark({ mark: n.getAttribute('data-mark'), color: n.getAttribute('data-mark-color'), at: n.getAttribute('data-mark-at') })}${n.getAttribute('style') ? ` style="${esc(n.getAttribute('style'))}"` : ''}>${content}</span>`,
 })
+// slide number and count in a slide's text: Slidev's own components (read back as fields); the title stays its text,
+// since {{ }} in slide text is escaped on purpose
+turndown.addRule('field', {
+  filter: n => n.nodeName === 'SPAN' && ['page', 'total'].includes(n.getAttribute('data-field')),
+  replacement: (_, n) => (n.getAttribute('data-field') === 'page' ? '<SlideCurrentNo />' : '<SlidesTotal />'),
+})
 turndown.addRule('img', {
   filter: 'img',
   replacement: (_, n) => {
@@ -314,7 +320,10 @@ function relink(slide, md) {
 function slideMd(slide) {
   if (slide.md != null && slide.hash === slideHash(slide)) return relink(slide, slide.md)
   const flow = slide.flow != null && slide.flow === flowHash(slide)
-  const els = flow ? [...slide.elements].sort((a, b) => a.y - b.y) : slide.elements
+  // the picture Slidev's image layouts draw from the frontmatter (image:) is not written twice
+  const pic = /^image(-left|-right)?$/.test(slide.layout) && fmGet(slide.fm, 'image')
+  const own = pic ? slide.elements.filter(e => !(e.type === 'image' && e.src === pic)) : slide.elements
+  const els = flow ? [...own].sort((a, b) => a.y - b.y) : own
   const steps = clickSteps(slide)
   const body = escapeMustache(els.map(e => withClick(e, withTo(e, elementMd(e, flow, stepOf(slide, e, steps))), steps)).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
@@ -331,7 +340,8 @@ function withTransition(fm, v) {
   if (cur !== to) fm = cur ? fm.replace(/^transition:.*(\n|$)/m, to ? `transition: ${to}$1` : '').trim() : [fm, `transition: ${to}`].filter(Boolean).join('\n')
   return v === 'morph' ? `${fm}\nslidecko-transition: morph` : fm
 }
-function slideFm(slide) {
+// first: the deck's first slide, which Slidev shows as a cover when it names no layout
+function slideFm(slide, first) {
   let fm = slide.fm || ''
   if (!!slide.hidden !== fmHidden(fm)) fm = [fm.replace(/^(hide|disabled):.*\n?/gm, '').trim(), slide.hidden && 'hide: true'].filter(Boolean).join('\n')
   if (!!slide.hideMaster !== (fmGet(fm, 'hideMaster') === 'true')) fm = [fm.replace(/^hideMaster:.*\n?/gm, '').trim(), slide.hideMaster && 'hideMaster: true'].filter(Boolean).join('\n')
@@ -344,9 +354,9 @@ function slideFm(slide) {
   // a background the editor could not load (a web address, a colour) stays as written
   if (slide.bg || /^(\.{0,2}\/|[\w-]+\/)\S*\.(png|jpe?g|gif|webp|svg|avif)$/i.test(fmGet(fm, 'background') || '')) fm = fmSet(fmSet(fmSet(fm, 'background', slide.bg?.src), 'backgroundSize', slide.bg?.fit), 'backgroundDim', slide.bg?.dim)
   if (slide.cls) fm = fmSet(fm, 'class', slide.cls)
-  if ((fmGet(fm, 'layout') || 'default') === slide.layout) return fm
+  if ((fmGet(fm, 'layout') || (first ? 'cover' : 'default')) === slide.layout) return fm
   const rest = fm.replace(/^layout:.*\n?/m, '').trim()
-  return slide.layout === 'default' && !fmGet(fm, 'layout') ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
+  return slide.layout === 'default' && !fmGet(fm, 'layout') && !first ? rest : [rest, `layout: ${slide.layout}`].filter(Boolean).join('\n')
 }
 
 // one frontmatter key set to v (removed when v is empty), unchanged when it already says so
@@ -414,7 +424,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   const used = {}
   for (const part of parts) {
     // slide 1's frontmatter is usually the headmatter, whose transition is the project default
-    const list = part.slides.map(s => ({ fm: slideFm(onLayout(s === slides[0] && !s.transition ? { ...s, transition: head } : s)), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
+    const list = part.slides.map(s => ({ fm: slideFm(onLayout(s === slides[0] && !s.transition ? { ...s, transition: head } : s), s === slides[0]), body: slideMd(s), gap: slideMd(s) === s.md ? s.gap : undefined }))
     if (part.file === entry) { entrySlides.push(...list); continue }
     // a file whose slides were split up by reordering continues in "name-2.md"
     const n = (used[part.file] = (used[part.file] || 0) + 1)

@@ -81,6 +81,8 @@ English text is the key: code calls `t('Slide {0} of {1}', a, b)` and `src/local
 
 ## Themes
 
+Each built-in theme is a file in `themes/built-in/` (`id`, `name`, `dark`, `vars`); a new one is a new file plus its import in `src/slide/themes.js`. `src/slide/themes.test.js` checks that every file is loaded.
+
 All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, callout, code block and table preset. For new or changed themes:
 
 - Set `accent-fg` when the accent is light (text on table headers). The accent itself must reach 4.5:1 on `bg`, because links use it.
@@ -99,6 +101,10 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 - Coordinates are logical; never store `getBoundingClientRect` values without dividing by the scale.
 - `slides-builder` is the storage prefix (existing user data), not a leftover name.
 - Slides keep their theme colours in dark mode; only the app chrome follows `src/core/scheme.js`.
+
+## Agent skill
+
+`skills/slidecko/SKILL.md` tells AI agents which Slidev Markdown Slidecko reads; `.claude-plugin/` makes the repository installable as a Claude Code plugin. When the Markdown import learns or drops something, update the skill: `src/import/skill.test.js` reads its example deck and checks layouts, notes, columns and diagrams.
 
 ## Project layout
 
@@ -128,7 +134,7 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 | `src/export/exportOdp.js` | OpenDocument writer with the pptxgenjs interface |
 | `src/export/exportFormats.js` | images, exact PPTX, HTML presentation, print preparation |
 | `src/slide/fonts.js`, `src/components/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
-| `src/slide/themes.js`, `src/slide/slide.css` | themes, table and callout styles (shared by the editor and the Slidev export) |
+| `src/slide/themes.js`, `src/slide/slide.css` | theme loading and own themes, table and callout styles (shared by the editor and the Slidev export) |
 | `src/components/ThemeEditor.vue`, `src/components/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
 | `src/core/store.js`, `src/core/actions.js` | project state, persistence, commands |
 | `src/slide/icons.js`, `src/components/IconPicker.vue` | icons: bundled Iconify sets (one lazy chunk each), search, SVG, Slidev tags; the picker dialog |
@@ -141,4 +147,5 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 | `index.html` | app entry |
 | `src/present/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
 | `server.js` | Bun server: serves `dist/`, `/health` |
+| `themes/built-in/*.theme.json` | the 13 built-in themes, one file each (bundled at build time; the format of an exported theme, so a copy can be imported and adapted in the theme editor) |
 | `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |

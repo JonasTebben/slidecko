@@ -1,0 +1,19 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "mono",
+  "name": "Contrast",
+  "vars": {
+    "bg": "#ffffff",
+    "fg": "#111111",
+    "title": "#000000",
+    "accent": "#000000",
+    "code-bg": "#f2f2f2",
+    "code-fg": "#111111",
+    "font": "Futura, 'Century Gothic', 'Trebuchet MS', system-ui, sans-serif",
+    "heading-weight": "800",
+    "cover-bg": "#000000",
+    "cover-fg": "#ffffff",
+    "rule": "#000000"
+  }
+}

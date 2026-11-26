@@ -2,7 +2,7 @@ import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
 import { toJpeg, toPng, getFontEmbedCSS } from 'html-to-image'
 import { OdpDoc } from './exportOdp.js'
-import { onePPr, numberFont, decorative, DECORATIVE, clickTiming } from './pptxFix.js'
+import { onePPr, numberFont, decorative, DECORATIVE, clickTiming, uniqueIds } from './pptxFix.js'
 import { W, H, deck } from '../core/store.js'
 import { SHADOWS } from '../slide/themes.js'
 import { t } from '../core/i18n.js'
@@ -616,8 +616,9 @@ const MORPH = '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/
 async function insets(buf, slides, timing) {
   const zip = await JSZip.loadAsync(buf)
   for (const path of Object.keys(zip.files).filter(p => p.endsWith('.xml'))) {
-    const xml = (await zip.file(path).async('string')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+    let xml = (await zip.file(path).async('string')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
     if (!/^ppt\/slides\/slide\d+\.xml$/.test(path)) { zip.file(path, xml); continue }
+    xml = uniqueIds(xml)
     const before = slides[+path.match(/\d+/)[0] - 2], name = before && (before.transition || deck.transition), tr = name === 'morph' ? MORPH : PPT_TRANSITION[name] && `<p:transition spd="med">${PPT_TRANSITION[name]}</p:transition>`
     zip.file(path, decorative(numberFont(onePPr(xml.replace(/(<a:pPr[^>]*?marL="\d+") indent="-\d+"([^>]*>(?:(?!<\/a:pPr>).)*?)<a:buSzPct val="100000"\/><a:buChar char="&#x200B;"\/>/g, '$1 indent="0"$2<a:buNone/>')))
       .replace('</p:clrMapOvr>', m => m + (tr || '') + clickTiming(xml, timing[+path.match(/\d+/)[0] - 1]))))

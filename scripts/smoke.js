@@ -61,7 +61,21 @@ const DECK = {
       { type: 'picker', names: ['x', 'y'], fontSize: 56, x: 56, y: 170, w: 440, h: 180 },
       { type: 'timer', seconds: 60, fontSize: 56, x: 560, y: 170, w: 364, h: 180 },
       { type: 'code', lang: 'js', code: 'const a = 1\nconsole.log(a)', x: 56, y: 380, w: 500, h: 120 }] },
+    // every other kind of element, so each export's round trip can be checked element by element (ROUND_TRIP)
+    { layout: 'default', elements: [
+      { type: 'text', title: true, x: 56, y: 20, w: 868, h: 40, html: '<h1>Everything else</h1>' },
+      { type: 'text', x: 56, y: 70, w: 400, h: 50, html: '<div data-callout="tip"><p><strong>Tip:</strong> water.</p></div>' },
+      { type: 'text', x: 56, y: 130, w: 400, h: 30, click: 1, html: '<p>Some <span data-mark="circle" data-mark-color="orange">marked</span> words, slide <span data-field="page">#</span></p>' },
+      { type: 'shape', shape: 'ellipse', fill: '#2563eb', stroke: 'none', strokeWidth: 0, radius: 0, x: 480, y: 70, w: 120, h: 80 },
+      { type: 'table', header: true, rows: [['A', 'B'], ['1', '2']], x: 620, y: 70, w: 300, h: 90 },
+      { type: 'icon', icon: 'lucide:sprout', x: 56, y: 180, w: 60, h: 60 },
+      { type: 'video', youtube: 'VIDEO_ID_11', x: 140, y: 180, w: 320, h: 180 },
+      { type: 'toc', x: 480, y: 180, w: 440, h: 160 },
+      { type: 'image', asset: 'P1', src: '/images/p.png', alt: 'A dot', x: 56, y: 380, w: 100, h: 100 },
+      { type: 'text', board: true, x: 480, y: 380, w: 440, h: 120, html: '<p>Notes box</p>' }] },
   ],
+  // a 1×1 PNG for the image element
+  assets: { P1: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' },
 }
 
 const browser = await chromium.launch()
@@ -155,7 +169,8 @@ await step(`dev: all ${modules.length} modules import`, async () => {
 })
 await step('dev: create project', async () => {
   await page.evaluate(async d => {
-    const S = await import('/src/core/store.js')
+    const S = await import('/src/core/store.js'), { getIcon } = await import('/src/slide/icons.js')
+    for (const s of d.slides) for (const e of s.elements) if (e.type === 'icon') Object.assign(e, await getIcon(e.icon))
     await S.createProject({ ...d, slides: d.slides.map(s => ({ ...s, elements: s.elements.map(e => ({ id: S.uid(), ...e })) })) })
   }, DECK)
   await page.waitForSelector('.stage .slide')
@@ -174,6 +189,16 @@ await step('dev: Export Git project', async () => {
   files.git = await download(page, () => page.evaluate(async () => { (await import('/src/core/actions.js')).slidev({ git: true }) }), 'dev-git')
 })
 await step('dev: insert text, shape, table', () => page.evaluate(async () => { const A = await import('/src/core/actions.js'); for (const k of ['text', 'shape', 'table']) A.insert(k) }))
+await step('dev: the agent skill example imports with every element it describes', async () => {
+  const md = readFileSync(new URL('../skills/slidecko/SKILL.md', import.meta.url), 'utf8').match(/````markdown\n([\s\S]*?)\n````/)[1]
+  const types = await page.evaluate(async md => {
+    const { importSlidev } = await import('/src/import/importSlidev.js')
+    const r = await importSlidev('slides.md', new Map([['slides.md', md]]), 'hell')
+    return r.slides.flatMap(s => s.elements.map(e => (e.click ? 'click:' : '') + e.type + (/data-callout|data-mark/.test(e.html) ? '+' : '')))
+  }, md)
+  for (const t of ['toc', 'click:text', 'click:text+', 'icon', 'text+', 'diagram', 'chart', 'timer', 'picker', 'quiz'])
+    if (!types.includes(t)) throw new Error(`${t} missing: ${types}`)
+})
 await step('dev: HTML presentation: its own timer (T), a draw starts over with its button', async () => {
   const p = await page.context().newPage()
   await p.goto('file://' + files.html.path)
@@ -192,13 +217,20 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   } else throw new Error('no picker on slide 5')
   await p.close()
 })
+// what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
+const ALL = ['chart', 'code', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
+const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['image', 'shape', 'table', 'text', 'text+click'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
-  const [opened, slides] = await page.evaluate(async ({ b64, name }) => {
+  const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
     const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
-    return [S.deck.id !== before, S.deck.slides.length]
+    // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
+    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.click ? '+click' : '')))
+    return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
+  const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))
+  if (lost.length) throw new Error(`lost on the way: ${lost.join(', ')} (came back: ${kinds.sort().join(' ')})`)
   // the project file restores the project it was saved from (same id); every other import opens a new project
   if (!opened && key !== 'json') throw new Error('no new project opened')
   if (slides < DECK.slides.length) throw new Error(`${slides} slides`)

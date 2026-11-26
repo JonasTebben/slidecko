@@ -1,0 +1,19 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "ozean",
+  "name": "Ocean",
+  "vars": {
+    "bg": "#ffffff",
+    "fg": "#16324f",
+    "title": "#0b2545",
+    "accent": "#0e7490",
+    "code-bg": "#ecfeff",
+    "code-fg": "#083344",
+    "font": "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "bar": "linear-gradient(90deg, #0b2545, #0e7490)",
+    "bar-fg": "#ffffff",
+    "cover-bg": "linear-gradient(135deg, #0b2545, #0e7490 60%, #22d3ee)",
+    "cover-fg": "#ffffff"
+  }
+}

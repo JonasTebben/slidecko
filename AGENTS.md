@@ -32,6 +32,7 @@ Run `bun test` and `bun run build` before you call a change done. Also run `bun 
 - **Storage**: if you change what is kept in IndexedDB, localStorage or sessionStorage, update [docs/privacy.md](docs/privacy.md). The `slides-builder` key prefix stays (existing user data).
 - **Themes**: built-in themes must stay WCAG AA; see "Themes" in [docs/architecture.md](docs/architecture.md).
 - **Formats**: anything new (an element, an option, a style) must work in every way a project leaves the app: project file and Save-all ZIP (`cleanEl` in `src/core/store.js` keeps it), HTML presentation, PDF and images, PowerPoint (also "for Google"), OpenDocument and Slidev, with the import reading it back where the format allows (Slidev `data-*`, PowerPoint/ODP as close as the format gets: a picture or text when there is no native equivalent). Say in `docs/features.md` what each format gets, and run `bun run smoke`.
+- **Agent skill**: when the Markdown import reads new syntax or a new element (or stops reading one), update `skills/slidecko/SKILL.md`; `src/import/skill.test.js` and the smoke test import its example.
 - **Features**: user-visible changes go into `docs/features.md` (and the README feature list if they are major).
 - **Licences**: a new dependency goes into `NOTICE` in the same commit, with its licence and "loaded only for …" if it is lazy, plus the packages it bundles into `dist/` under a licence other than MIT.
 
