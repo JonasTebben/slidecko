@@ -309,7 +309,7 @@ export default {
   "Click steps shown": "Gezeigte Klick-Schritte",
   "Hidden while presenting until a click or → reveals it; elements with the same number appear together": "Beim Präsentieren unsichtbar, bis ein Klick oder → es einblendet; Elemente mit derselben Nummer erscheinen zusammen",
   "Locked elements can be selected and edited, but not moved, resized or aligned.": "Gesperrte Elemente lassen sich auswählen und bearbeiten, aber nicht verschieben, in der Größe ändern oder ausrichten.",
-  "Main deck": "Gesamt-Deckblatt",
+  "Main deck": "Hauptfoliensatz",
   "Markdown / AI slides …": "Markdown / KI-Folien …",
   "Markdown of slide {0}": "Markdown von Folie {0}",
   "Markdown with all decks, images and theme": "Markdown mit allen Foliensätzen, Bildern und Theme",
@@ -1341,4 +1341,8 @@ export default {
   "Slidecko is already installed as an app.": "Slidecko ist bereits als App installiert.",
   "In the browser menu choose “Install” or “Add to Home Screen”. On iPhone and iPad this works in Safari.": "Wähle im Browsermenü „Installieren“ oder „Zum Startbildschirm hinzufügen“. Auf iPhone und iPad geht das in Safari.",
   "Offline: this icon set needs an internet connection. Icons already on slides stay.": "Offline: Dieses Icon-Set braucht eine Internetverbindung. Icons, die schon auf Folien sind, bleiben erhalten.",
+  "This file could not be read: it is damaged or not the format its name says.": "Diese Datei lässt sich nicht lesen: Sie ist beschädigt oder hat ein anderes Format, als ihr Name sagt.",
+  "Import presentation …": "Präsentation importieren …",
+  "Duplicate project": "Projekt duplizieren",
+  "Theme font": "Theme-Schrift",
 }

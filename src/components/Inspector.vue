@@ -270,8 +270,8 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       </Sec>
       <Sec v-if="texts.length" id="text" icon="text" :title="`${t('Text')} (${texts.length} ${texts.length === 1 ? t('Text box') : t('Text boxes')})`">
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="same('font') ?? ''" @change="chooseFont($event, texts)"><option value="">{{ same('font') === null ? t('Mixed') : t('Theme') }}</option><FontOptions upload /></select>
-          <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="same('fontSize') ?? ''" @change="setAll(texts, 'fontSize', +$event.target.value || undefined)"><option value="">{{ same('fontSize') === null ? t('Mixed') : t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="same('font') ?? ''" @change="chooseFont($event, texts)"><option value="">{{ same('font') === null ? t('Mixed') : t('Theme font') }}</option><FontOptions upload /></select>
+          <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="same('fontSize') ?? ''" @change="setAll(texts, 'fontSize', +$event.target.value || undefined)"><option value="">{{ same('fontSize') === null ? t('Mixed') : t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </div>
         <div class="seg-row">
           <span class="seg" role="group" :aria-label="t('Paragraph')">
@@ -341,9 +341,9 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </Menu>
         </div>
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="el.font || ''" :style="{ fontFamily: fontStack(el.font) || null }" @change="chooseFont($event, [el])"><option value="">{{ t('Theme') }}</option><FontOptions upload /></select>
+          <select class="grow" :aria-label="t('Font')" :title="t('Font')" :value="el.font || ''" :style="{ fontFamily: fontStack(el.font) || null }" @change="chooseFont($event, [el])"><option value="">{{ t('Theme font') }}</option><FontOptions upload /></select>
           <button v-if="FONTS[el.font]?.[2] === 'own'" class="ib" :aria-label="t('Remove font {0} from the project', FONTS[el.font][0])" :title="t('Remove font {0} from the project', FONTS[el.font][0])" @click="removeFont(el.font)"><Icon name="trash" /></button>
-          <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+          <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </div>
         <div class="seg-row" @mousedown.prevent>
           <!-- disabled buttons get no hover: the wrapper explains why -->
@@ -433,7 +433,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
       <Sec v-else-if="el.type === 'code'" id="code" icon="code" :title="t('Code')">
         <label class="field">{{ t('Language') }} <select v-model="el.lang"><option v-for="l in langs" :key="l">{{ l }}</option></select></label>
         <label class="field">{{ t('Font size') }}
-          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
+          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
         </label>
         <label v-if="!isRun(el.meta)" class="field" :title="t('Line numbers in braces, e.g. {2,4-5}; steps separated by | advance one per click while presenting, e.g. {1|3-4|all}')">{{ t('Highlight lines') }} <input :value="el.meta || ''" :placeholder="t('e.g. {2,4-5} or {1|3|all}')" @change="el.meta = $event.target.value.trim() || undefined" /></label>
         <label class="check"><input type="checkbox" :checked="codeOpts(el.meta).lines" @change="el.meta = setLines(el.meta, $event.target.checked)" /> {{ t('Line numbers') }}</label>
@@ -547,12 +547,12 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button v-if="el.borders" class="ib wide" @click="el.borders = undefined"><Icon name="undo" /> {{ t('Use the preset’s lines') }}</button>
         </div>
         <label class="field">{{ t('Font size') }}
-          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [10, 12, 13, 14, 15, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
+          <select :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in [10, 12, 13, 14, 15, 16, 18, 20, 24]" :key="s" :value="s">{{ s }} px</option></select>
         </label>
       </Sec>
 
       <Sec v-else-if="el.type === 'image'" id="image" icon="image" :title="t('Image')">
-        <label class="ib wide file"><Icon name="image" /> {{ t('Replace image') }}<input type="file" accept="image/*" hidden @change="run(() => replaceImage(el, $event.target.files[0]))" /></label>
+        <label class="ib wide file" tabindex="0" role="button"><Icon name="image" /> {{ t('Replace image') }}<input type="file" accept="image/*" hidden @change="run(() => replaceImage(el, $event.target.files[0]))" /></label>
         <template v-if="ui.crop === el.id">
           <label class="field">{{ t('Aspect ratio') }}
             <select :value="ui.cropRatio || ''" @change="setCropRatio(el, $event.target.value || null)"><option v-for="[k, n] in CROP_RATIOS" :key="n" :value="k || ''">{{ t(n) }}</option></select>
@@ -579,7 +579,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <Sec id="shape" icon="shapes" :title="t('Shape')">
           <select v-model="el.shape" :aria-label="t('Shape')" :title="t('Shape')"><option v-for="s in SHAPES" :key="s" :value="s">{{ t(SHAPE_NAMES[s]) }}</option></select>
           <label v-if="el.shape !== 'line'" class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
-            <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+            <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
           </label>
           <!-- a line: its direction (corner to corner for any angle, set by the box) and arrowheads -->
           <template v-if="el.shape === 'line'">
@@ -669,7 +669,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </Menu></span>
         </div>
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
+          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
           <span class="chip" :style="chip(el.color, 'currentColor')"><Menu icon="fontColor" :title="t('Text color')">
             <div class="swatches pop-sw">
               <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.color === c" @click="el.color = c" />
@@ -718,7 +718,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </div>
         </div>
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
+          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in [...SIZES, 96, 128]" :key="s" :value="s">{{ s }} px</option></select>
           <span class="chip" :style="chip(el.color, 'currentColor')"><Menu icon="fontColor" :title="t('Text color')">
             <div class="swatches pop-sw">
               <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.color === c" @click="el.color = c" />
@@ -744,7 +744,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </div>
         </div>
         <label class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
-          <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+          <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </label>
       </Sec>
 
@@ -761,7 +761,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           </div>
         </div>
         <label class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
-          <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
+          <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </label>
         <p class="hint">{{ t('Lists the slide titles (their first heading, by its level) as links. Hidden slides and slides with “Hide in table of contents” are left out.') }}</p>
       </Sec>
@@ -784,7 +784,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <div class="math-preview" :aria-label="t('Preview')" v-html="formulaHtml(el.tex)" />
         <p v-if="mathError(el.tex)" class="error diagram-error" role="alert">{{ t('The TeX code has an error.') }} <small>{{ mathError(el.tex) }}</small></p>
         <div class="btn-row">
-          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in [...SIZES, 96]" :key="s" :value="s">{{ s }} px</option></select>
+          <select class="grow" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Default') }}</option><option v-for="s in [...SIZES, 96]" :key="s" :value="s">{{ s }} px</option></select>
           <span class="chip" :style="chip(el.color, 'currentColor')"><Menu icon="fontColor" :title="t('Text color')">
             <div class="swatches pop-sw">
               <button v-for="c in PALETTE" :key="c" class="sw" :class="{ on: el.color === c }" :style="{ background: c }" :title="c" :aria-label="c" :aria-pressed="el.color === c" @click="el.color = c" />
@@ -856,7 +856,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <label class="check"><input type="checkbox" :checked="!!slide.hideInToc" @change="setSlideProp(slide, 'hideInToc', $event.target.checked)" />{{ t('Hide in table of contents') }}</label>
         <h4 class="sub-head">{{ t('Background image') }}</h4>
         <div class="btn-row">
-          <label class="ib wide file"><Icon name="image" /> {{ slide.bg ? t('Replace') : t('Choose image …') }}<input type="file" accept="image/*" hidden @change="run(() => setBackground(slide, $event.target.files[0]))" /></label>
+          <label class="ib wide file" tabindex="0" role="button"><Icon name="image" /> {{ slide.bg ? t('Replace') : t('Choose image …') }}<input type="file" accept="image/*" hidden @change="run(() => setBackground(slide, $event.target.files[0]))" /></label>
           <button v-if="slide.bg" class="ib" :aria-label="t('Remove background image')" :title="t('Remove background image')" @click="delete slide.bg"><Icon name="trash" /></button>
         </div>
         <template v-if="slide.bg">

@@ -4,6 +4,8 @@
 
 Ways to start (four cards: new, open project folder, open Markdown, import; a saved `.slides.json` or the ZIP from "Save all" is restored through Import), below them "New to Markdown?" with the Markdown tutorial, then your projects (only when there are any), then the theme gallery. What Slidecko can do is shown on the landing page; its screenshots and demo video live in `public/showcase/`, recorded by `scripts/showcase.js`.
 
+In the editor the File menu has the same: New presentation, Import presentation …, Duplicate project, All projects, and Export … next to Save project as file. A file that cannot be read (damaged, or not the format its name says) gets one plain sentence; the details go to the browser console.
+
 ## Import
 
 Everything is read in the browser and opens as a new project (from the start page or by drag and drop).

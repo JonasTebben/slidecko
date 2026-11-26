@@ -1320,4 +1320,8 @@ export default {
   "Slidecko is already installed as an app.": "Slidecko est déjà installé comme application.",
   "In the browser menu choose “Install” or “Add to Home Screen”. On iPhone and iPad this works in Safari.": "Dans le menu du navigateur, choisissez « Installer » ou « Ajouter à l’écran d’accueil ». Sur iPhone et iPad, cela fonctionne dans Safari.",
   "Offline: this icon set needs an internet connection. Icons already on slides stay.": "Hors ligne : ce jeu d’icônes nécessite une connexion Internet. Les icônes déjà placées sur les diapositives restent.",
+  "This file could not be read: it is damaged or not the format its name says.": "Impossible de lire ce fichier : il est endommagé ou n’est pas au format qu’indique son nom.",
+  "Import presentation …": "Importer une présentation …",
+  "Duplicate project": "Dupliquer le projet",
+  "Theme font": "Police du thème",
 }

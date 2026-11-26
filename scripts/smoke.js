@@ -424,6 +424,16 @@ await page.context().close()
 page = await open(DEV, 'ipad', undefined, devices['iPad Pro 11 landscape'])
 await presenting(page, 'ipad', true)
 await page.context().close()
+await step('ipad portrait, German: the top bar wraps instead of pushing Export and Present off the screen', async () => {
+  const ctx = await browser.newContext({ ...devices['iPad Pro 11'], viewport: { width: 1024, height: 1366 }, locale: 'de' })
+  await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
+  const q = await ctx.newPage()
+  await q.goto(PROD + '?lang=de'); await q.waitForSelector('.home', { timeout: 20000 })
+  await q.locator('.start-card.primary').click(); await q.waitForSelector('.stage .slide')
+  const r = await q.evaluate(() => ({ page: document.documentElement.scrollWidth, present: document.querySelector('.right .tb.primary').getBoundingClientRect().right }))
+  if (r.page > 1024 || r.present > 1024) throw new Error(`top bar too wide: ${JSON.stringify(r)}`)
+  await ctx.close()
+})
 
 // 4. phone layout
 page = await open(PROD, 'phone', { width: 390, height: 844 })

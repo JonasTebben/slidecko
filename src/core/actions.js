@@ -1,10 +1,10 @@
 import { toggleList } from '../editor/lists.js'
 import { computed, nextTick, ref } from 'vue'
 import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
-import { ELEMENTS } from '../slide/presets.js'
+import { ELEMENTS, SLIDE_PRESETS } from '../slide/presets.js'
 import { importSlidev } from '../import/importSlidev.js'
 import { formatSize, parseRatio } from '../slide/format.js'
-import { THEMES } from '../slide/themes.js'
+import { THEMES, DEFAULT_THEME } from '../slide/themes.js'
 import { t, lang } from './i18n.js'
 import { fmSet, toSlidev, slideToMarkdown, slideHash, flowHash, flowable, imagePath, layoutOf, imageMap } from '../export/toSlidev.js'
 import { withSolutions } from '../present/quiz.js'
@@ -40,8 +40,18 @@ export function toast(msg, ms = 4000) {
 }
 // runs a user action; failures are shown instead of swallowed
 export async function run(fn) {
-  try { return await fn() } catch (e) { console.error(e); toast(t('Error: {0}', e.message), 8000) }
+  try { return await fn() } catch (e) { console.error(e); toast(errorText(e), 8000) }
 }
+// a file the ZIP or PDF reader cannot open gets one plain sentence instead of the library's message (that goes to the console)
+export const errorText = e => /central directory|is this a zip|corrupted zip|invalid pdf|InvalidPDF|end of data/i.test(String(e?.message || e))
+  ? t('This file could not be read: it is damaged or not the format its name says.')
+  : t('Error: {0}', e?.message || e)
+
+// a new presentation with a title and a content slide (start page, File menu)
+export const newPresentation = (theme = DEFAULT_THEME) => createProject({
+  title: t('New presentation'), theme,
+  slides: ['title', 'content'].map(id => { const p = SLIDE_PRESETS.find(x => x.id === id); return { layout: p.layout, elements: p.make() } }),
+})
 
 // --- elements ---
 export function addElement(el) {

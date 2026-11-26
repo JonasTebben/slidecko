@@ -69,7 +69,8 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 @media (max-width: 1180px) { .tools .tb > span, .right .tb:not(.primary) > span { display: none; } }
 
 .app > main { flex: 1; display: flex; min-height: 0; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); } /* landscape phones: nothing under the notch */
-@media (max-width: 1023px) { .topbar { flex-wrap: wrap; } }
+.topbar { flex-wrap: wrap; } /* too narrow (an iPad in portrait, longer labels in German or French): a second row, nothing cut off */
+.right { margin-left: auto; }
 .app-foot { padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: var(--ui-panel); border-top: 1px solid var(--ui-line); color: var(--ui-muted); font-size: 12.5px; text-align: center; }
 /* language and light/dark: quiet selects in the footer line */
 .app-foot .offline-badge { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; background: var(--ui-text); color: var(--ui-panel); font-weight: 600; cursor: help; }
@@ -695,7 +696,7 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
 .inspector .seg .ib:only-child { border-radius: 6px; }
 .inspector .seg .ib.on { position: relative; } /* its accent border stays above the neighbours' */
 .inspector .ib.mixed { background: linear-gradient(90deg, var(--ui-accent-soft) 50%, transparent 50%); border-color: var(--ui-accent-line); }
-.inspector .btn-row > select.size { flex: none; width: 76px; }
+.inspector .btn-row > select.size { flex: none; width: 96px; } /* "Default", also in French "Par défaut" */
 .inspector .style-menu .tb { width: 100%; justify-content: flex-start; border: 1px solid var(--ui-line-strong); }
 .inspector .style-menu .tb > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .style-pop { display: flex; flex-direction: column; gap: 4px; width: 240px; }
@@ -810,7 +811,7 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
   .inspector :is(.field, .grid3 label, .slider) { font-size: 13px; }
   .inspector .hint, .inspector .hint-box { font-size: 13px; }
   .inspector :is(select, input:not([type]), input[type='text'], input[type='number']) { height: 40px; padding-block: 0; }
-  .inspector .btn-row > select.size { width: 96px; } /* "Theme" at 16px */
+  .inspector .btn-row > select.size { width: 116px; } /* "Default" at 16px */
   .inspector .ib { padding: 0 10px; }
   .inspector .ib.wide { flex: 1 1 auto; }
 }
@@ -891,3 +892,6 @@ dialog.source-editor.dark { --se-bar: #252526; --se-tab: #2d2d2d; --se-tab-fg: #
 .se-status span { padding: 0 6px; }
 .se-grow { flex: 1; }
 @media (max-width: 760px) { .se-main { flex-direction: column; } .se-preview { width: auto; border-left: 0; border-top: 1px solid var(--se-line); } }
+
+label[role=button]:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; } /* file buttons: keyboard focus shows */
+.export-dlg menu { position: sticky; bottom: -22px; margin-bottom: -22px; padding: 12px 0 22px; background: var(--ui-panel); border-top: 1px solid var(--ui-line); } /* a long format list: the Export button stays in view */

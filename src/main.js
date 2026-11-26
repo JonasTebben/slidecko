@@ -13,6 +13,11 @@ const app = createApp(App)
 addEventListener('vite:preloadError', e => { if (reloadForUpdate()) e.preventDefault() })
 addEventListener('unhandledrejection', e => { if (staleChunk(e.reason) && reloadForUpdate()) e.preventDefault() })
 app.config.errorHandler = (e, _, info) => { if (!(staleChunk(e) && reloadForUpdate())) console.error(e, info) }
+// a <label> around a hidden file input is a button: Enter and Space open the file dialog (a tap or click does natively)
+addEventListener('keydown', e => {
+  const input = (e.key === 'Enter' || e.key === ' ') && e.target.matches?.('label[role=button]') && e.target.querySelector('input[type=file]')
+  if (input) { e.preventDefault(); input.click() }
+})
 app.mount('#app')
 // offline use (service worker, not in the dev server: it would keep old files while editing)
 if (import.meta.env.PROD) addEventListener('load', registerOffline, { once: true }) // after the page: its ~5 MB first download must not slow the start

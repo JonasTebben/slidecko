@@ -12,7 +12,6 @@ import Menu from './components/Menu.vue'
 import SlideView from './components/SlideView.vue'
 import Inspector from './components/Inspector.vue'
 import Home from './components/Home.vue'
-import ThemeEditor from './components/ThemeEditor.vue'
 import MasterPanel from './components/MasterPanel.vue'
 import Overview from './components/Overview.vue'
 import Recorder from './components/Recorder.vue'
@@ -29,7 +28,7 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./components/A11yPanel.vue'))
 import { checkDeck } from './editor/a11yCheck.js'
 import { t, lang } from './core/i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid , webUrl } from './core/store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, duplicateProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid , webUrl } from './core/store.js'
 import { parseRatio } from './slide/format.js'
 import { slidePoint, arrowHead, inkSvg } from './present/draw.js'
 import { toggleSolution, resetQuiz } from './present/quiz.js'
@@ -264,7 +263,13 @@ watchEffect(() => { themeRules.textContent = editorCss() })
 const fontRules = document.head.appendChild(document.createElement('style'))
 watchEffect(() => { fontRules.textContent = fontCss(Object.keys(BUNDLED), deck.fonts, deck.assets) })
 // --- own themes: editor, import ---
-const themeEditor = ref()
+const ThemeEditor = defineAsyncComponent(() => import('./components/ThemeEditor.vue')) // with the CSS editor (CodeMirror): only when opened
+const themeEditor = ref(), themeOn = ref(false)
+async function editTheme(id) {
+  themeOn.value = true
+  for (let i = 0; i < 600 && !themeEditor.value; i++) await new Promise(r => requestAnimationFrame(r)) // until its chunk has loaded
+  themeEditor.value?.open(id)
+}
 const themeName = id => (THEMES[id]?.custom ? THEMES[id].name : t(themeOf(id).name))
 async function importThemeFiles(files) {
   for (const f of files) {
@@ -686,7 +691,7 @@ async function installApp() {
   if (await promptInstall()) return
   A.toast(iosSafari() ? t('Slidecko as an app: tap Share, then “Add to Home Screen”.') : t('In the browser menu choose “Install” or “Add to Home Screen”. On iPhone and iPad this works in Safari.'), 10000)
 }
-watch(offlineReady, v => { if (v) A.toast(t('Slidecko is now ready to work offline.'), 6000) })
+watch(offlineReady, v => { if (v) A.toast(t('Slidecko is now ready to work offline.')) })
 watch(presenting, v => { stayAwake(v); if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
 function stopPresenting() {
   closeAudience()
@@ -928,7 +933,7 @@ const commands = computed(() => [
   [t('Revert this slide to imported version'), () => A.revertSlides([slide.value]), 'revertSlide'],
   [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert')), 'revertAll'],
   ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),
-  [t('Edit theme …'), () => themeEditor.value.open(deck.theme), 'editTheme'], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click(), 'importTheme'],
+  [t('Edit theme …'), () => editTheme(deck.theme), 'editTheme'], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click(), 'importTheme'],
 ])
 const keyLabel = spec => fmtKey(spec) // fixed keys (find options); commands show kbd(id), the user's current key
 const keysDialog = ref(), openKeys = () => keysDialog.value?.open()
@@ -1117,16 +1122,20 @@ function onClipboard(e) {
         </div>
         <div class="menubar">
           <Menu :label="t('File')">
+            <button class="mi" @click="A.run(() => A.newPresentation())"><Icon name="plus" />{{ t('New presentation') }}</button>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Import presentation …') }}<input type="file" :accept="A.IMPORT_ACCEPT" multiple hidden @change="A.run(() => A.importPresentations([...$event.target.files])); $event.target.value = ''" /></label>
+            <button class="mi" @click="A.run(() => duplicateProject(deck.id))"><Icon name="copy" />{{ t('Duplicate project') }}</button>
             <button class="mi" @click="ui.home = true"><Icon name="home" />{{ t('All projects') }}</button>
             <hr />
-            <label class="mi"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
-            <label class="mi"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
-            <label class="mi"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
+            <label class="mi" tabindex="0" role="button"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
             <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ kbd('sourceEditor') }}</kbd></button>
             <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
             <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ kbd('saveFile') }}</kbd></button>
+            <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}</button>
             <button class="mi" @click="openSnaps"><Icon name="history" />{{ t('Version history …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
@@ -1228,7 +1237,7 @@ function onClipboard(e) {
         </Menu>
         <span class="divider" />
         <button class="tb" :title="t('Text (T)')" @click="A.insert('text')"><Icon name="text" /><span>{{ t('Text') }}</span></button>
-        <label class="tb" :title="t('Image (I) – also via drag & drop or paste')"><Icon name="image" /><span>{{ t('Image') }}</span><input type="file" accept="image/*" multiple hidden @change="A.addImages([...$event.target.files]); $event.target.value = ''" /></label>
+        <label class="tb" :title="t('Image (I) – also via drag & drop or paste')" tabindex="0" role="button"><Icon name="image" /><span>{{ t('Image') }}</span><input type="file" accept="image/*" multiple hidden @change="A.addImages([...$event.target.files]); $event.target.value = ''" /></label>
         <Menu icon="table" :label="t('Table')" :title="t('Table')">
           <button v-for="[id, n] in TABLE_PRESETS" :key="id" class="mi" @click="A.insert('table', id)">
             <span class="slide mini-tbl" :class="`theme-${deck.theme}`"><span class="tbl-wrap" :data-table="id"><table><thead><tr><th /><th /><th /></tr></thead><tbody><tr><td /><td /><td /></tr><tr><td /><td /><td /></tr></tbody></table></span></span>{{ t(n) }}
@@ -1286,7 +1295,7 @@ function onClipboard(e) {
           </Menu>
           <button class="tb icon small" :aria-label="t('Zoom in')" :title="`${t('Zoom in')} (${kbd('zoomIn')})`" @click="zoomBy(1.25)"><Icon name="zoomIn" :size="16" /></button>
         </div>
-        <span data-tour="theme" class="tour-anchor"><Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" title="Theme" wide>
+        <span data-tour="theme" class="tour-anchor"><Menu v-slot="{ open }" icon="palette" :label="themeName(deck.theme)" :title="t('Theme')" wide>
           <template v-for="own in [false, true]" :key="own">
             <h4 class="mh">{{ own ? t('Own themes') : t('Built-in themes') }}</h4>
             <div class="theme-grid">
@@ -1298,8 +1307,8 @@ function onClipboard(e) {
             <p v-if="own && !themeIds(true).length" class="mh-note">{{ t('None yet – edit a theme or import a .theme.json.') }}</p>
           </template>
           <div class="mi-row theme-actions">
-            <button class="mi" @click="themeEditor.open(deck.theme)"><Icon name="pen" />{{ THEMES[deck.theme]?.custom ? t('Edit theme …') : t('Customize as own theme …') }}</button>
-            <label class="mi"><Icon name="upload" />{{ t('Import …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
+            <button class="mi" @click="editTheme(deck.theme)"><Icon name="pen" />{{ THEMES[deck.theme]?.custom ? t('Edit theme …') : t('Customize as own theme …') }}</button>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Import …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
           </div>
           <label class="check keep-sizes" data-keep :title="t('The new theme brings its colors and fonts but keeps the current font sizes – so no layout shifts')"><input v-model="keepSizes" type="checkbox" /> {{ t('Keep font sizes when switching') }}<small v-if="deck.typo.from">{{ t('currently: sizes from “{0}”', themeName(deck.typo.from)) }}</small></label>
         </Menu></span>
@@ -1538,7 +1547,7 @@ function onClipboard(e) {
           </template>
           <template v-else-if="ctxAt?.el">
             <button v-if="selection.length === 1 && ['text', 'code', 'table'].includes(ctxAt.el.type)" class="mi" @click="ctxEdit"><Icon name="pen" />{{ ctxAt.el.type === 'table' ? t('Edit cell') : t('Edit') }}<kbd>↵</kbd></button>
-            <label v-if="selection.length === 1 && ctxAt.el.type === 'image'" class="mi"><Icon name="image" />{{ t('Replace image …') }}<input type="file" accept="image/*" hidden @change="A.run(() => A.replaceImage(ctxAt.el, $event.target.files[0]))" /></label>
+            <label v-if="selection.length === 1 && ctxAt.el.type === 'image'" class="mi" tabindex="0" role="button"><Icon name="image" />{{ t('Replace image …') }}<input type="file" accept="image/*" hidden @change="A.run(() => A.replaceImage(ctxAt.el, $event.target.files[0]))" /></label>
             <template v-if="selection.length === 1 && ctxAt.el.type === 'image' && !ctxAt.el.locked">
               <button class="mi" @click="A.run(() => A.startCrop(ctxAt.el))"><Icon name="crop" />{{ t('Crop') }}</button>
               <button v-if="ctxAt.el.crop" class="mi" @click="A.resetCrop(ctxAt.el)"><Icon name="undo" />{{ t('Remove crop') }}</button>
@@ -1631,7 +1640,7 @@ function onClipboard(e) {
     <div v-if="ui.status" class="toast" role="status">{{ ui.status }}<button class="tb icon small" :aria-label="t('Close')" @click="ui.status = ''"><Icon name="x" :size="14" /></button></div>
 
     <!-- dialogs -->
-    <ThemeEditor ref="themeEditor" @saved="id => { setTheme(id); A.toast(t('Theme “{0}” saved', THEMES[id].name)) }" @deleted="id => A.toast(t('Theme deleted'))" />
+    <ThemeEditor v-if="themeOn" ref="themeEditor" @saved="id => { setTheme(id); A.toast(t('Theme “{0}” saved', THEMES[id].name)) }" @deleted="id => A.toast(t('Theme deleted'))" />
     <dialog ref="dupDialog" @close="dupChoice">
       <form method="dialog">
         <h2>{{ t('Project already exists') }}</h2>
