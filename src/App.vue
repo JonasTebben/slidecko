@@ -332,6 +332,9 @@ onMounted(async () => {
   const view = parseViewHash(location.hash)
   await restore({ project: view?.project, home: view?.home })
   if (view?.project && view.project === deck.id) ui.slide = Math.max(0, Math.min(view.slide, deck.slides.length - 1))
+  // ?tutorial (a link from the start page of the site) opens the Markdown tutorial once; a reload does not again
+  const url = new URL(location.href)
+  if (url.searchParams.has('tutorial')) { url.searchParams.delete('tutorial'); history.replaceState(history.state, '', url); openTutorial() }
   const back = sessionView(session, deck) // what the URL does not hold
   if (back) {
     collapsed.value = new Set(back.collapsed)

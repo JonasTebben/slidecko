@@ -186,6 +186,12 @@ await step('dev: Markdown tutorial', async () => {
   await page.waitForSelector('dialog[open]', { timeout: 10000 })
   await page.evaluate(async () => { (await import('/src/editor/tutorial.js')).tutorial.open = false })
 })
+await step('dev: a link with ?tutorial opens the tutorial once', async () => {
+  const q = await page.context().newPage()
+  await q.goto(DEV + '?tutorial&lang=en'); await q.waitForSelector('dialog[open]', { timeout: 20000 })
+  if (new URL(q.url()).searchParams.has('tutorial')) throw new Error('?tutorial stays in the address')
+  await q.close()
+})
 const files = await editor(page, 'dev')
 await step('dev: PDF handout: a page per slide with its notes, the page format restored after printing', async () => {
   const r = await page.evaluate(async () => {
