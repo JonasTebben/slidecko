@@ -7,4 +7,4 @@ export function stayAwake(on) {
   if (on && (!lock || lock.released)) return take()
   if (!on) { lock?.release().catch(() => {}); lock = null }
 }
-if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (want && document.visibilityState === 'visible') take() })
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (want && document.visibilityState === 'visible') take() })
