@@ -2,7 +2,7 @@
 import { online } from '../core/offline.js'
 import { gapSnaps, nearestGap } from '../editor/spacing.js'
 import { computed, nextTick, reactive, ref, watch, onBeforeUnmount, onMounted, onUpdated } from 'vue'
-import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, untilOf, markItems, codeStage, codeStages, underlay } from '../core/store.js'
+import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, untilOf, markItems, codeStage, codeStages, underlay, slideIndex } from '../core/store.js'
 import { themeStyle, fontStack, codeDark, shadowCss, themeOf } from '../slide/themes.js'
 import { chartSvg } from '../slide/chart.js'
 import { hlLines, codeOpts } from '../slide/hl.js'
@@ -443,7 +443,7 @@ async function fitCode() {
   }
 }
 // only on the user's own code edits (text, size, width, the runnable output panel), never on theme/typo changes
-watch(() => props.slide.elements.map(e => e.type === 'code' && [e.code, e.fontSize, e.w, e.meta, e.outPos, e.outH]), fitCode, { deep: true })
+watch(() => props.editable && props.slide.elements.map(e => e.type === 'code' && [e.code, e.fontSize, e.w, e.meta, e.outPos, e.outH]), fitCode, { deep: true }) // not on thumbnails
 // text boxes: a fill adds padding around the text — grow the box so the coloured area stays inside the frame
 // (the user's own change only: compares with the previous state, so loading or switching slides never resizes)
 watch(() => props.slide.elements.map(e => e.type === 'text' && (e.fill || e.stroke) ? 'box' + (e.stroke ? e.strokeWidth : 0) : ''), async (now, before) => {
@@ -461,7 +461,8 @@ const bgStyle = computed(() => {
   return d ? { backgroundImage: `${k ? `linear-gradient(rgba(0,0,0,${k}), rgba(0,0,0,${k})), ` : ''}url("${d.replace(/"/g, '%22')}")`, backgroundSize: b.fit || 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundBlendMode: 'normal' } : null
 })
 // a click target outside the editor: only while the slide it names exists
-const linked = el => !props.editable && el.to && deck.slides.some(s => s.id === el.to)
+const linked = el => !props.editable && el.to && slideIndex.value.has(el.to)
+const slideNo = id => (slideIndex.value.get(id) ?? -1) + 1
 // v-mark: hand-drawn marks over spans of text, measured where the browser laid the text out (so they follow
 // reflow); recomputed after every render, while typing, after a mark change ("marks" event) and when fonts load
 const marks = ref({})
@@ -616,8 +617,8 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       </div>
       <!-- the series' first colour is the theme's accent -->
       <div v-else-if="el.type === 'chart'" class="chart-box" role="img" :aria-label="el.title || t('Chart')" v-html="chartSvg(el, themeOf(theme || deck.theme).vars?.accent)" />
-      <a v-if="linked(el)" class="el-link" :href="slideHref(el.to)" :aria-label="t('Go to slide {0}', deck.slides.findIndex(s => s.id === el.to) + 1)" />
-      <span v-if="editable && el.to && !decor(el)" class="click-badge link-badge" :title="t('Goes to slide {0} on click', deck.slides.findIndex(s => s.id === el.to) + 1 || '?')">→ {{ deck.slides.findIndex(s => s.id === el.to) + 1 || '?' }}</span>
+      <a v-if="linked(el)" class="el-link" :href="slideHref(el.to)" :aria-label="t('Go to slide {0}', slideNo(el.to))" />
+      <span v-if="editable && el.to && !decor(el)" class="click-badge link-badge" :title="t('Goes to slide {0} on click', slideNo(el.to) || '?')">→ {{ slideNo(el.to) || '?' }}</span>
       <svg v-if="marks[el.id]" class="marks" :width="el.w" :height="el.h" aria-hidden="true">
         <g v-for="(m, i) in marks[el.id]" :key="i" :data-type="m.mark" :data-click="(m.at && steps.indexOf(m.at) + 1) || null" :data-unshown="!markShown(m) || null" :style="{ stroke: m.color }">
           <path v-for="(p, j) in m.paths" :key="j" :d="p.d" pathLength="1" :stroke-width="p.w" :stroke-opacity="p.o" :style="{ transitionDelay: j * 80 + 'ms' }" />

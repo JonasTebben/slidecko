@@ -93,7 +93,7 @@ button.primary.danger { background: var(--ui-danger); border-color: var(--ui-dan
 .deck-head .tb { height: 24px; }
 .deck-head .tb.icon, .deck-head .menu-wrap .tb { width: 24px; padding: 0; }
 .deck-head .tb .chev { display: none; }
-.thumb-row { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; }
+.thumb-row { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; content-visibility: auto; contain-intrinsic-size: auto 110px; } /* long decks: thumbnails out of view are not laid out or painted */
 .num { width: 18px; text-align: right; font-size: 11px; color: var(--ui-muted); padding-top: 4px; font-variant-numeric: tabular-nums; }
 .thumb { position: relative; flex: none; width: 180px; height: 101px; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--ui-line); cursor: pointer; text-align: left; }
 .thumb:hover { box-shadow: 0 0 0 1px var(--ui-line-strong), 0 2px 6px #0001; }

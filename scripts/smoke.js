@@ -255,6 +255,17 @@ await step('dev: project files: a newer version and unreadable elements are repo
   if (JSON.stringify(r.theme) !== '[true,"#111111","#222222"]') throw new Error('theme: ' + JSON.stringify(r.theme))
   if (r.history[0] === 'Edited' || !r.history[1] || r.history[2] !== 'Edited') throw new Error('undo/redo: ' + JSON.stringify(r.history))
 })
+await step('dev: a photo larger than 2560 px is scaled down on insert, a small one stays as it is', async () => {
+  const r = await page.evaluate(async () => {
+    const S = await import('/src/core/store.js')
+    const png = (w, h) => new Promise(res => { const c = Object.assign(document.createElement('canvas'), { width: w, height: h }), g = c.getContext('2d'); for (let i = 0; i < 400; i++) { g.fillStyle = `hsl(${i * 37 % 360} 70% 50%)`; g.fillRect(Math.random() * w, Math.random() * h, 200, 200) } c.toBlob(b => res(new File([b], 'p.png', { type: 'image/png' })), 'image/png') })
+    const big = await S.storeImage(await png(4000, 2000)), small = await S.storeImage(await png(800, 400))
+    const out = [big.size, small.size, (await S.imageSize(S.deck.assets[big.id])).w]
+    delete S.deck.assets[big.id]; delete S.deck.assets[small.id]
+    return out
+  })
+  if (JSON.stringify(r) !== '[{"w":2560,"h":1280},{"w":800,"h":400},2560]') throw new Error(JSON.stringify(r))
+})
 await step('dev: the same project in a second tab says so (both tabs would save over each other)', async () => {
   const id = await page.evaluate(async () => (await import('/src/core/store.js')).deck.id)
   const q = await page.context().newPage()

@@ -51,6 +51,8 @@ export const decks = computed(() => {
   })
   return out
 })
+// slide id -> its index: links on every thumbnail look their target up here instead of searching the list
+export const slideIndex = computed(() => new Map(deck.slides.map((s, i) => [s.id, i])))
 export const deckOfSlide = i => decks.value.find(d => i >= d.start && i < d.start + d.count)
 
 // the starting layouts of a project: today's "New slide" presets, their elements as placeholders (translated when created)
@@ -225,9 +227,22 @@ export const imageSize = src => new Promise((res, rej) => {
   img.src = src
 })
 // stores an image file; returns the asset id and the path it gets in a Slidev export
+// photos larger than this (on the long side) are scaled down on insert: sharp on any projector, a fraction of the memory
+export const IMAGE_MAX_PX = 2560
+async function shrink(data, size) {
+  const type = data.match(/^data:(image\/(?:png|jpeg|webp));/)?.[1], k = IMAGE_MAX_PX / Math.max(size.w, size.h)
+  if (!type || k >= 1 || typeof document === 'undefined') return { data, size } // GIF (animation) and SVG stay
+  const img = new Image()
+  img.src = data
+  await img.decode()
+  const c = Object.assign(document.createElement('canvas'), { width: Math.round(size.w * k), height: Math.round(size.h * k) })
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+  const out = c.toDataURL(type, 0.9)
+  return out.length < data.length ? { data: out, size: { w: c.width, h: c.height } } : { data, size }
+}
 export async function storeImage(file) {
-  const data = await readDataUrl(file)
-  const size = await imageSize(data)
+  const raw = await readDataUrl(file)
+  const { data, size } = await shrink(raw, await imageSize(raw))
   const id = uid()
   deck.assets[id] = data
   let path = '/images/' + (file.name || 'image.png').replace(/[^\w.-]+/g, '_')
