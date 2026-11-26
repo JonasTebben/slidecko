@@ -88,6 +88,8 @@
 .slide .el > .content > :first-child { margin-top: 0 !important; }
 .slide .el > .content > :last-child { margin-bottom: 0 !important; }
 /* a text box's own line and paragraph spacing (--lh, --ps); the same rules go into a Slidev export's style.css */
+/* a text box's own font size counts for its headings too (they have fixed sizes otherwise) */
+.slide .el[style*="font-size"] > .content :is(h1, h2, h3, h4, h5, h6) { font-size: inherit !important; line-height: 1.25 !important; }
 .slide .el > .content[style*="--lh"] :is(p, li, h1, h2, h3, h4, h5, h6, blockquote) { line-height: var(--lh) !important; }
 .slide .el > .content[style*="--ps"] > * { margin-block: 0 !important; }
 .slide .el > .content[style*="--ps"] > * + *, .slide .el > .content[style*="--ps"] li + li { margin-top: var(--ps) !important; }

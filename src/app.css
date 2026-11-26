@@ -234,6 +234,7 @@ a.mi { color: inherit; text-decoration: none; }
 .present-split { display: inline-flex; }
 .present-split > .tb.primary:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .present-split .tb .chev { display: none; } /* the arrow is the button's own icon */
+.present-split > .tb.primary[aria-expanded='true'], .present-split > .tb.primary:has(+ .menu:popover-open) { background: var(--ui-fill-hover); } /* open stays blue */
 .present-split > .tb.primary + .tb.primary { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgb(255 255 255 / 35%); padding-inline: 6px; }
 .mi-row .mi { flex: 1; justify-content: center; border: 1px solid var(--ui-line); }
 .mi-row .mi.on { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent); }
@@ -823,8 +824,8 @@ dialog.theme-editor menu button.danger { color: var(--ui-danger); }
   .tools > :nth-last-child(2) { left: 0; }
   .tools > :nth-last-child(-n + 2):disabled { opacity: 1; color: color-mix(in srgb, var(--ui-fg) 40%, var(--ui-panel)); } /* opacity would let the scrolled icons show through */
   .tools > :last-child { left: 40px; margin-right: 6px; box-shadow: 10px 0 8px -4px var(--ui-panel); } /* the icons fade in under it */
-  .right > .tb.primary { position: sticky; right: 0; z-index: 1; margin-left: auto; box-shadow: -10px 0 8px 2px var(--ui-panel); }
-  @media (max-width: 480px) { .right > .tb.primary > span { display: none; } } /* its title still names it */
+  .right > .present-split { position: sticky; right: 0; z-index: 1; margin-left: auto; box-shadow: -10px 0 8px 2px var(--ui-panel); }
+  @media (max-width: 480px) { .present-split > .tb.primary > span { display: none; } } /* its title still names it */
   /* slide strip: the add buttons stand in a fixed column on the left, the thumbnails scroll and fade out on the right */
   .slides-panel { flex-direction: row; align-items: stretch; }
   .slides-panel > .panel-head { flex: none; padding: 4px 2px 4px max(4px, env(safe-area-inset-left)); border-right: 1px solid var(--ui-line); }

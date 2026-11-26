@@ -101,6 +101,16 @@ test('line and paragraph spacing go into the box style, with their CSS in style.
   assert.doesNotMatch(slideToMarkdown({ layout: 'default', elements: [{ ...el, line: undefined, para: undefined }] }), /--lh|--ps/)
 })
 
+test('a text box with its own font size gets its headings sized too, through style.css only when used', () => {
+  const el = { id: 'h', type: 'text', ...box, html: '<h3>Big</h3>', fontSize: 48 }
+  const css = d => toSlidev({ title: 'T', theme: 'hell', slides: [{ layout: 'default', elements: [d] }] }, {}).files['style.css'] || ''
+  assert.match(css(el), /\/\* sizes \(Slidecko\) \*\/\n.*h3.*font-size: inherit/)
+  assert.doesNotMatch(css({ ...el, fontSize: undefined }), /sizes \(Slidecko\)/)
+  // exported again from an imported project: the block is replaced, not repeated
+  const again = toSlidev({ title: 'T', theme: 'hell', slides: [{ layout: 'default', elements: [el] }] }, { 'style.css': css(el) }).files['style.css']
+  assert.equal(again.match(/sizes \(Slidecko\)/g).length, 1)
+})
+
 test('a notes box keeps its "editable while presenting" flag as --board in its box style', () => {
   const el = { id: 'n', type: 'text', ...box, html: '<ul><li>idea</li></ul>', board: true }
   assert.match(slideToMarkdown({ layout: 'default', elements: [el] }), /<div style="position:absolute[^"]*;--board:1[^"]*">/) // positioned, not flowed
