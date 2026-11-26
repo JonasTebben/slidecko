@@ -548,6 +548,7 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 /* export dialog */
 .mi-ext { margin-left: auto; padding-left: 12px; color: var(--ui-muted); font-size: 11px; }
 .export-scope { display: grid; gap: 6px; font-size: 12px; color: var(--ui-muted); margin: 10px 0 14px; }
+.export-scope .err { color: var(--ui-danger); }
 .export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .export-card { position: relative; display: grid; gap: 4px; align-content: start; padding: 12px 14px; border: 1px solid var(--ui-line-strong); border-radius: 10px; cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; }
 .export-card:hover { background: var(--ui-hover); }

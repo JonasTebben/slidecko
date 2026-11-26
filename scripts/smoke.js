@@ -199,6 +199,21 @@ await step('dev: PDF handout: a page per slide with its notes, the page format r
   })
   if (r[0] !== r[3] || r[1] !== 'Say hello.\n\nThen the rest.' || !r[2] || r[4] || r[5]) throw new Error(`handout: ${JSON.stringify(r)}`)
 })
+await step('dev: export only some slides (range), the dialog refuses one that does not exist', async () => {
+  const n = await page.evaluate(async () => {
+    const A = await import('/src/core/actions.js')
+    const pages = new Promise(res => { window.print = () => { res(document.querySelectorAll('.output > .slide').length); dispatchEvent(new Event('afterprint')) } })
+    A.exportAs('pdf', undefined, false, false, [0, 1])
+    return pages
+  })
+  if (n !== 2) throw new Error(`${n} pages for slides 1-2`)
+  await palette(page, 'Export …'); await page.waitForSelector('dialog.export-dlg[open]')
+  await page.fill('dialog.export-dlg input[placeholder]', '999')
+  if (!(await page.locator('dialog.export-dlg button.primary').isDisabled())) throw new Error('a range past the end is accepted')
+  await page.fill('dialog.export-dlg input[placeholder]', '1-2')
+  if (await page.locator('dialog.export-dlg button.primary').isDisabled()) throw new Error('1-2 refused')
+  await page.keyboard.press('Escape')
+})
 await step('dev: Export Git project', async () => {
   files.git = await download(page, () => page.evaluate(async () => { (await import('/src/core/actions.js')).slidev({ git: true }) }), 'dev-git')
 })

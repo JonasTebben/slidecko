@@ -1322,4 +1322,7 @@ export default {
   "Slides in a second window, for the projector (F there: full screen)": "Diapositivas en una segunda ventana, para el proyector (F allí: pantalla completa)",
   "Audience window": "Ventana del público",
   "With speaker notes (A4 handout, a page per slide)": "Con las notas del orador (folleto A4, una página por diapositiva)",
+  "all, or e.g. 1, 6-8": "todas, o p. ej. 1, 6-8",
+  "Numbers as in the slide list; hidden slides stay out": "Números como en la lista de diapositivas; las ocultas quedan fuera",
+  "Not a slide range of this scope.": "No es un rango de diapositivas de este ámbito.",
 }

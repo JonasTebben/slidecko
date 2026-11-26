@@ -1,4 +1,5 @@
 <script setup>
+import { parseRange } from './export/range.js'
 import { plainNotes } from './present/clicks.js'
 import { openAudience } from './present/audience.js'
 import { stayAwake } from './present/wake.js'
@@ -237,6 +238,8 @@ const EXPORTS = [
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 const exportClicks = ref(false) // PDF and images: one page per click step
 const exportWithNotes = ref(false) // PDF: a handout with the speaker notes
+const exportRange = ref('') // "1, 6-8": only these slides (empty: all)
+const exportPicked = computed(() => parseRange(exportRange.value, A.scopeList(exportScope.value || undefined).length))
 function openExport(scope = '', format) {
   exportScope.value = scope
   if (format) exportFormat.value = format
@@ -245,7 +248,7 @@ function openExport(scope = '', format) {
 function doExport() {
   if (exportDialog.value.returnValue !== 'ok') return
   try { localStorage.setItem('slides-builder:export', exportFormat.value) } catch { /* private mode */ }
-  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value, exportWithNotes.value)
+  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value, exportWithNotes.value, !EXPORTS.find(f => f.id === exportFormat.value)?.project && exportPicked.value || [])
 }
 const THUMB = computed(() => 176 / format.w)
 // one style object for all thumbnails: a new object per render would re-render every thumbnail
@@ -1699,10 +1702,14 @@ function onClipboard(e) {
             <span class="badges"><em v-if="f.editable" class="b-edit">{{ t('editable') }}</em><em v-if="f.exact" class="b-exact">{{ t('pixel-perfect') }}</em><em v-if="f.project">{{ t('whole project only') }}</em></span>
           </label>
         </div>
+        <label v-if="!EXPORTS.find(f => f.id === exportFormat)?.project" class="export-scope">{{ t('Slides') }}
+          <input v-model="exportRange" :placeholder="t('all, or e.g. 1, 6-8')" :aria-invalid="!exportPicked" :title="t('Numbers as in the slide list; hidden slides stay out')" />
+          <small v-if="!exportPicked" class="err">{{ t('Not a slide range of this scope.') }}</small>
+        </label>
         <label v-if="['pdf', 'png'].includes(exportFormat)" class="check"><input v-model="exportClicks" type="checkbox" /> {{ t('One page per click step') }}</label>
         <label v-if="exportFormat === 'pdf'" class="check"><input v-model="exportWithNotes" type="checkbox" /> {{ t('With speaker notes (A4 handout, a page per slide)') }}</label>
         <p class="export-hint">{{ t('Keynote opens') }} <code>.pptx</code> {{ t('directly. For Google Slides pick its own variant and open it there via “File → Import”. For an exact look there, choose “PowerPoint as images”.') }}</p>
-        <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok" :disabled="EXPORTS.find(f => f.id === exportFormat)?.project && !!exportScope">{{ t('Export') }}</button></menu>
+        <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok" :disabled="EXPORTS.find(f => f.id === exportFormat)?.project ? !!exportScope : !exportPicked">{{ t('Export') }}</button></menu>
       </form>
     </dialog>
 

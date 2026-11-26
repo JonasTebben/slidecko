@@ -1322,4 +1322,7 @@ export default {
   "Slides in a second window, for the projector (F there: full screen)": "Dia’s in een tweede venster, voor de beamer (daar F: volledig scherm)",
   "Audience window": "Venster voor het publiek",
   "With speaker notes (A4 handout, a page per slide)": "Met sprekersnotities (A4-hand-out, een pagina per dia)",
+  "all, or e.g. 1, 6-8": "alle, of bijv. 1, 6-8",
+  "Numbers as in the slide list; hidden slides stay out": "Nummers zoals in de dialijst; verborgen dia’s blijven weg",
+  "Not a slide range of this scope.": "Geen diabereik van dit bereik.",
 }
