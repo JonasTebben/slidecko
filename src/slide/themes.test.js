@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { THEMES, cleanTheme, importTheme, saveTheme, deleteTheme, newThemeId, themeFile, themeIds, editorCss, slidevThemeCss, themeLayouts, isBuiltin, themeStyle } from './themes.js'
+import { THEMES, cleanTheme, importTheme, saveTheme, deleteTheme, newThemeId, themeFile, themeIds, editorCss, slidevThemeCss, themeLayouts, isBuiltin, themeStyle, themeUrl, fetchTheme } from './themes.js'
 
 test('a theme file for a Slidev package imports with id, layouts and package', () => {
   const id = importTheme(JSON.parse(readFileSync(new URL('../import/fixtures/package.theme.json', import.meta.url), 'utf8')))
@@ -72,4 +72,26 @@ test('every file in themes/built-in is a built-in theme, and imports as an own t
     assert.ok(isBuiltin(th.id) && f === `${th.id}.theme.json`, f)
     assert.deepEqual(cleanTheme(th).vars, th.vars, f) // nothing a theme file may not hold
   }
+})
+
+test('theme addresses: https only, a GitHub file page becomes its raw file', () => {
+  assert.equal(themeUrl('https://github.com/JonasTebben/jbt-theme/blob/main/jbt.theme.json'), 'https://raw.githubusercontent.com/JonasTebben/jbt-theme/main/jbt.theme.json')
+  assert.equal(themeUrl(' https://example.org/a.theme.json '), 'https://example.org/a.theme.json')
+  for (const bad of ['http://example.org/a.json', 'file:///Users/a.json', '/Users/a.json', 'https://u:p@example.org/a.json', 'javascript:alert(1)', 42]) assert.equal(themeUrl(bad), '')
+})
+
+test('a theme fetched from a URL is checked like a file and keeps its address', async () => {
+  const real = globalThis.fetch
+  let asked
+  globalThis.fetch = async (url, opts) => { asked = [url, opts]; return new Response(JSON.stringify({ id: 'remote', name: 'Remote', vars: { accent: '#123456' }, css: '} body { color: red' }), { status: 200 }) }
+  try {
+    const id = await fetchTheme('https://github.com/a/b/blob/main/r.theme.json')
+    assert.equal(id, 'remote')
+    assert.deepEqual([asked[0], asked[1].credentials, asked[1].referrerPolicy], ['https://raw.githubusercontent.com/a/b/main/r.theme.json', 'omit', 'no-referrer'])
+    assert.equal(THEMES.remote.source, 'https://raw.githubusercontent.com/a/b/main/r.theme.json')
+    assert.equal(THEMES.remote.css, undefined) // CSS that would leave its block is dropped, as from a file
+    globalThis.fetch = async () => new Response('', { status: 404 })
+    await assert.rejects(fetchTheme('https://example.org/x.json'), /HTTP 404/)
+    await assert.rejects(fetchTheme('/Users/x.json'), /https/)
+  } finally { globalThis.fetch = real; deleteTheme('remote') }
 })

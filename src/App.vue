@@ -1,6 +1,6 @@
 <script setup>
 import { promptInstall, installed, iosSafari } from './core/install.js'
-import { offlineReady } from './core/offline.js'
+import { offlineReady, online } from './core/offline.js'
 import { parseRange } from './export/range.js'
 import { plainNotes } from './present/clicks.js'
 import { openAudience } from './present/audience.js'
@@ -36,7 +36,7 @@ import { toggleSolution, resetQuiz } from './present/quiz.js'
 import { resetLiveText } from './present/board.js'
 import { resetLive, setLines } from './present/run.js'
 import { BUNDLED, fontCss } from './slide/fonts.js'
-import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme } from './slide/themes.js'
+import { THEMES, TABLE_PRESETS, CALLOUTS, editorCss, typoCss, themeStyle, themeOf, themeIds, importTheme, fetchTheme } from './slide/themes.js'
 import { PALETTE, FILLS } from './slide/presets.js'
 import { shapeSvg } from './export/toSlidev.js'
 import { slideHref, linkTarget } from './slide/links.js'
@@ -286,6 +286,18 @@ async function importThemeFiles(files) {
     catch { A.toast(t('{0} is not a valid theme file', f.name)) }
   }
 }
+// a theme from a web address (kept with the theme, so it can be fetched again after a new version)
+const themeUrlDialog = ref(), themeUrlText = ref('')
+const openThemeUrl = () => { themeUrlText.value = THEMES[deck.theme]?.source || 'https://'; openDlg(themeUrlDialog.value) }
+async function loadThemeUrl(url, update) {
+  if (!online.value) return A.toast(t('Loading a theme needs a connection.'))
+  try {
+    const id = await fetchTheme(url)
+    setTheme(id)
+    A.toast(update ? t('Theme “{0}” updated', THEMES[id].name) : t('Theme “{0}” imported', THEMES[id].name))
+  } catch (e) { A.toast(t('The theme could not be loaded: {0}', e.message)) }
+}
+function importThemeUrl() { if (themeUrlDialog.value.returnValue === 'ok') loadThemeUrl(themeUrlText.value) }
 // --- theme switch: keep the type sizes of the current theme, so boxes and line breaks stay put ---
 const keepSizes = ref((() => { try { return localStorage.getItem('slides-builder:keep-sizes') !== '0' } catch { return true } })())
 watch(keepSizes, v => { try { localStorage.setItem('slides-builder:keep-sizes', v ? '1' : '0') } catch {} })
@@ -962,7 +974,7 @@ const commands = computed(() => [
   [t('Revert this slide to imported version'), () => A.revertSlides([slide.value]), 'revertSlide'],
   [t('Revert all changed slides to imported version'), () => ask(t('Revert {0} changed imported slides? Your changes to them will be lost.', deck.slides.filter(A.canRevert).length), () => A.revertSlides(), t('Revert')), 'revertAll'],
   ...[...themeIds(false), ...themeIds(true)].map(id => [`Theme: ${themeName(id)}`, () => setTheme(id)]),
-  [t('Edit theme …'), () => editTheme(deck.theme), 'editTheme'], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click(), 'importTheme'],
+  [t('Edit theme …'), () => editTheme(deck.theme), 'editTheme'], [t('Import theme …'), () => document.querySelector('[data-theme-import]')?.click(), 'importTheme'], [t('Import theme from URL …'), openThemeUrl, 'importThemeUrl'],
 ])
 const keyLabel = spec => fmtKey(spec) // fixed keys (find options); commands show kbd(id), the user's current key
 const keysDialog = ref(), openKeys = () => keysDialog.value?.open()
@@ -1384,6 +1396,8 @@ function onClipboard(e) {
           <div class="mi-row theme-actions">
             <button class="mi" @click="editTheme(deck.theme)"><Icon name="pen" />{{ THEMES[deck.theme]?.custom ? t('Edit theme …') : t('Customize as own theme …') }}</button>
             <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Import …') }}<input data-theme-import type="file" accept=".json,application/json" multiple hidden @change="importThemeFiles([...$event.target.files]); $event.target.value = ''" /></label>
+            <button class="mi" @click="openThemeUrl"><Icon name="globe" />{{ t('From URL …') }}</button>
+            <button v-if="THEMES[deck.theme]?.source" class="mi" :title="THEMES[deck.theme].source" @click="loadThemeUrl(THEMES[deck.theme].source, true)"><Icon name="upload" />{{ t('Update from URL') }}</button>
           </div>
           <label class="check keep-sizes" data-keep :title="t('The new theme brings its colors and fonts but keeps the current font sizes – so no layout shifts')"><input v-model="keepSizes" type="checkbox" /> {{ t('Keep font sizes when switching') }}<small v-if="deck.typo.from">{{ t('currently: sizes from “{0}”', themeName(deck.typo.from)) }}</small></label>
         </Menu></span>
@@ -1773,6 +1787,14 @@ function onClipboard(e) {
       </form>
     </dialog>
 
+    <dialog ref="themeUrlDialog" @close="importThemeUrl">
+      <form method="dialog">
+        <h2>{{ t('Import theme from URL') }}</h2>
+        <input v-model="themeUrlText" type="url" :aria-label="t('Address of a .theme.json (https://…)')" placeholder="https://raw.githubusercontent.com/…/name.theme.json" autofocus />
+        <p class="hint">{{ t('GitHub file links work too. The address stays with the theme: “Update from URL” in the theme menu fetches its newest version.') }}</p>
+        <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok">{{ t('Import') }}</button></menu>
+      </form>
+    </dialog>
     <dialog ref="ytDialog" @close="addVideo">
       <form method="dialog">
         <h2>{{ t('YouTube video or web page') }}</h2>

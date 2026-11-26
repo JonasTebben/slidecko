@@ -74,6 +74,7 @@ export function cleanTheme(th) {
     // own CSS that could leave its .theme-x block would style the whole app (also the live preview and a stored theme)
     name, custom: true, ...(th.dark === true && { dark: true }), vars, ...(css && containedCss(css) && { css }), ...(th.base === false && { base: false }),
     ...(layouts.length && { layouts }), ...(/^[\w@/.-]{1,100}$/.test(th.slidev) && { slidev: th.slidev }), ...(/^[\w@/.:#+-]{1,200}$/.test(th.pkg) && { pkg: th.pkg }),
+    ...(themeUrl(th.source) && { source: themeUrl(th.source) }), // where "Update from URL" fetches it again
   }
 }
 try {
@@ -136,6 +137,24 @@ export function containedCss(css) {
     s.replaceSync('.theme-x{' + css + '}')
     return s.cssRules.length === 1 && s.cssRules[0].selectorText === '.theme-x'
   } catch { return false }
+}
+// a theme address: https only; a GitHub file page becomes its raw file (github.com/u/r/blob/ref/path -> raw.githubusercontent.com/u/r/ref/path)
+export function themeUrl(u) {
+  if (typeof u !== 'string') return ''
+  let url
+  try { url = new URL(u.trim()) } catch { return '' }
+  if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 500) return ''
+  const gh = url.hostname === 'github.com' && url.pathname.match(/^\/([^/]+)\/([^/]+)\/blob\/(.+)$/)
+  return gh ? `https://raw.githubusercontent.com/${gh[1]}/${gh[2]}/${gh[3]}` : url.href
+}
+// a .theme.json from the web: fetched without cookies or referrer, then checked like a file; the address stays with the theme
+export async function fetchTheme(u) {
+  const url = themeUrl(u)
+  if (!url) throw new Error('not an https address')
+  const r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-cache' })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  if (+r.headers.get('content-length') > 1_000_000) throw new Error('too large')
+  return importTheme({ ...(await r.json()), source: url })
 }
 // an imported theme keeps its id (so projects using it find it again) unless that is a built-in one
 export function importTheme(d) {

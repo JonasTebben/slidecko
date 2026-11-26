@@ -486,6 +486,20 @@ await step('mouse: Enter in the YouTube dialog inserts the video', async () => {
   await palette(page, 'Insert YouTube'); await page.fill('dialog[open] input', 'https://www.youtube.com/live/dQw4w9WgXcQ'); await page.keyboard.press('Enter')
   await page.waitForSelector('.stage .el.video', { timeout: 5000 })
 })
+await step('mouse: a theme imported from a GitHub link is fetched as its raw file, applied, and updated from the theme menu', async () => {
+  let accent = '#123456'
+  await page.route('https://raw.githubusercontent.com/example/demo/main/demo.theme.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ format: 'slidecko-theme', version: 1, id: 'remote-demo', name: 'Remote Demo', vars: { accent } }) }))
+  await palette(page, 'Import theme from URL'); await page.fill('dialog[open] input', 'https://github.com/example/demo/blob/main/demo.theme.json'); await page.keyboard.press('Enter')
+  const themed = () => page.evaluate(async () => { const S = await import('/src/core/store.js'), T = await import('/src/slide/themes.js'); return [S.deck.theme, T.THEMES['remote-demo']?.vars.accent] })
+  await page.waitForFunction(async () => (await import('/src/core/store.js')).deck.theme === 'remote-demo', null, { timeout: 5000 })
+  accent = '#654321' // a new version on the server
+  await page.locator('[data-tour=theme] button').first().click()
+  await page.getByRole('button', { name: 'Update from URL' }).click()
+  await page.waitForFunction(async () => (await import('/src/slide/themes.js')).THEMES['remote-demo']?.vars.accent === '#654321', null, { timeout: 5000 })
+  const [id, now] = await themed()
+  if (id !== 'remote-demo' || now !== '#654321') throw new Error(`${id} ${now}`)
+  await page.keyboard.press('Escape')
+})
 await page.context().close()
 page = await open(DEV, 'ipad', undefined, devices['iPad Pro 11 landscape'])
 await presenting(page, 'ipad', true)

@@ -17,7 +17,7 @@ export const DEFAULTS = {
   export: 'mod+e', exportPdf: 'mod+p', exportPptx: 'mod+shift+e', exportSlidev: 'mod+alt+s',
   exportPptxImage: '', exportOdp: '', exportGoogle: '', exportHtml: '', exportPng: '',
   saveFile: 'mod+s', home: '', snapshot: '', versions: '', palette: 'mod+k', shortcuts: '', tour: '', tourFull: '', install: '',
-  revertSlide: '', revertAll: '', editTheme: '', importTheme: '',
+  revertSlide: '', revertAll: '', editTheme: '', importTheme: '', importThemeUrl: '',
   // while presenting (handled separately, so the same key can mean something else there)
   'present-view': 'p', 'present-black': 'b', 'present-white': 'w', 'present-timer': 'r', 'present-quiz': 'q', 'present-laser': 'l',
   'present-draw': 'd', 'present-arrow': 'a', 'present-erase': 'e', 'present-undo': 'z', 'present-overview': 'o', 'present-help': 'h',
