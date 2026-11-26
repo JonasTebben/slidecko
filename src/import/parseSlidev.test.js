@@ -5,8 +5,8 @@ import { parseSlidev, headFormat, slidevTags, slots, slidevComponents, snippets 
 import { toSlidev, slideHash, slideToMarkdown, escapeMustache } from '../export/toSlidev.js'
 import { importTheme } from '../slide/themes.js'
 
-// the JBT Theme is no built-in theme: the tests use it the way a user does, imported from its file
-importTheme(JSON.parse(readFileSync(new URL('../../themes/jbt.theme.json', import.meta.url), 'utf8')))
+// a theme that stands for a Slidev theme package (like the JBT Theme, github.com/JonasTebben/jbt-theme), imported from its file as a user does
+importTheme(JSON.parse(readFileSync(new URL('./fixtures/package.theme.json', import.meta.url), 'utf8')))
 
 const md = `---
 theme: ./theme
@@ -148,20 +148,20 @@ test('exports tables, shapes and decks in slide order', () => {
 
 test('project-wide font sizes are exported to style.css', () => {
   const slides = [{ id: 'a', layout: 'default', elements: [{ id: 'x', type: 'text', x: 0, y: 0, w: 100, h: 40, html: '<p>Hi</p>' }] }]
-  const own = toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides, typo: { text: 20, code: 12 } }, { 'style.css': '.mine { color: red }', 'theme/package.json': '{}' }).files['style.css']
+  const own = toSlidev({ title: 'T', theme: 'pkg', entry: 'slides.md', slides, typo: { text: 20, code: 12 } }, { 'style.css': '.mine { color: red }', 'theme/package.json': '{}' }).files['style.css']
   assert.match(own, /^\.mine \{ color: red \}/) // the project's own style.css is kept
   assert.match(own, /\.slidev-layout \{ font-size: 20px !important; \}/)
   assert.match(own, /--slidev-code-font-size: 12px/)
   assert.doesNotMatch(own, /h1 \{ font-size/) // no title size chosen
-  assert.equal(toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides }, { 'theme/package.json': '{}' }).files['style.css'], undefined)
-  // the JBT Theme is a package: named in the headmatter and installable via package.json, no generated CSS
-  const loose = toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides }, {}).files
-  assert.match(loose['slides.md'], /theme: jbt-theme/)
+  assert.equal(toSlidev({ title: 'T', theme: 'pkg', entry: 'slides.md', slides }, { 'theme/package.json': '{}' }).files['style.css'], undefined)
+  // a package theme: named in the headmatter and installable via package.json, no generated CSS
+  const loose = toSlidev({ title: 'T', theme: 'pkg', entry: 'slides.md', slides }, {}).files
+  assert.match(loose['slides.md'], /theme: demo-theme/)
   assert.equal(loose['style.css'], undefined)
-  assert.equal(JSON.parse(loose['package.json']).dependencies['jbt-theme'], 'github:JonasTebben/jbt-theme#v1.1.4')
+  assert.equal(JSON.parse(loose['package.json']).dependencies['demo-theme'], 'github:example/demo-theme#v1.0.0')
   // a project that still uses its own ./theme folder keeps it, and gets no theme dependency
   const legacy = [{ ...slides[0], fm: 'theme: ./theme' }]
-  const old = toSlidev({ title: 'T', theme: 'jbt', entry: 'slides.md', slides: legacy }, { 'package.json': '{"dependencies":{}}\n' }).files
+  const old = toSlidev({ title: 'T', theme: 'pkg', entry: 'slides.md', slides: legacy }, { 'package.json': '{"dependencies":{}}\n' }).files
   assert.match(old['slides.md'], /theme: \.\/theme/)
   assert.equal(old['package.json'], '{"dependencies":{}}\n')
   assert.match(toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', slides }, { 'style.css': '.mine {}' }).files['style.css'], /\.mine \{\}/) // generated theme CSS keeps the project's rules

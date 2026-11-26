@@ -3,23 +3,19 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { THEMES, cleanTheme, importTheme, saveTheme, deleteTheme, newThemeId, themeFile, themeIds, editorCss, slidevThemeCss, themeLayouts, isBuiltin, themeStyle } from './themes.js'
 
-test('JBT is no built-in theme, its file imports with id, layouts and Slidev package', () => {
-  assert.equal(isBuiltin('jbt'), false)
-  const id = importTheme(JSON.parse(readFileSync(new URL('../../themes/jbt.theme.json', import.meta.url), 'utf8')))
-  assert.equal(id, 'jbt')
-  assert.ok(themeIds(true).includes('jbt')) // other tests may have added own themes before
-  assert.ok(!themeIds(false).includes('jbt'))
-  assert.equal(THEMES.jbt.pkg, 'github:JonasTebben/jbt-theme#v1.1.4')
-  assert.ok(themeLayouts('jbt').some(l => l[0] === 'quiz'))
-  // every top-level rule of the theme file is the theme's own (&); general editor rules belong in slide.css
-  const tops = THEMES.jbt.css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{[^{}]*\}/g, '{}').split('{}').map(x => x.trim()).filter(Boolean)
-  assert.deepEqual(tops.filter(x => !x.startsWith('&')), [])
+test('a theme file for a Slidev package imports with id, layouts and package', () => {
+  const id = importTheme(JSON.parse(readFileSync(new URL('../import/fixtures/package.theme.json', import.meta.url), 'utf8')))
+  assert.equal(id, 'pkg')
+  assert.ok(themeIds(true).includes('pkg')) // other tests may have added own themes before
+  assert.ok(!themeIds(false).includes('pkg'))
+  assert.equal(THEMES.pkg.pkg, 'github:example/demo-theme#v1.0.0')
+  assert.ok(themeLayouts('pkg').some(l => l[0] === 'quiz'))
   // own CSS nests under the theme class; base: false keeps the generic theme rules off its slides
   const css = editorCss()
-  assert.match(css, /\.theme-jbt \{\n[\s\S]*&\.layout-quiz/)
-  assert.match(css, /\.slide:not\(\.theme-jbt\)/)
-  deleteTheme('jbt')
-  assert.equal(THEMES.jbt, undefined)
+  assert.match(css, /\.theme-pkg \{\n[\s\S]*& h1/)
+  assert.match(css, /\.slide:not\([^)]*\.theme-pkg/)
+  deleteTheme('pkg')
+  assert.equal(THEMES.pkg, undefined)
 })
 
 test('a copy of a built-in theme gets its own id; untrusted values are dropped', () => {

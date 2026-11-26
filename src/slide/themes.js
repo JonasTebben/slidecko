@@ -4,7 +4,7 @@
 //   root = '.slidev-layout' + layout(n) = '.n'     in Slidev (style.css / per-slide <style>)
 // A theme is a set of CSS variables, optionally with own CSS (`css`, nested under `.theme-<id>`, `&` = the slide).
 // Built-in themes live here; the user's own ones (custom: true) are kept in this browser and can be
-// exported/imported as .theme.json (e.g. themes/jbt.theme.json). A theme with `slidev`/`pkg` is a Slidev
+// exported/imported as .theme.json (e.g. jbt.theme.json in github.com/JonasTebben/jbt-theme). A theme with `slidev`/`pkg` is a Slidev
 // theme package: the Slidev export names it as `theme:` and adds it to package.json.
 import { reactive, toRaw } from 'vue'
 import { BUNDLED, bundledStack, ownStack } from './fonts.js'

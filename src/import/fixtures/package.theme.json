@@ -1,0 +1,12 @@
+{
+  "format": "slidecko-theme",
+  "version": 1,
+  "id": "pkg",
+  "name": "Package Theme",
+  "vars": { "bg": "#ffffff", "fg": "#181818", "title": "#181818", "accent": "#006b96" },
+  "base": false,
+  "layouts": [["quiz", "Quiz"]],
+  "slidev": "demo-theme",
+  "pkg": "github:example/demo-theme#v1.0.0",
+  "css": "& h1 { font-size: 30px; }\n"
+}

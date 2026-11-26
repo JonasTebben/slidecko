@@ -164,4 +164,3 @@ The hosted site deploys a version of this repository's `main`; when it is live, 
 | `src/present/run.js`, `public/runner.html`, `public/runner.js` | runnable code: Slidev `{monaco-run}` options and the sandbox (iframe with an opaque origin, one worker per run) |
 | `server.js` | Bun server: serves `dist/` (text files compressed with brotli or gzip, each once and kept in memory; any `/assets/` path cached for a year, the rest `no-cache`), `/health` |
 | `themes/built-in/*.theme.json` | the 13 built-in themes, one file each (bundled at build time; the format of an exported theme, so a copy can be imported and adapted in the theme editor) |
-| `themes/jbt.theme.json` | an importable theme that maps to the Slidev theme package [`jbt-theme`](https://github.com/JonasTebben/jbt-theme) |
