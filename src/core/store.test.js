@@ -318,3 +318,13 @@ test('a video or sound file is kept with its stored file and a known kind, its n
   assert.equal(S.cleanEl({ type: 'media', kind: 'audio', asset: 'm1', name: 'x'.repeat(300) }).name.length, 200)
   delete S.deck.assets.m1
 })
+
+test('web pages on slides: https only, never the app itself (its sandbox would allow its own origin)', async () => {
+  const { webUrl } = await import('./store.js')
+  const real = globalThis.location
+  globalThis.location = { origin: 'https://slidecko.example' }
+  try {
+    assert.equal(webUrl(' https://example.org/a '), 'https://example.org/a')
+    for (const bad of ['https://slidecko.example/app/', 'https://slidecko.example/runner.html', 'http://example.org/', 'https://u:p@example.org/', 'javascript:alert(1)']) assert.equal(webUrl(bad), undefined)
+  } finally { globalThis.location = real }
+})

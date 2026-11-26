@@ -59,7 +59,7 @@ export const themeIds = own => Object.keys(THEMES).filter(id => !THEMES[id].draf
 // --- own themes ---
 // the variables a theme may set (the editor offers these)
 export const THEME_VARS = ['bg', 'fg', 'title', 'accent', 'accent-fg', 'code-bg', 'code-fg', 'rule', 'bar', 'bar-fg', 'cover-bg', 'cover-fg', 'font', 'heading-font', 'heading-weight']
-export const validThemeId = id => typeof id === 'string' && /^[\w-]{1,40}$/.test(id)
+export const validThemeId = id => typeof id === 'string' && /^[\w-]{1,40}$/.test(id) && !['__proto__', 'constructor', 'prototype'].includes(id) // THEMES is a plain object
 const THEME_KEY = 'slides-builder:themes'
 // a theme from storage or a file (untrusted): known variables only, values that cannot leave their declaration
 export function cleanTheme(th) {
@@ -135,9 +135,16 @@ export function containedCss(css) {
   try {
     const s = new CSSStyleSheet()
     s.replaceSync('.theme-x{' + css + '}')
-    return s.cssRules.length === 1 && s.cssRules[0].selectorText === '.theme-x'
+    return s.cssRules.length === 1 && s.cssRules[0].selectorText === '.theme-x' && nestedInside(s.cssRules[0].cssRules)
   } catch { return false }
 }
+// nested rules stay on the slide: & only at the start (not in :has(&) or :root:has(&)); where & is the slide itself
+// (top level, or inside &.layout-x), no ~ or + after it: the slide's siblings are the app
+const parts = sel => sel.split(',').map(p => p.trim())
+const insideSlide = (sel, slide) => parts(sel).every(p => p.lastIndexOf('&') <= 0 && !(slide && (/^[~+]/.test(p) || /^&[^\s~+>]*\s*[~+]/.test(p))))
+const nestedInside = (rules, slide = true) => [...(rules || [])].every(r => r.selectorText === undefined
+  ? nestedInside(r.cssRules, slide) // @media, @supports …
+  : insideSlide(r.selectorText, slide) && nestedInside(r.cssRules, slide && parts(r.selectorText).every(p => /^&[^\s~+>]*$/.test(p))))
 // a theme address: https only; a GitHub file page becomes its raw file (github.com/u/r/blob/ref/path -> raw.githubusercontent.com/u/r/ref/path)
 export function themeUrl(u) {
   if (typeof u !== 'string') return ''

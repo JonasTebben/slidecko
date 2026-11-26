@@ -22,7 +22,7 @@ export const bundledFaces = k => {
   return (italic ? ['', '-italic'] : ['']).flatMap(st => Object.entries(RANGES).map(([sub, range]) =>
     [`${k}/${sub}${st}.woff2`, family, `font-weight: ${weight}; font-style: ${st ? 'italic' : 'normal'}; unicode-range: ${range}; `]))
 }
-export const face = (family, src, more = '') => `@font-face { font-family: '${family}'; src: url("${src}"); font-display: swap; ${more}}`
+export const face = (family, src, more = '') => `@font-face { font-family: '${family}'; src: url("${String(src).replace(/["\\\n]/g, encodeURIComponent)}"); font-display: swap; ${more}}`
 // @font-face rules of the bundled fonts (keys) and own fonts (fonts: id -> name; src: id -> URL or data URL)
 export const fontCss = (keys, fonts = {}, src = {}, dir = 'fonts/') => [
   ...keys.flatMap(k => bundledFaces(k).map(([f, family, more]) => face(family, dir + f, more))),
@@ -48,5 +48,5 @@ export function fontLabel(name, taken = []) {
 }
 // deck.fonts from a file or storage: only names that stay inside their quotes, only ids whose file is a font
 export const cleanFonts = (fonts, assets = {}) => Object.fromEntries(Object.entries(fonts && typeof fonts === 'object' ? fonts : {})
-  .filter(([id, name]) => /^[\w-]{1,20}$/.test(id) && typeof name === 'string' && /^data:font\//.test(assets[id]))
+  .filter(([id, name]) => /^[\w-]{1,20}$/.test(id) && id !== '__proto__' && typeof name === 'string' && /^data:font\//.test(assets[id]))
   .map(([id, name]) => [id, fontLabel(name)]))

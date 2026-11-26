@@ -871,7 +871,7 @@ function presentClick(e, width = innerWidth) {
   // a link to a slide jumps there (one to a deleted slide does nothing); others open in a new tab
   const to = a && linkTarget(a.getAttribute('href'))
   if (to) { e.preventDefault(); const i = deck.slides.findIndex(s => s.id === to); if (i >= 0) presentGo(i); return }
-  if (a) return window.open(a.href, '_blank', 'noopener')
+  if (a) { e.preventDefault(); return window.open(a.href, '_blank', 'noopener') } // the app tab stays
   if (tool.value) return // pointing or drawing does not turn the slide
   // composedPath: the path at the click; a picker's or quiz's own handler may have replaced the clicked node already (detached, closest finds nothing)
   if (e.composedPath().some(n => n.matches?.('iframe, .pv-side, .pv-bar, .pv-clock, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar'))) return // a timer click starts the timer, a picker click draws, not the next slide

@@ -43,7 +43,8 @@ export function handle(req) {
 }
 
 async function serve(req, file, f, pathname) {
-  const headers = { 'Cache-Control': cacheFor(pathname), 'Content-Type': f.type }
+  // frame-ancestors: no other site may frame the app (clickjacking, or its runner outside a sandbox)
+  const headers = { 'Cache-Control': cacheFor(pathname), 'Content-Type': f.type, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "frame-ancestors 'self'", 'Referrer-Policy': 'strict-origin-when-cross-origin' }
   if (!TEXT.test(file)) return new Response(f, { headers })
   const accept = req.headers.get('accept-encoding') || ''
   const enc = /\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null

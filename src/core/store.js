@@ -62,7 +62,7 @@ let markLast = 0
 DOMPurify.addHook?.('beforeSanitizeAttributes', n => { if (n.attributes?.length) markLast = vmarkToData(n, markLast) })
 DOMPurify.addHook?.('afterSanitizeAttributes', n => { if (n.hasAttribute?.('data-mark') || n.hasAttribute?.('data-mark-at') || n.hasAttribute?.('data-mark-color')) checkMark(n) })
 // :initial: the start state of a v-motion entrance effect, which the import reads
-export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'hide', 'v-click', 'v-click.hide', 'v-after', ':initial'], FORBID_TAGS: ['style'] }))
+export const clean = html => (markLast = 0, DOMPurify.sanitize(String(html ?? ''), { ADD_TAGS: ['v-clicks', 'v-click', 'v-after'], ADD_ATTR: ['at', 'every', 'depth', 'hide', 'v-click', 'v-click.hide', 'v-after', ':initial'], FORBID_TAGS: ['style', 'form', 'dialog'], FORBID_ATTR: ['popover', 'popovertarget', 'popovertargetaction', 'command', 'commandfor', 'formaction'] })) // a form could post typed text (a fake login) elsewhere; popovers and dialogs would cover the app outside the slide
 // a rendered diagram (Mermaid SVG, labels may be HTML in foreignObject) -> sanitized <body> holding it
 export const cleanSvg = svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true, html: true }, ADD_TAGS: ['foreignObject'], RETURN_DOM: true })
 
@@ -83,7 +83,7 @@ export const deckOfSlide = i => decks.value.find(d => i >= d.start && i < d.star
 
 // --- validation of untrusted data (files, IndexedDB, clipboard, import) ---
 const str = v => (typeof v === 'string' ? v : undefined)
-export const webUrl = v => { try { const u = new URL(String(v).trim()); return u.protocol === 'https:' && !u.username && !u.password ? u.href : undefined } catch { return undefined } }
+export const webUrl = v => { try { const u = new URL(String(v).trim()); return u.protocol === 'https:' && !u.username && !u.password && u.origin !== globalThis.location?.origin ? u.href : undefined } catch { return undefined } } // not the app itself: its sandbox allows same-origin
 // a project-relative path (deck file, project file) or undefined: no empty or dots-only segment ('.', '..', also %2e%2e;
 // Windows drops trailing dots, so '....' counts too), no backslash or NUL
 export function safePath(v) {

@@ -66,7 +66,8 @@ function work() {
   }
 }
 
-if (typeof window !== 'undefined' && window.parent !== window) {
+// only inside a sandboxed frame (opaque origin): embedded without sandbox by another page, posted code would run with the app's origin
+if (typeof window !== 'undefined' && window.parent !== window && self.origin === 'null') {
   const url = URL.createObjectURL(new Blob([`'use strict'\n${fmt}\n${errText}\n(${work})()`], { type: 'text/javascript' }))
   let worker = null, timer = null, current
   const stop = () => { if (worker) worker.terminate(); worker = null; clearTimeout(timer) }

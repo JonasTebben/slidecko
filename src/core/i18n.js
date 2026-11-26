@@ -20,10 +20,10 @@ const pick = () => {
   if (!globalThis.document?.documentElement) return 'en' // node tests assert the English source text
   // a link can choose, ahead of the stored choice, and it is stored like a switch (as on the static pages)
   const url = new URLSearchParams(location.search).get('lang')
-  if (LOCALES[url]) { try { localStorage.setItem(KEY, url) } catch {} return url }
-  try { const s = localStorage.getItem(KEY); if (LOCALES[s]) return s } catch {}
+  if (Object.hasOwn(LOCALES, url ?? '')) { try { localStorage.setItem(KEY, url) } catch {} return url }
+  try { const s = localStorage.getItem(KEY); if (Object.hasOwn(LOCALES, s ?? '')) return s } catch {}
   const nav = globalThis.navigator?.languages || []
-  return nav.map(l => l.slice(0, 2)).find(l => LOCALES[l]) || 'en'
+  return nav.map(l => l.slice(0, 2)).find(l => Object.hasOwn(LOCALES, l)) || 'en'
 }
 export const lang = ref(pick())
 

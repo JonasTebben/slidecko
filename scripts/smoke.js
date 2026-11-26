@@ -193,6 +193,36 @@ await step('dev: Markdown tutorial', async () => {
   await page.waitForSelector('dialog[open]', { timeout: 10000 })
   await page.evaluate(async () => { (await import('/src/editor/tutorial.js')).tutorial.open = false })
 })
+await step('dev: untrusted content stays on its slide: theme CSS, slide HTML, font files, the code runner and ?lang', async () => {
+  const bad = await page.evaluate(async () => {
+    const T = await import('/src/slide/themes.js'), S = await import('/src/core/store.js'), F = await import('/src/slide/fonts.js')
+    const out = []
+    for (const css of [':root:has(&) header { display: none }', 'body:has(&)::after { content: "x" }', '& ~ * { display: none }', '& + * { display: none }', '&.layout-cover { & ~ aside { color: red } }', '@media print { :root:has(&) { color: red } }'])
+      if (T.containedCss(css)) out.push('theme CSS accepted: ' + css)
+    for (const css of ['& h1 { color: red }', '&.layout-cover h1, & .pageno { color: red }', '& li + li { margin: 0 }', '&.layout-quiz { & .pageno { right: 0 } }', '& h1 { & + p { margin: 0 } }'])
+      if (!T.containedCss(css)) out.push('theme CSS refused: ' + css)
+    for (const id of Object.keys(T.THEMES)) if (T.THEMES[id].css && !T.containedCss(T.THEMES[id].css)) out.push('theme refused: ' + id)
+    const html = S.clean('<button popovertarget="p" command="show-modal" commandfor="d">x</button><div id="p" popover="manual">y</div><dialog id="d">z</dialog><form action="https://evil.example/"><input name="pw"></form><img src="https://example.org/a.png"><input type="checkbox" checked disabled>')
+    if (/popover|command|<dialog|<form/.test(html)) out.push('slide HTML keeps ' + html)
+    if (!html.includes('https://example.org/a.png') || !html.includes('checkbox')) out.push('remote picture or task box dropped: ' + html)
+    const fs = new CSSStyleSheet(); fs.replaceSync(F.face('X', 'data:font/woff2,"); } body { display: none } x{'))
+    if (fs.cssRules.length !== 1) out.push('font URL leaves its rule')
+    if (T.validThemeId('__proto__')) out.push('__proto__ is a theme id')
+    // the runner answers only inside a sandboxed (opaque) frame: embedded without sandbox it stays silent
+    const f = document.body.appendChild(Object.assign(document.createElement('iframe'), { src: '/runner.html', hidden: true }))
+    await new Promise(r => f.onload = r)
+    let answered = false
+    const on = e => { if (e.source === f.contentWindow) answered = true }
+    addEventListener('message', on); f.contentWindow.postMessage({ run: 1, code: 'console.log(1)' }, '*')
+    await new Promise(r => setTimeout(r, 1500)); removeEventListener('message', on); f.remove()
+    if (answered) out.push('runner ran code outside a sandbox')
+    return out
+  })
+  if (bad.length) throw new Error(bad.join('; '))
+  const q = await page.context().newPage()
+  await q.goto(DEV + '?lang=constructor'); await q.waitForSelector('.home, .editor, header', { timeout: 20000 })
+  await q.goto(DEV + '?lang=en'); await q.close()
+})
 await step('dev: a link with ?tutorial opens the tutorial once', async () => {
   const q = await page.context().newPage()
   await q.goto(DEV + '?tutorial&lang=en'); await q.waitForSelector('dialog[open]', { timeout: 20000 })
