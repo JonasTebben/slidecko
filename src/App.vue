@@ -1,6 +1,7 @@
 <script setup>
+import { openAudience } from './present/audience.js'
 import { stayAwake } from './present/wake.js'
-import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defineAsyncComponent } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defineAsyncComponent, shallowRef } from 'vue'
 import Icon from './components/Icon.vue'
 import AppFooter from './components/AppFooter.vue'
 import Menu from './components/Menu.vue'
@@ -365,7 +366,7 @@ onMounted(async () => {
   addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault() })
   addEventListener('drop', onWindowDrop)
   addEventListener('resize', fitPresenter)
-  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !capturing.on) presenting.value = false })
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !capturing.on && !audience.value) presenting.value = false })
   setInterval(() => { now.value = Date.now() }, 1000)
 })
 const stageObserver = new ResizeObserver(([e]) => { stageBox = e.contentRect; fitStage() })
@@ -629,6 +630,21 @@ const fitPresenter = () => {
   const narrow = phone.matches // phones: presenter view stacks slide, next slide and notes
   presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
 }
+// the audience's window (a second screen): this one becomes the presenter view
+const audience = shallowRef(null), audScale = ref(1)
+const fitAudience = () => { const w = audience.value?.win; if (w) audScale.value = Math.min(w.innerWidth / format.w, w.innerHeight / format.h) }
+function toggleAudience() {
+  if (audience.value) return closeAudience()
+  audience.value = openAudience({ title: deck.title || 'Slidecko', onKey: presentKey, onClose: () => { audience.value = null }, onResize: fitAudience })
+  if (!audience.value) return A.toast(t('The browser blocked the second window. Allow pop-ups for this site.'))
+  fitAudience()
+  presenterView.value = true
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {}) // the presenter view in a window; the slides are full screen over there
+  fitPresenter()
+}
+function closeAudience() { audience.value?.close(); audience.value = null }
+// the laser's point on the slide (it moves over this window's slide), for the audience's copy of it
+const laserOnSlide = () => { const r = laser.value && presenter.value?.querySelector('.pv-main')?.getBoundingClientRect(); return r && [(laser.value[0] - r.left) / presentScale.value, (laser.value[1] - r.top) / presentScale.value] }
 async function present(from = ui.slide) {
   ui.master = null
   ui.sel = []
@@ -656,6 +672,7 @@ const extra = ref(null)
 const toggleExtra = () => { resetRun('pv-extra'); extra.value = extra.value ? null : reactive({ id: 'pv-extra', type: 'timer', seconds: 300 }) }
 watch(presenting, v => { stayAwake(v); if (!v) holdAll() }) // editing in between: timers go on only by a click (or by themselves when set to)
 function stopPresenting() {
+  closeAudience()
   presenting.value = false
   tool.value = null
   if (document.fullscreenElement) document.exitFullscreen()
@@ -784,7 +801,7 @@ function swipeUp(e) {
   swiped = true
   presentStep(dx < 0 ? 1 : -1)
 }
-function presentClick(e) {
+function presentClick(e, width = innerWidth) {
   if (swiped) { swiped = false; return }
   const a = e.target.closest('a[href]')
   // a link to a slide jumps there (one to a deleted slide does nothing); others open in a new tab
@@ -794,7 +811,7 @@ function presentClick(e) {
   if (tool.value) return // pointing or drawing does not turn the slide
   // composedPath: the path at the click; a picker's or quiz's own handler may have replaced the clicked node already (detached, closest finds nothing)
   if (e.composedPath().some(n => n.matches?.('iframe, .pv-side, .pv-bar, .pv-clock, .timer-face, .picker-face, .el.board, .quiz-tile, .quiz-reveal, .run-bar'))) return // a timer click starts the timer, a picker click draws, not the next slide
-  presentStep(e.clientX < innerWidth / 4 ? -1 : 1) // the left edge goes back: touch screens have no arrow keys
+  presentStep(e.clientX < width / 4 ? -1 : 1) // the left edge goes back: touch screens have no arrow keys
 }
 const elapsed = computed(() => { const s = Math.max(0, Math.floor((now.value - started.value) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })
 
@@ -1786,6 +1803,21 @@ function onClipboard(e) {
       <button v-if="!timerRuns[extra.id]" class="tb icon small" :title="t('One minute more')" :aria-label="t('One minute more')" @click="extra.seconds = Math.min(359940, extra.seconds + 60)"><Icon name="plus" :size="16" /></button>
       <button class="tb icon small" :title="t('Close timer')" :aria-label="t('Close timer')" @click="toggleExtra"><Icon name="x" :size="16" /></button>
     </div>
+    <!-- the audience's window: the same slide, drawing, laser and blank screen, nothing of the presenter view -->
+    <Teleport v-if="audience" :to="audience.root">
+      <div class="presenter audience" :class="{ laser: tool === 'laser' }" @click="e => presentClick(e, audience.win.innerWidth)">
+        <div class="pv-main" :style="{ width: format.w * audScale + 'px', height: format.h * audScale + 'px' }">
+          <Transition :name="'tr-' + transition" :css="transition !== 'none' && transition !== 'morph'">
+            <div :key="ui.slide" class="pv-slide"><SlideView :slide="slide" :index="ui.slide" live :step="clickStep" :style="{ transform: `scale(${audScale})` }" /></div>
+          </Transition>
+          <svg v-if="strokes.length" class="pv-ink" :viewBox="`0 0 ${format.w} ${format.h}`" aria-hidden="true">
+            <g v-for="(s, i) in strokes" :key="i" :style="{ stroke: s.color, strokeWidth: s.width }"><polyline :points="s.pts.join(' ')" /><polyline v-if="s.arrow" :points="arrowHead(s.pts[0], s.pts[1], s.width).join(' ')" /></g>
+          </svg>
+          <div v-if="tool === 'laser' && laserOnSlide()" class="pv-laser" :style="{ position: 'absolute', translate: `${laserOnSlide()[0] * audScale}px ${laserOnSlide()[1] * audScale}px` }" aria-hidden="true" />
+        </div>
+        <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
+      </div>
+    </Teleport>
     <div class="pv-jump" aria-live="polite">{{ jump && t('Slide {0}', jump) }}</div>
     <Overview v-if="overview" @go="i => { presentGo(i); closeOverview() }" @close="closeOverview" />
     <div v-if="keysHelp" class="pv-keys" role="dialog" :aria-label="t('Keys while presenting')" @click.stop="keysHelp = false">
@@ -1825,6 +1857,7 @@ function onClipboard(e) {
       </span>
       <span class="pv-group" role="group" :aria-label="t('View')">
         <button class="tb icon small" :class="{ on: presenterView }" :title="`${t('Presenter view')} (${kbd('present-view')})`" :aria-label="t('Presenter view')" :aria-pressed="presenterView" @click.stop="presenterView = !presenterView; fitPresenter()"><Icon name="presenter" :size="16" /></button>
+        <button class="tb icon small" :class="{ on: audience }" :title="t('Slides in a second window, for the projector (F there: full screen)')" :aria-label="t('Audience window')" :aria-pressed="!!audience" @click.stop="toggleAudience"><Icon name="presentation" :size="16" /></button>
         <button class="tb icon small" :class="{ on: keysHelp }" :title="t('Keys while presenting') + ' (?)'" :aria-label="t('Keys while presenting')" :aria-pressed="keysHelp" @click.stop="keysHelp = !keysHelp"><Icon name="keyboard" :size="16" /></button>
       </span>
       <!-- like Esc: with a tool on, the first press puts the tool away, so the tool buttons come back instead of the presentation ending -->

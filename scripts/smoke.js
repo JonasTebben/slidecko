@@ -325,6 +325,18 @@ async function presenting(page, label, touch) {
     await tap('.pv-clock-face'); await page.waitForTimeout(1200)
     ok((await text('.pv-clock-face')) === '5:59', await text('.pv-clock-face'))
   })
+  if (!touch) await step(`${label}: the audience window shows the slide, takes the keys and can be closed`, async () => {
+    await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1))
+    const [pop] = await Promise.all([page.waitForEvent('popup'), tap('.pv-bar button[aria-label="Audience window"]')])
+    await pop.waitForSelector('.audience .pv-slide .slide')
+    ok((await pop.locator('.audience .el.timer').count()) === 2, 'not the current slide')
+    await pop.keyboard.press('ArrowRight'); await pop.waitForTimeout(400)
+    ok((await shown()) === '2 / 2' && (await pop.locator('.audience .pv-slide').last().innerText()).includes('Two'), 'did not follow')
+    await pop.keyboard.press('ArrowLeft'); await pop.waitForTimeout(400)
+    await pop.close(); await page.waitForTimeout(800)
+    ok((await shown()) === '1 / 2' && (await page.locator('.presenter').count()), 'presenting ended with the window')
+    await tap('.pv-bar button[aria-label="Presenter view"]')
+  })
   await step(`${label}: after editing, notes and drawing are kept as set, timers wait for a tap`, async () => {
     await leave()
     await page.waitForTimeout(300)

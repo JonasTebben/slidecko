@@ -1297,4 +1297,7 @@ export default {
   "Web page": "Page web",
   "Not a YouTube link or web address (https://…).": "Ni un lien YouTube ni une adresse web (https://…).",
   "Web page: tap to load it (this sends data to its site)": "Page web : touchez pour la charger (cela envoie des données à son site)",
+  "The browser blocked the second window. Allow pop-ups for this site.": "Le navigateur a bloqué la deuxième fenêtre. Autorisez les fenêtres pop-up pour ce site.",
+  "Slides in a second window, for the projector (F there: full screen)": "Diapositives dans une deuxième fenêtre, pour le projecteur (F dans celle-ci : plein écran)",
+  "Audience window": "Fenêtre du public",
 }
