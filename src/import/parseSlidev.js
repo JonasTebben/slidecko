@@ -17,7 +17,7 @@ export const COVER = ['cover', 'intro', 'quiz', 'section', 'statement', 'fact', 
 export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'))?.[1].trim().replace(/^['"]|['"]$/g, '')
 // Slidev hides a slide with `hide: true` (alias `disabled: true`)
 // slide transitions the editor offers (Slidev's built-in names); 'none' turns the project's default off for one slide
-export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-up', 'morph']
+export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'morph']
 // Magic move (Slidecko's own) is written as `transition: fade` plus this key, which Slidev ignores
 export const trOf = fm => (fmGet(fm, 'slidecko-transition') === 'morph' ? 'morph' : fmGet(fm, 'transition'))
 // Slidev's v-click value -> click step: "2" is that step, an empty one (or "+1") the step after the last one

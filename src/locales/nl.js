@@ -650,6 +650,8 @@ export default {
   "Fade": "Vervagen",
   "Slide left": "Naar links schuiven",
   "Slide up": "Naar boven schuiven",
+  "Slide right": "Naar rechts schuiven",
+  "Slide down": "Naar beneden schuiven",
   "Timer": "Timer",
   "Insert timer": "Timer invoegen",
   "Start or pause the timer": "Timer starten of pauzeren",

@@ -650,6 +650,8 @@ export default {
   "Fade": "Fundido",
   "Slide left": "Deslizar a la izquierda",
   "Slide up": "Deslizar hacia arriba",
+  "Slide right": "Deslizar a la derecha",
+  "Slide down": "Deslizar hacia abajo",
   "Timer": "Temporizador",
   "Insert timer": "Insertar temporizador",
   "Start or pause the timer": "Iniciar o pausar el temporizador",

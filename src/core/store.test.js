@@ -117,7 +117,7 @@ test('snapshots are stored apart from the project: a full disk fails only the sn
 
 test('cleanSlides keeps only the transitions the editor offers', async () => {
   const { cleanSlides } = await import('./store.js')
-  assert.deepEqual(cleanSlides([{ transition: 'fade' }, { transition: 'none' }, { transition: 'slide-right' }, { transition: '<x>' }]).map(s => s.transition), ['fade', 'none', undefined, undefined])
+  assert.deepEqual(cleanSlides([{ transition: 'fade' }, { transition: 'none' }, { transition: 'slide-right' }, { transition: 'zoom' }, { transition: '<x>' }]).map(s => s.transition), ['fade', 'none', 'slide-right', undefined, undefined])
 })
 
 test('runnable code: output kept as capped plain lines, panel side and size validated', () => {

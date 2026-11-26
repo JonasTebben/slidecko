@@ -650,6 +650,8 @@ export default {
   "Fade": "Fondu",
   "Slide left": "Glisser vers la gauche",
   "Slide up": "Glisser vers le haut",
+  "Slide right": "Glisser vers la droite",
+  "Slide down": "Glisser vers le bas",
   "Timer": "Minuteur",
   "Insert timer": "Insérer un minuteur",
   "Start or pause the timer": "Démarrer ou mettre en pause le minuteur",

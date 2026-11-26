@@ -91,7 +91,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .deck { position: fixed; inset: 0; touch-action: manipulation; }
 .deck > .slide { position: absolute !important; left: 50% !important; top: 50% !important; width: ${W}px !important; height: ${H}px !important; margin: 0 !important; visibility: hidden; box-shadow: 0 8px 40px #0008; }
 .deck > .slide.on, .deck > .slide.moving { visibility: visible; }
-@media screen { .deck .el.unshown, .deck .el li.unshown { visibility: hidden; } }
+@media screen { .deck .el.unshown, .deck .el li.unshown { visibility: hidden; opacity: 0; } }
 .deck { --tr-w: 100vw; --tr-h: 100vh; }
 .hud { position: fixed; right: 14px; bottom: 10px; padding: 4px 4px 4px 10px; border-radius: 9px; background: #000a; font: 12px/1 system-ui, sans-serif; color: #fffc; user-select: none; opacity: 0; transition: opacity .3s; }
 .hud.show, .hud:hover, .hud:focus-within { opacity: 1; }
@@ -142,7 +142,7 @@ function fit() {
 }
 // as when presenting in the editor: the earlier slide's transition (Slidev's rule), reversed when going back
 const still = matchMedia('(prefers-reduced-motion: reduce)')
-const BACK = { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }
+const BACK = { 'slide-left': 'slide-right', 'slide-right': 'slide-left', 'slide-up': 'slide-down', 'slide-down': 'slide-up' }
 const morphPairs = ${morphPairs}, playMorph = ${playMorph}
 const settle = s => s.classList.remove('moving', ...[...s.classList].filter(c => c.startsWith('tr-')))
 for (const s of slides) s.addEventListener('animationend', e => { if (e.target === s) settle(s) })

@@ -94,11 +94,13 @@ function frameImage(doc, { data, x, y, w, h }) {
   return `<draw:frame draw:style-name="${doc.style('graphic', '<style:graphic-properties draw:stroke="none" draw:fill="none"/>', 'Mgr')}" svg:x="${inch(x)}" svg:y="${inch(y)}" svg:width="${inch(w)}" svg:height="${inch(h)}"><draw:image xlink:href="${doc.image(data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`
 }
 
-// Impress's click animations: one click per step, an element's objects appear ("Appear") or vanish ("Disappear") together
+// Impress's click animations: one click per step, an element's objects fade in or out together
 export function clickAnimations(clicks, id) {
   const steps = [...new Set(clicks.flatMap(c => [c.click, c.until]).filter(Boolean))].sort((a, b) => a - b)
   if (!steps.length) return ''
-  const set = (o, show, first) => `<anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="${first ? 'on-click' : 'with-previous'}" presentation:preset-class="${show ? 'entrance' : 'exit'}" presentation:preset-id="ooo-${show ? 'entrance-appear' : 'exit-disappear'}"><anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:attributeName="visibility" smil:to="${show ? 'visible' : 'hidden'}"/></anim:par>`
+  const vis = (o, show) => `<anim:set smil:begin="${show ? 0 : 0.3}s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:attributeName="visibility" smil:to="${show ? 'visible' : 'hidden'}"/>`
+  const fade = (o, show) => `<anim:transitionFilter smil:dur="0.3s" smil:targetElement="${id(o)}" anim:sub-item="whole" smil:type="fade" smil:subtype="crossfade"${show ? '' : ' smil:mode="out"'}/>`
+  const set = (o, show, first) => `<anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="${first ? 'on-click' : 'with-previous'}" presentation:preset-class="${show ? 'entrance' : 'exit'}" presentation:preset-id="ooo-${show ? 'entrance-fade-in' : 'exit-fade-out'}">${show ? vis(o, true) + fade(o, true) : fade(o, false) + vis(o, false)}</anim:par>`
   const step = k => `<anim:par smil:begin="next"><anim:par smil:begin="0s">${clicks.flatMap(c => [c.click === k && [c, true], c.until === k && [c, false]].filter(Boolean))
     .flatMap(([c, show]) => c.objs.map(o => [o, show])).map(([o, show], j) => set(o, show, !j)).join('')}</anim:par></anim:par>`
   return `<anim:par presentation:node-type="timing-root"><anim:seq presentation:node-type="main-sequence">${steps.map(step).join('')}</anim:seq></anim:par>`

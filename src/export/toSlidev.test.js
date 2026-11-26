@@ -33,14 +33,14 @@ test('a malformed escape in an image path does not throw', () => {
 
 test('transitions: project default in the headmatter, own ones in the slide frontmatter, read back', () => {
   const hi = { id: 'a', type: 'text', ...box, html: '<p>Hi</p>' }
-  const slides = [{ layout: 'default', elements: [hi] }, { layout: 'default', transition: 'slide-up', elements: [hi] }, { layout: 'default', transition: 'none', elements: [hi] }, { layout: 'default', fm: 'transition: fade', elements: [hi] }]
+  const slides = [{ layout: 'default', elements: [hi] }, { layout: 'default', transition: 'slide-up', elements: [hi] }, { layout: 'default', transition: 'slide-down', elements: [hi] }, { layout: 'default', transition: 'none', elements: [hi] }, { layout: 'default', fm: 'transition: fade', elements: [hi] }]
   const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'slide-left', slides }, {}).files['slides.md']
   assert.equal(headFormat(md).transition, 'slide-left')
   // slide 4 follows the default again: its old `transition: fade` is gone
-  assert.deepEqual(parseSlidev(md).map(s => s.transition), ['slide-left', 'slide-up', 'none', undefined])
+  assert.deepEqual(parseSlidev(md).map(s => s.transition), ['slide-left', 'slide-up', 'slide-down', 'none', undefined])
   // no default: nothing written; a Slidev transition the editor does not offer stays
-  const plain = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', slides: [{ layout: 'default', fm: 'transition: slide-right', elements: [hi] }, { layout: 'default', elements: [hi] }] }, {}).files['slides.md']
-  assert.deepEqual(parseSlidev(plain).map(s => s.transition), ['slide-right', undefined])
+  const plain = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'none', slides: [{ layout: 'default', fm: 'transition: fade-out', elements: [hi] }, { layout: 'default', elements: [hi] }] }, {}).files['slides.md']
+  assert.deepEqual(parseSlidev(plain).map(s => s.transition), ['fade-out', undefined])
   assert.equal(headFormat(plain).transition, undefined)
 })
 

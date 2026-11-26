@@ -43,7 +43,7 @@ const setBorder = mode => { const b = border.value; tbl(table.toggleBorder, mode
 const onSelection = () => { listKind.value = listAt(getSelection().anchorNode) }
 onMounted(() => document.addEventListener('selectionchange', onSelection))
 onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelection))
-const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-up': 'Slide up', morph: 'Magic move' } // Slidev's names and Slidecko's morph (store.js keeps only these)
+const TRANSITIONS = { none: 'None', fade: 'Fade', 'slide-left': 'Slide left', 'slide-right': 'Slide right', 'slide-up': 'Slide up', 'slide-down': 'Slide down', morph: 'Magic move' } // Slidev's names and Slidecko's morph (store.js keeps only these)
 // plays Magic move on the canvas, from this slide into the next (the copy keeps the old slide's look once the canvas shows the next one)
 async function previewMorph() {
   const i = ui.slide

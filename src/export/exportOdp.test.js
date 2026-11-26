@@ -106,7 +106,7 @@ test('click animations: the objects get ids, each step is one click of Impress',
   assert.match(xml, /<draw:rect xml:id="s1o1"/)
   const clicks = xml.split('smil:begin="next"').slice(1)
   assert.equal(clicks.length, 2)
-  assert.match(clicks[0], /entrance-appear[^]*targetElement="s1o0"/)
+  assert.match(clicks[0], /entrance-fade-in[^]*targetElement="s1o0"/)
   assert.match(clicks[1], /on-click" presentation:preset-class="exit"[^]*targetElement="s1o0"[^]*with-previous" presentation:preset-class="entrance"[^]*targetElement="s1o1"/)
   assert.match(xml, /xmlns:anim=/)
 })

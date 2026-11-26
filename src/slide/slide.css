@@ -99,8 +99,10 @@
 .slide .el.image.cropped > img { filter: none; }
 /* locked (editor only): a dashed selection frame instead of handles */
 .slide .el.locked.selected { outline-style: dashed !important; cursor: default; }
-/* appears on click: not revealed yet while presenting, but keeps its place */
-.slide .el[data-unshown], .slide .el li[data-unshown] { visibility: hidden; }
+/* appears on click: not revealed yet while presenting, but keeps its place; fades in and out softly like Slidev's v-click */
+.slide .el:is([data-click], [data-until]), .slide .el li[data-click] { transition: opacity .15s ease, visibility .15s; }
+.slide .el[data-unshown], .slide .el li[data-unshown] { visibility: hidden; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .slide .el:is([data-click], [data-until]), .slide .el li[data-click] { transition: none; } }
 /* v-mark: hand-drawn marks over the text; a mark with a click step draws itself along its strokes (the HTML
    presentation toggles .unshown), with reduced motion it just appears */
 .slide .el > svg.marks { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; fill: none; stroke-linecap: round; stroke-linejoin: round; }

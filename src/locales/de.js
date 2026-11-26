@@ -650,6 +650,8 @@ export default {
   "Fade": "Überblenden",
   "Slide left": "Nach links schieben",
   "Slide up": "Nach oben schieben",
+  "Slide right": "Nach rechts schieben",
+  "Slide down": "Nach unten schieben",
   "Timer": "Timer",
   "Insert timer": "Timer einfügen",
   "Start or pause the timer": "Timer starten oder anhalten",

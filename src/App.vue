@@ -784,7 +784,7 @@ watch(notesNow, () => nextTick(() => document.querySelector('.pv-notes .note-now
 const transition = ref('none')
 watch(() => ui.slide, (n, o) => {
   const name = deck.slides[Math.min(n, o)]?.transition || deck.transition
-  transition.value = n < o ? { 'slide-left': 'slide-right', 'slide-up': 'slide-down' }[name] || name : name
+  transition.value = n < o ? { 'slide-left': 'slide-right', 'slide-right': 'slide-left', 'slide-up': 'slide-down', 'slide-down': 'slide-up' }[name] || name : name
   // Magic move: the old slide is still on screen here; it is replaced at once and its elements fly over to the new one
   const from = name === 'morph' && presenter.value?.querySelector('.pv-slide .slide')
   if (from) nextTick(() => morphSlides(from, presenter.value?.querySelector('.pv-slide .slide'), deck.slides[o], deck.slides[n]))

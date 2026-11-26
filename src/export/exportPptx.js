@@ -628,7 +628,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
 // pptxgenjs writes control characters as they are (terminal escapes pasted into code, notes): invalid XML, PowerPoint
 // rejects the file, so they are dropped everywhere
 // Slidev plays the earlier slide's transition between two slides; PowerPoint plays it as the next slide's entrance
-const PPT_TRANSITION = { fade: '<p:fade/>', 'slide-left': '<p:push dir="l"/>', 'slide-up': '<p:push dir="u"/>' }
+const PPT_TRANSITION = { fade: '<p:fade/>', 'slide-left': '<p:push dir="l"/>', 'slide-right': '<p:push dir="r"/>', 'slide-up': '<p:push dir="u"/>', 'slide-down': '<p:push dir="d"/>' }
 // Magic move is PowerPoint's Morph (2016 and later pair the shapes themselves), older versions fade, as PowerPoint writes it
 const MORPH = '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" Requires="p159"><p:transition spd="slow"><p159:morph option="byObject"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="slow"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>'
 async function insets(buf, slides, timing) {

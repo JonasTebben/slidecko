@@ -22,7 +22,7 @@ export const decorative = xml => xml.replace(/(<p:cNvPr [^>]*?)descr="(?:\.\.\/m
   .replace(new RegExp(`(<p:cNvPr [^>]*name="${DECORATIVE}"[^>]*>)([\\s\\S]*?)</p:cNvPr>`, 'g'), `$1$2${DECOR_EXT}</p:cNvPr>`)
 
 // appear / disappear on click as PowerPoint animations (p:timing, after the transition): one click per step, the
-// objects of an element appear (entrance "Appear") or vanish (exit "Disappear") together.
+// objects of an element fade in (entrance "Fade") or out (exit "Fade") together.
 // clicks: [{ objs: object indexes, click, until }] (steps); the n-th <p:cNvPr> after the slide's group is the n-th
 // object pptxgenjs added. Steps where nothing appears or goes (further list items, code stages) are no click here
 export function clickTiming(xml, clicks = []) {
@@ -31,9 +31,12 @@ export function clickTiming(xml, clicks = []) {
   const steps = [...new Set(clicks.flatMap(c => [c.click, c.until]).filter(Boolean))].sort((a, b) => a - b)
   let n = 3
   const cond = d => `<p:stCondLst><p:cond delay="${d}"/></p:stCondLst>`
+  // "Fade" (preset 10): the visibility switch plus a short fade, shown first or hidden after the fade
   const set = (id, show, first) => {
-    const a = n++, b = n++
-    return `<p:par><p:cTn id="${a}" presetID="1" presetClass="${show ? 'entr' : 'exit'}" presetSubtype="0" fill="hold" nodeType="${first ? 'clickEffect' : 'withEffect'}">${cond(0)}<p:childTnLst><p:set><p:cBhvr><p:cTn id="${b}" dur="1" fill="hold">${cond(0)}</p:cTn><p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="${show ? 'visible' : 'hidden'}"/></p:to></p:set></p:childTnLst></p:cTn></p:par>`
+    const a = n++, b = n++, c = n++, tgt = `<p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>`
+    const vis = `<p:set><p:cBhvr><p:cTn id="${show ? b : c}" dur="1" fill="hold">${cond(show ? 0 : 299)}</p:cTn>${tgt}<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="${show ? 'visible' : 'hidden'}"/></p:to></p:set>`
+    const fade = `<p:animEffect transition="${show ? 'in' : 'out'}" filter="fade"><p:cBhvr><p:cTn id="${show ? c : b}" dur="300"/>${tgt}</p:cBhvr></p:animEffect>`
+    return `<p:par><p:cTn id="${a}" presetID="10" presetClass="${show ? 'entr' : 'exit'}" presetSubtype="0" fill="hold" nodeType="${first ? 'clickEffect' : 'withEffect'}">${cond(0)}<p:childTnLst>${show ? vis + fade : fade + vis}</p:childTnLst></p:cTn></p:par>`
   }
   const step = k => {
     const fx = clicks.flatMap(c => [c.click === k && [c, true], c.until === k && [c, false]].filter(Boolean))
