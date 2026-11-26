@@ -643,7 +643,12 @@ export function download(blob, name) {
 // all: hidden slides too (the Slidev export keeps them, with hide: true)
 // range: 0-based indexes in the scope's slide list (the export dialog's "Slides" field), empty for all
 export const scopeList = file => (file ? slidesOf(file) : deck.slides)
-const scopeSlides = (file, all, range) => (all ? s => s : shownSlides)(range?.length ? range.map(i => scopeList(file)[i]).filter(Boolean) : scopeList(file))
+function scopeSlides(file, all, range) {
+  const list = (all ? s => s : shownSlides)(scopeList(file))
+  if (!range?.length) return list
+  const picked = new Set(range.map(i => scopeList(file)[i]))
+  return list.flatMap((s, no) => (picked.has(s) ? [{ ...s, no }] : [])) // the slides keep their page numbers
+}
 const scopeName = file => safe(file ? deckName(file) : deck.title)
 async function renderOutput(file, all, solutions, clicks, range) {
   const scoped = solutions ? withSolutions(scopeSlides(file, all, range)) : scopeSlides(file, all, range)

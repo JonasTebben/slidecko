@@ -202,11 +202,11 @@ await step('dev: PDF handout: a page per slide with its notes, the page format r
 await step('dev: export only some slides (range), the dialog refuses one that does not exist', async () => {
   const n = await page.evaluate(async () => {
     const A = await import('/src/core/actions.js')
-    const pages = new Promise(res => { window.print = () => { res(document.querySelectorAll('.output > .slide').length); dispatchEvent(new Event('afterprint')) } })
-    A.exportAs('pdf', undefined, false, false, [0, 1])
+    const pages = new Promise(res => { window.print = () => { res([document.querySelectorAll('.output > .slide').length, A.exportSlides.value.map(x => x.no).join()]); dispatchEvent(new Event('afterprint')) } })
+    A.exportAs('pdf', undefined, false, false, [1, 2])
     return pages
   })
-  if (n !== 2) throw new Error(`${n} pages for slides 1-2`)
+  if (n.join() !== '2,1,2') throw new Error(`slides 2-3: ${n} (pages, their numbers)`)
   await palette(page, 'Export …'); await page.waitForSelector('dialog.export-dlg[open]')
   await page.fill('dialog.export-dlg input[placeholder]', '999')
   if (!(await page.locator('dialog.export-dlg button.primary').isDisabled())) throw new Error('a range past the end is accepted')

@@ -68,7 +68,7 @@ export const plainNotes = notes => String(notes || '').replace(/[ \t]*\[click(?:
 // static exports with "one page per click step" (Slidev's --with-clicks): a slide with n steps becomes n + 1 pages,
 // before the first click up to all shown (step: what SlideView reveals, no: the slide's page number)
 export const perClick = slides => slides.flatMap((s, no) => (s.id?.endsWith('-solution') || !clickSteps(s).length ? [s]
-  : Array.from({ length: clickSteps(s).length + 1 }, (_, step) => ({ ...s, id: `${s.id}-click${step}`, step, no }))))
+  : Array.from({ length: clickSteps(s).length + 1 }, (_, step) => ({ ...s, id: `${s.id}-click${step}`, step, no: s.no ?? no }))))
 // list items one by one: each top-level <li> gets its step (data-click, read by the HTML presentation)
 // and data-unshown from the shown-th one on
 export function markItems(html, from, shown = Infinity) {
