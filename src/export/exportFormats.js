@@ -5,6 +5,7 @@ import { lang, t } from '../core/i18n.js'
 import { morphPairs, playMorph } from '../present/morph.js'
 import { usesFamily } from '../slide/fonts.js'
 import { toJs } from '../present/run.js'
+import { clock } from '../present/timer.js'
 
 // Exports that reuse the rendered slides (root: one .slide per slide at 1:1) as they are:
 // pictures of each slide and a self-contained HTML presentation. Both look exactly like the editor.
@@ -210,7 +211,7 @@ addEventListener('keydown', e => {
 })
 // timers: a click starts or pauses, a double click sets back, a run-out countdown starts over (same as in the editor, timer.js);
 // a stopwatch shows tenths, ring and bar follow --p, data-warn: the last minute in red, data-auto: starts when visible, a sound at the end unless data-silent
-const clock = (sec, tenths) => { if (tenths) { const t = Math.floor(Math.max(0, sec) * 10 + 1e-6); return clock(Math.floor(t / 10)) + '.' + (t % 10) } sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + s : m + ':' + s }
+const clock = ${clock} // timer.js's own function: the editor and the file count alike
 let audio
 // made and resumed in a click, or iOS keeps it silent; 'playback': also with the silent switch on (timer.js)
 const unlock = () => { try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; audio ||= new AudioContext(); audio.resume() } catch {} }
