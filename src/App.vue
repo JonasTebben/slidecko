@@ -9,6 +9,7 @@ import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defin
 import Icon from './components/Icon.vue'
 import AppFooter from './components/AppFooter.vue'
 import Menu from './components/Menu.vue'
+import { HOME_URL } from './core/support.js'
 import SlideView from './components/SlideView.vue'
 import Inspector from './components/Inspector.vue'
 import Home from './components/Home.vue'
@@ -28,7 +29,7 @@ const openIcons = () => Object.assign(iconPicker, { open: true, target: null })
 const A11yPanel = defineAsyncComponent(() => import('./components/A11yPanel.vue'))
 import { checkDeck } from './editor/a11yCheck.js'
 import { t, lang } from './core/i18n.js'
-import { format, setFormat, deck, ui, decks, library, openProject, duplicateProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid , webUrl } from './core/store.js'
+import { format, setFormat, deck, ui, decks, library, openProject, duplicateProject, removeProject, fileOf, restore, undo, redo, canUndo, canRedo, newSlide, cleanSlides, usedAssets, withGroups, regroup, saveSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot, SNAP_MAX, SNAP_EVERY, nextShown, stepMove, clickSteps, underlay, notesParts, storeImage, readDataUrl, cleanEl, uid , webUrl } from './core/store.js'
 import { parseRatio } from './slide/format.js'
 import { slidePoint, arrowHead, inkSvg } from './present/draw.js'
 import { toggleSolution, resetQuiz } from './present/quiz.js'
@@ -62,6 +63,14 @@ const importDialog = ref(), importFiles = ref([]), importEntries = ref([]), impo
 const mdDialog = ref(), mdText = ref(''), mdTarget = ref('slide')
 const paletteDialog = ref(), paletteQuery = ref(''), paletteIndex = ref(0)
 const deckDialog = ref(), deckNameInput = ref(''), deckRenaming = ref(null)
+const deleteDialog = ref(), deleteWhat = ref('slide')
+const openDelete = () => { deleteWhat.value = deck.slides.length > 1 ? 'slide' : 'project'; openDlg(deleteDialog.value) }
+function deleteChosen() {
+  const w = deleteWhat.value
+  if (w === 'slide') A.deleteSlide()
+  else if (w.startsWith('deck:')) A.removeDeck(w.slice(5))
+  else if (w === 'project') A.run(() => removeProject(deck.id))
+}
 const confirmDialog = ref(), confirmText = ref(''), confirmAction = ref(null)
 const ytDialog = ref(), ytUrl = ref('')
 // version history of the open project
@@ -1156,8 +1165,9 @@ function onClipboard(e) {
             <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ kbd('sourceEditor') }}</kbd></button>
             <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
             <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
-            <label class="mi" tabindex="0" role="button"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
-            <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
+            <label class="mi" tabindex="0" role="button"><Icon name="folder" />{{ t('Open Slidev project folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
+            <hr />
+            <button class="mi danger" @click="openDelete"><Icon name="trash" />{{ t('Delete …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
             <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ kbd('undo') }}</kbd></button>
@@ -1169,9 +1179,6 @@ function onClipboard(e) {
             <button class="mi" @click="A.selectAll"><Icon name="selectAll" />{{ t('Select all') }}<kbd>{{ kbd('selectAll') }}</kbd></button>
             <button class="mi" :disabled="!selection.length" @click="A.duplicate"><Icon name="copy" />{{ t('Duplicate') }}<kbd>{{ kbd('duplicate') }}</kbd></button>
             <button class="mi" :disabled="!selection.length" @click="A.remove"><Icon name="trash" />{{ t('Delete') }}<kbd>⌫</kbd></button>
-            <hr />
-            <button class="mi" @click="openPalette"><Icon name="keyboard" />{{ t('All commands & shortcuts …') }}<kbd>{{ kbd('palette') }}</kbd></button>
-            <button class="mi" @click="begin(false)"><Icon name="info" />{{ t('Take the tour') }}</button>
           </Menu>
           <Menu :label="t('Insert')">
             <button class="mi" @click="A.insert('text')"><Icon name="text" />{{ t('Text') }}<kbd>{{ kbd('insertText') }}</kbd></button>
@@ -1239,10 +1246,22 @@ function onClipboard(e) {
             <hr />
             <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ kbd('toggleSlides') }}</kbd></button>
             <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ kbd('toggleProps') }}</kbd></button>
-            <button class="mi" @click="openKeys"><Icon name="keyboard" />{{ t('Keyboard shortcuts …') }}<kbd>{{ kbd('shortcuts') }}</kbd></button>
             <hr />
             <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
             <button class="mi" :aria-pressed="a11yOpen" @click="a11yOpen = !a11yOpen"><Icon name="eye" />{{ t('Check accessibility …') }}</button>
+          </Menu>
+          <!-- learning the app, then the outside links (they open in a new tab) -->
+          <Menu :label="t('Help')">
+            <button class="mi" @click="openPalette"><Icon name="search" />{{ t('All commands …') }}<kbd>{{ kbd('palette') }}</kbd></button>
+            <button class="mi" @click="openKeys"><Icon name="keyboard" />{{ t('Keyboard shortcuts …') }}<kbd>{{ kbd('shortcuts') }}</kbd></button>
+            <button class="mi" @click="begin(false)"><Icon name="info" />{{ t('Take the tour') }}</button>
+            <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
+            <button class="mi" @click="installApp"><Icon name="download" />{{ t('Install as app') }}</button>
+            <hr />
+            <a class="mi" :href="HOME_URL" target="_blank" rel="noopener"><Icon name="globe" />{{ t('Slidecko website') }}</a>
+            <a class="mi" href="https://github.com/JonasTebben/slidecko/blob/main/skills/slidecko/SKILL.md" target="_blank" rel="noopener"><Icon name="markdown" />{{ t('Write slides with an AI assistant') }}</a>
+            <a class="mi" href="https://github.com/JonasTebben/slidecko/releases" target="_blank" rel="noopener"><Icon name="history" />{{ t('What’s new') }}</a>
+            <a class="mi" href="https://github.com/JonasTebben/slidecko/issues" target="_blank" rel="noopener"><Icon name="notes" />{{ t('Report a problem or suggest an idea') }}</a>
           </Menu>
         </div>
       </div>
@@ -1810,6 +1829,19 @@ function onClipboard(e) {
           </table>
         </div>
         <menu><button type="button" @click="rhUseTimes">{{ t('Use these times as planned times') }}</button><button type="button" @click="rhAgain">{{ t('Rehearse again') }}</button><button class="primary" value="">{{ t('Close') }}</button></menu>
+      </form>
+    </dialog>
+
+    <!-- Delete in the File menu: the slide, one of the added decks or the whole project, the smallest one chosen first -->
+    <dialog ref="deleteDialog" class="delete-dlg" @close="deleteDialog.returnValue === 'ok' && deleteChosen()">
+      <form method="dialog">
+        <h2>{{ t('What do you want to delete?') }}</h2>
+        <div class="delete-options" role="radiogroup" :aria-label="t('What do you want to delete?')">
+          <label v-if="deck.slides.length > 1"><input v-model="deleteWhat" type="radio" value="slide" /><span><b>{{ t('This slide') }}</b><small>{{ t('Slide {0}', ui.slide + 1) }} · {{ t('You can get it back with “Undo”.') }}</small></span></label>
+          <label v-for="g in decks.filter(g => g.file !== deck.entry)" :key="g.file"><input v-model="deleteWhat" type="radio" :value="'deck:' + g.file" /><span><b>{{ t('Deck “{0}”', g.name) }}</b><small>{{ g.count === 1 ? t('Slide {0}', g.start + 1) : t('Slides {0}–{1}', g.start + 1, g.start + g.count) }} · {{ t('You can get it back with “Undo”.') }}</small></span></label>
+          <label class="danger"><input v-model="deleteWhat" type="radio" value="project" /><span><b>{{ t('Whole project “{0}”', deck.title) }}</b><small>{{ t('All slides, decks, images, media and saved versions in this browser. This cannot be undone: save the project as a file first if you may need it again.') }}</small></span></label>
+        </div>
+        <menu><button value="">{{ t('Cancel') }}</button><button class="primary danger" value="ok">{{ t('Delete') }}</button></menu>
       </form>
     </dialog>
 
