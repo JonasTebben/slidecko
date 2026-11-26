@@ -236,6 +236,7 @@ const EXPORTS = [
   { id: 'slidev', icon: 'markdown', name: 'Slidev project', ext: '.zip', apps: 'Slidev (npx slidev)', note: 'Markdown with all decks, images and theme', editable: true, project: true },
   { id: 'git', icon: 'git', name: 'Git project', ext: '.zip', apps: 'Git · GitHub · GitLab', note: 'The Slidev project, with every saved version as a commit', editable: true, project: true },
 ]
+const MAIN_EXPORTS = ['pdf', 'pptx', 'pptx-google', 'html']
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 const exportClicks = ref(false) // PDF and images: one page per click step
 const exportWithNotes = ref(false) // PDF: a handout with the speaker notes
@@ -643,8 +644,18 @@ const sheet = ref(true)
 watch(() => selection.value.map(e => e.id).join(), ids => { if (ids && phone.matches) { sheet.value = true; nextTick(() => document.querySelector('.inspector')?.scrollTo(0, 0)) } })
 const fitPresenter = () => {
   const narrow = phone.matches // phones: presenter view stacks slide, next slide and notes
-  presentScale.value = presenterView.value ? Math.min((innerWidth * (narrow ? 1 : 0.62) - (narrow ? 32 : 0)) / format.w, (innerHeight * (narrow ? 0.4 : 0.7)) / format.h) : Math.min(innerWidth / format.w, innerHeight / format.h)
+  if (!presenterView.value) { presentScale.value = Math.min(innerWidth / format.w, innerHeight / format.h); return }
+  if (narrow) { presentScale.value = Math.min((innerWidth - 32) / format.w, innerHeight * 0.4 / format.h); nextScale.value = 0.3; notesBelow.value = false; return }
+  // the current slide as large as the screen allows next to a side column (time, next slide, notes) of a third, the bar below
+  const side = Math.min(560, Math.max(300, innerWidth * 0.32))
+  presentScale.value = Math.min((innerWidth - side - 72) / format.w, (innerHeight - 112) / format.h)
+  // room below the slide (a 16:9 slide on a 16:10 screen): the notes go there, the next slide gets the side column
+  notesBelow.value = innerHeight - 112 - format.h * presentScale.value >= 160
+  nextScale.value = Math.min(innerWidth - 72 - format.w * presentScale.value, innerHeight * (notesBelow.value ? 0.6 : 0.36) * format.w / format.h) / format.w
 }
+const notesBelow = ref(false)
+const nextScale = ref(0.3)
+const clockNow = computed(() => new Date(now.value).toLocaleTimeString(lang.value, { hour: '2-digit', minute: '2-digit' }))
 // the audience's window (a second screen): this one becomes the presenter view
 const audience = shallowRef(null), audScale = ref(1)
 const fitAudience = () => { const w = audience.value?.win; if (w) audScale.value = Math.min(w.innerWidth / format.w, w.innerHeight / format.h) }
@@ -1127,16 +1138,17 @@ function onClipboard(e) {
             <button class="mi" @click="A.run(() => duplicateProject(deck.id))"><Icon name="copy" />{{ t('Duplicate project') }}</button>
             <button class="mi" @click="ui.home = true"><Icon name="home" />{{ t('All projects') }}</button>
             <hr />
-            <label class="mi" tabindex="0" role="button"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
-            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
-            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
-            <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
-            <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ kbd('sourceEditor') }}</kbd></button>
-            <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
-            <hr />
             <button class="mi" @click="A.saveFile"><Icon name="save" />{{ t('Save project as file') }}<kbd>{{ kbd('saveFile') }}</kbd></button>
             <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}</button>
             <button class="mi" @click="openSnaps"><Icon name="history" />{{ t('Version history …') }}</button>
+            <hr />
+            <h4 class="mh">{{ t('Markdown and Slidev') }}</h4>
+            <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Insert slides from Markdown …') }}</button>
+            <button class="mi" @click="source.open = true"><Icon name="code" />{{ t('Edit Markdown source …') }}<kbd>{{ kbd('sourceEditor') }}</kbd></button>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks (.md) …') }}<input type="file" accept=".md,text/markdown" multiple hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
+            <label class="mi" tabindex="0" role="button"><Icon name="upload" />{{ t('Add decks from folder …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'decks'); $event.target.value = ''" /></label>
+            <label class="mi" tabindex="0" role="button"><Icon name="folder" />{{ t('Open Slidecko / Slidev project …') }}<input type="file" webkitdirectory hidden @change="pickImport([...$event.target.files], 'project'); $event.target.value = ''" /></label>
+            <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
           </Menu>
           <Menu :label="t('Edit')">
             <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ kbd('undo') }}</kbd></button>
@@ -1715,14 +1727,29 @@ function onClipboard(e) {
             <option v-for="d in decks.filter(d => d.file !== deck.entry)" :key="d.file" :value="d.file">{{ t('Deck “{0}” · {1} slides', d.name, d.count) }}</option>
           </select>
         </label>
-        <div class="export-grid" role="radiogroup" aria-label="Format">
-          <label v-for="f in EXPORTS" :key="f.id" class="export-card" :class="{ on: exportFormat === f.id, off: f.project && exportScope }">
+        <div role="radiogroup" aria-label="Format">
+          <div class="export-grid main">
+          <label v-for="f in EXPORTS.filter(f => MAIN_EXPORTS.includes(f.id))" :key="f.id" class="export-card" :class="{ on: exportFormat === f.id, off: f.project && exportScope }">
             <input v-model="exportFormat" type="radio" name="export-format" :value="f.id" :disabled="f.project && !!exportScope" />
             <strong>{{ t(f.name) }} <small>{{ f.ext }}</small></strong>
             <span class="apps">{{ t(f.apps) }}</span>
             <span class="note">{{ t(f.note) }}</span>
             <span class="badges"><em v-if="f.editable" class="b-edit">{{ t('editable') }}</em><em v-if="f.exact" class="b-exact">{{ t('pixel-perfect') }}</em><em v-if="f.project">{{ t('whole project only') }}</em></span>
           </label>
+          </div>
+          <!-- the rest folded away: most people want one of the four above -->
+          <details class="export-more" :open="!MAIN_EXPORTS.includes(exportFormat)">
+            <summary>{{ t('More formats') }}</summary>
+            <div class="export-grid">
+          <label v-for="f in EXPORTS.filter(f => !MAIN_EXPORTS.includes(f.id))" :key="f.id" class="export-card" :class="{ on: exportFormat === f.id, off: f.project && exportScope }">
+            <input v-model="exportFormat" type="radio" name="export-format" :value="f.id" :disabled="f.project && !!exportScope" />
+            <strong>{{ t(f.name) }} <small>{{ f.ext }}</small></strong>
+            <span class="apps">{{ t(f.apps) }}</span>
+            <span class="note">{{ t(f.note) }}</span>
+            <span class="badges"><em v-if="f.editable" class="b-edit">{{ t('editable') }}</em><em v-if="f.exact" class="b-exact">{{ t('pixel-perfect') }}</em><em v-if="f.project">{{ t('whole project only') }}</em></span>
+          </label>
+            </div>
+          </details>
         </div>
         <label v-if="!EXPORTS.find(f => f.id === exportFormat)?.project" class="export-scope">{{ t('Slides') }}
           <input v-model="exportRange" :placeholder="t('all, or e.g. 1, 6-8')" :aria-invalid="!exportPicked" :title="t('Numbers as in the slide list; hidden slides stay out')" />
@@ -1796,7 +1823,7 @@ function onClipboard(e) {
     <KeysDialog ref="keysDialog" :commands="commands" />
   </template>
 
-  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
+  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, 'notes-below': notesBelow, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
     @pointerdown="swipeDown" @pointermove="e => { swipeMove(e); if (tool === 'laser') laser = [e.clientX, e.clientY] }" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
       <Transition :name="'tr-' + transition" :css="transition !== 'none' && transition !== 'morph'">
@@ -1820,13 +1847,15 @@ function onClipboard(e) {
           <button class="tb small" :title="t('End rehearsal') + ' (Esc)'" @click="stopPresenting"><Icon name="x" :size="16" />{{ t('End rehearsal') }}</button>
         </div>
       </section>
+      <!-- time at a glance: since the start (the bar's button resets it) and the time of day -->
+      <div v-if="!rehearsal" class="pv-time"><b>{{ elapsed }}</b><span>{{ clockNow }}</span></div>
       <div class="pv-next">
         <small>{{ t('Next slide') }}</small>
-        <div v-if="upNext.slide !== ui.slide || upNext.step !== clickStep" :style="{ width: format.w * 0.3 + 'px', height: format.h * 0.3 + 'px' }"><SlideView :slide="deck.slides[upNext.slide]" :index="upNext.slide" :step="upNext.step" :style="{ transform: 'scale(0.3)' }" /></div>
+        <div v-if="upNext.slide !== ui.slide || upNext.step !== clickStep" :style="{ width: format.w * nextScale + 'px', height: format.h * nextScale + 'px' }"><SlideView :slide="deck.slides[upNext.slide]" :index="upNext.slide" :step="upNext.step" :style="{ transform: `scale(${nextScale})` }" /></div>
         <p v-else>{{ t('End') }}</p>
       </div>
-      <div class="pv-notes"><template v-if="slide.notes"><span v-for="(p, j) in notes" :key="j" :class="notesNow >= 0 && (j === notesNow ? 'note-now' : 'note-off')">{{ p.text }}</span></template><template v-else>{{ t('No notes') }}</template></div>
     </aside>
+    <div v-if="presenterView" class="pv-notes"><template v-if="slide.notes"><span v-for="(p, j) in notes" :key="j" :class="notesNow >= 0 && (j === notesNow ? 'note-now' : 'note-off')">{{ p.text }}</span></template><template v-else>{{ t('No notes') }}</template></div>
     <div v-if="blank" class="pv-blank" :class="blank" aria-hidden="true" />
     <div v-if="tool === 'laser' && laser" class="pv-laser" :style="{ translate: `${laser[0]}px ${laser[1]}px` }" aria-hidden="true" />
     <div v-if="extra" class="pv-clock" :class="{ done: done(extra), warn: warning(extra, true) }" @click.stop>

@@ -13,7 +13,7 @@ Everything below is what Slidecko's import reads. Do not invent other syntax: un
 
 Write one file, `slides.md`, then tell the user how to open it:
 
-- **New project**: on the start page of [slidecko.de](https://slidecko.de) choose "Open Markdown files" (or "Open Slidecko / Slidev project" for a folder with `slides.md` and its pictures).
+- **New project**: on the start page of [slidecko.de](https://slidecko.de) choose "Open slides written as text" (or, below the cards, "Open Slidev project folder …" for a folder with `slides.md` and its pictures).
 - **Into an open project**: Insert → "Markdown / AI slides …" (⇧M), paste, "Insert slides".
 
 Nothing is uploaded; the deck stays in the user's browser.

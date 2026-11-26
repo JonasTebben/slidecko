@@ -435,6 +435,46 @@ await step('ipad portrait, German: the top bar wraps instead of pushing Export a
   await ctx.close()
 })
 
+await step('laptop: layout prompts stay out of the presentation, a new shape goes into free space, More formats, presenter view uses the screen', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
+  const q = await ctx.newPage()
+  await q.goto(PROD + '?lang=en'); await q.waitForSelector('.home', { timeout: 20000 })
+  await q.locator('.start-card.primary').click(); await q.waitForSelector('.stage .slide')
+  // slide 2 (title and list from its layout): a shape must not land on the list
+  await q.locator('.thumb').nth(1).click()
+  await palette(q, 'Insert shape: Rectangle'); await q.waitForSelector('.stage .el.shape')
+  const over = await q.evaluate(() => {
+    const r = n => n.getBoundingClientRect(), hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1
+    const shape = r(document.querySelector('.stage .slide > .el.shape'))
+    return [...document.querySelectorAll('.stage .slide > .el.text')].filter(n => hit(r(n), shape)).length
+  })
+  if (over) throw new Error(`the new shape covers ${over} text box(es)`)
+  // the title is only a prompt: dimmed in the editor, gone while presenting
+  await q.locator('.thumb').first().click()
+  if (!(await q.locator('.stage .el[data-prompt]').count())) throw new Error('no prompt on a new title slide')
+  await q.locator('.right .tb.primary').click(); await q.waitForSelector('.presenter .slide')
+  if (await q.locator('.presenter .el[data-prompt]').first().isVisible()) throw new Error('a prompt shows while presenting')
+  await q.keyboard.press('Escape'); await q.waitForSelector('.presenter', { state: 'detached' })
+  // typing over the title makes it real content
+  const title = q.locator('.stage .el.title').first()
+  await title.dblclick(); await q.keyboard.type('Quarterly review'); await q.locator('.stage').click({ position: { x: 5, y: 5 } })
+  if (await q.locator('.stage .el.title[data-prompt]').count()) throw new Error('an edited title is still a prompt')
+  if (!/^Quarterly review$/.test((await title.innerText()).trim())) throw new Error(`title after typing: ${await title.innerText()}`)
+  // presenter view: the notes sit below the slide on a 16:10 screen
+  await palette(q, 'Presenter view'); await q.waitForSelector('.presenter.pv')
+  const pv = await q.evaluate(() => { const m = document.querySelector('.pv-main').getBoundingClientRect(), n = document.querySelector('.pv-notes').getBoundingClientRect(); return { below: n.top >= m.bottom, w: m.width } })
+  if (!pv.below || pv.w < 860) throw new Error(`presenter view: ${JSON.stringify(pv)}`)
+  await q.keyboard.press('Escape'); await q.waitForSelector('.presenter', { state: 'detached' })
+  // export dialog: four formats, the rest folded under More formats
+  await palette(q, 'Export …'); await q.waitForSelector('dialog.export-dlg[open]')
+  if (await q.locator('dialog.export-dlg input[value="odp"]').isVisible()) throw new Error('OpenDocument shown before More formats')
+  await q.locator('dialog.export-dlg summary').click()
+  if (!(await q.locator('dialog.export-dlg .export-more .export-card').first().isVisible())) throw new Error('More formats does not open')
+  await q.keyboard.press('Escape')
+  await ctx.close()
+})
+
 // 4. phone layout
 page = await open(PROD, 'phone', { width: 390, height: 844 })
 await step('phone: start page', () => page.screenshot({ path: join(OUT, 'phone-home.png') }))

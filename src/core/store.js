@@ -141,6 +141,7 @@ export function cleanEl(e) {
     case 'text': return {
       ...base, html: clean(e.html), ...(e.title && { title: true }), ...(ALIGN.includes(e.align) && { align: e.align }), ...(['middle', 'bottom'].includes(e.valign) && { valign: e.valign }),
       ...(color(e.color) && { color: color(e.color) }), ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(fontStack(e.font) && { font: e.font }),
+      ...(e.prompt === true && { prompt: true }), // a layout's text not yet edited: left out when presenting and exporting
       ...(e.board === true && { board: true }), // notes box: the audience's answers are typed into it while presenting
       ...(e.board === true && e.liveTemp === true && { liveTemp: true }), // what is typed there is gone after the presentation
       ...(e.clickItems === true && { clickItems: true }), // its list items appear one per click while presenting

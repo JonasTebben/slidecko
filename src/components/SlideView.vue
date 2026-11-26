@@ -292,6 +292,9 @@ async function edit(e, el) {
   const target = cell ? box.querySelector(`[data-r="${cell.dataset.r}"][data-c="${cell.dataset.c}"]`) : box.querySelector('[contenteditable=true], textarea')
   target?.focus()
   if (el.type === 'text' || cell) caretAt(e, target)
+  // a prompt ("Title", "First point"): its line is selected, so typing replaces it
+  const line = el.prompt && target && document.getSelection().anchorNode?.parentElement?.closest('h1, h2, h3, h4, p, li, blockquote')
+  if (line && target.contains(line)) document.getSelection().selectAllChildren(line)
 }
 // caret where the user clicked, not at the start
 function caretAt(e, target) {
@@ -317,7 +320,7 @@ function editLive(e, el) {
 function commit(e, el) {
   const html = clean(unresolveImgs(e.target.innerHTML))
   if (liveEdit.value === el.id) keepTyped(el, html)
-  else if (html !== el.html) el.html = html
+  else if (html !== el.html) { el.html = html; delete el.prompt } // edited: real content from now on
   if (ui.editing === el.id) ui.editing = null
   if (liveEdit.value === el.id) { liveEdit.value = null; root.value?.closest('[tabindex]')?.focus() } // back to the slide keys
 }
@@ -513,7 +516,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
 <template>
   <div ref="root" class="slide" :data-steps="steps.length || null" :class="[`theme-${theme || deck.theme}`, `layout-${slide.layout}`, { painting: editable && ui.painting }]" :style="[themeStyle(theme || deck.theme), bgStyle]" @pointerdown.self="backgroundDown" @marks="layoutMarks">
     <div
-      v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
+      v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id" :data-prompt="el.prompt || null"
       :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-until="untilOf(el, steps) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
       class="el" :class="[el.type, { run: el.type === 'code' && isRun(el.meta), tabbed: el.type === 'code' && el.tabs?.length, 'out-right': el.outPos === 'right', cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,

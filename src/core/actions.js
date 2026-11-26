@@ -1,4 +1,5 @@
 import { toggleList } from '../editor/lists.js'
+import { freeSpot } from '../editor/spacing.js'
 import { computed, nextTick, ref } from 'vue'
 import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
 import { ELEMENTS, SLIDE_PRESETS } from '../slide/presets.js'
@@ -47,15 +48,21 @@ export const errorText = e => /central directory|is this a zip|corrupted zip|inv
   ? t('This file could not be read: it is damaged or not the format its name says.')
   : t('Error: {0}', e?.message || e)
 
+// a layout's text copied into a slide is only a prompt ("Title", "First point") until it is edited:
+// dimmed in the editor, left out when presenting and exporting
+const prompted = e => (e.type === 'text' && !e.board ? { ...e, prompt: true } : e)
+export const withoutPrompts = s => (s.elements.some(e => e.prompt) ? { ...s, elements: s.elements.filter(e => !e.prompt) } : s)
 // a new presentation with a title and a content slide (start page, File menu)
 export const newPresentation = (theme = DEFAULT_THEME) => createProject({
   title: t('New presentation'), theme,
-  slides: ['title', 'content'].map(id => { const p = SLIDE_PRESETS.find(x => x.id === id); return { layout: p.layout, elements: p.make() } }),
+  slides: ['title', 'content'].map(id => { const p = SLIDE_PRESETS.find(x => x.id === id); return { layout: p.layout, elements: p.make().map(prompted) } }),
 })
 
 // --- elements ---
-export function addElement(el) {
+// place: into the free space of the slide (not over its text); off for boxes with a fixed spot (a footer field)
+export function addElement(el, place = true) {
   el = { ...el, id: uid() }
+  if (place && el.w < W && el.h < H) Object.assign(el, freeSpot(el, slide.value.elements, W, H))
   slide.value.elements.push(el)
   ui.sel = [el.id]
   return el
@@ -270,7 +277,7 @@ export async function fitHeight(el) {
 // a new slide from a project layout (default: "Title & content"): its placeholders, copied
 export function addSlide(l = deck.layouts.find(x => x.id === 'content') || deck.layouts[0]) {
   ui.master = null
-  const s = newSlide(l?.layout, l && regroup(l.elements.filter(e => e.placeholder).map(({ placeholder, ...e }) => ({ ...JSON.parse(JSON.stringify(e)), id: uid() }))))
+  const s = newSlide(l?.layout, l && regroup(l.elements.filter(e => e.placeholder).map(({ placeholder, ...e }) => prompted({ ...JSON.parse(JSON.stringify(e)), id: uid() }))))
   if (l) s.type = l.id
   if (flowable(s.elements)) s.flow = flowHash(s) // exported as plain Markdown until it is rearranged or styled
   s.file = slide.value ? fileOf(slide.value) : deck.entry // stays in the current deck
@@ -321,7 +328,7 @@ export function setLayoutBase(l, base) {
   l.layout = base
 }
 // a text box with a field (slide number, count, project title), bottom right
-export const insertField = kind => addElement({ type: 'text', html: `<p><span data-field="${kind}">#</span></p>`, x: W - 216, y: H - 44, w: 160, h: 28, align: 'right', fontSize: 14 })
+export const insertField = kind => addElement({ type: 'text', html: `<p><span data-field="${kind}">#</span></p>`, x: W - 216, y: H - 44, w: 160, h: 28, align: 'right', fontSize: 14 }, false)
 
 // file: the deck the slide was dropped into (it becomes part of it)
 export function moveSlide(from, to, file) {
@@ -654,10 +661,10 @@ export function download(blob, name) {
 // range: 0-based indexes in the scope's slide list (the export dialog's "Slides" field), empty for all
 export const scopeList = file => (file ? slidesOf(file) : deck.slides)
 function scopeSlides(file, all, range) {
-  const list = (all ? s => s : shownSlides)(scopeList(file))
+  const list = (all ? s => s : shownSlides)(scopeList(file)).map(withoutPrompts)
   if (!range?.length) return list
-  const picked = new Set(range.map(i => scopeList(file)[i]))
-  return list.flatMap((s, no) => (picked.has(s) ? [{ ...s, no }] : [])) // the slides keep their page numbers
+  const picked = new Set(range.map(i => scopeList(file)[i]?.id))
+  return list.flatMap((s, no) => (picked.has(s.id) ? [{ ...s, no }] : [])) // the slides keep their page numbers
 }
 const scopeName = file => safe(file ? deckName(file) : deck.title)
 async function renderOutput(file, all, solutions, clicks, range) {
@@ -721,7 +728,7 @@ export const exportAs = (format, file, clicks, notes, range) => {
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0))
 // the Slidev project as { path: text or bytes }: entry file, deck files, images, fonts (and style.css for generic themes)
 async function slidevFiles(data, assets, shapeFont = {}) {
-  const { files, images, fonts } = toSlidev(data, deck.files, { shapeFont, assets })
+  const { files, images, fonts } = toSlidev({ ...data, slides: data.slides.map(withoutPrompts) }, deck.files, { shapeFont, assets })
   const out = {}
   // bundled font files come from the app itself, uploaded ones from the project
   for (const [path, src] of Object.entries(fonts)) {

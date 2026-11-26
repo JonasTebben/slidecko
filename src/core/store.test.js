@@ -294,3 +294,9 @@ test('a web page element keeps only an https address', () => {
   expect(S.cleanEl({ type: 'video', url: ' https://example.org/a?b=1 ' }).url).toBe('https://example.org/a?b=1')
   for (const url of ['http://example.org', 'javascript:alert(1)', 'https://u:p@example.org', 'nope']) expect(S.cleanEl({ type: 'video', url })).toBeNull()
 })
+
+test('prompt: a layout text not yet edited keeps its mark in the project file, other elements do not get one', () => {
+  assert.equal(S.cleanEl({ type: 'text', html: '<h1>Title</h1>', prompt: true }).prompt, true)
+  assert.equal(S.cleanEl({ type: 'text', html: '<h1>Mine</h1>' }).prompt, undefined)
+  assert.equal(S.cleanEl({ type: 'shape', shape: 'rect', prompt: true }).prompt, undefined)
+})

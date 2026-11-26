@@ -30,3 +30,17 @@ export function nearestGap(snaps, pos, [c0, c1], dist) {
   }
   return best
 }
+
+// A new box where it covers the least of what is already on the slide: its own spot if that is free,
+// otherwise the nearest free place (grid of 8, 24 from the edges); with no free place the one covering least.
+const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
+export function freeSpot(box, others, W, H, margin = 24, grid = 8) {
+  const cover = p => others.reduce((n, o) => n + overlap({ ...box, ...p }, o), 0)
+  if (!cover(box)) return { x: box.x, y: box.y }
+  let best = { x: box.x, y: box.y }, bestScore = Infinity
+  for (let y = margin; y + box.h <= H - margin; y += grid) for (let x = margin; x + box.w <= W - margin; x += grid) {
+    const score = cover({ x, y }) * 1e6 + Math.hypot(x - box.x, y - box.y) // covering less beats being near
+    if (score < bestScore) { bestScore = score; best = { x, y } }
+  }
+  return best
+}
