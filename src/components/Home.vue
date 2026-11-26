@@ -20,6 +20,8 @@ const confirmId = ref(null)
 const go = fn => async (...a) => { error.value = ''; try { await fn(...a) } catch (e) { console.error(e); error.value = errorText(e) } }
 const blank = go(newPresentation)
 const fromTemplate = go(newFromTemplate)
+// each template's icon and what it holds
+const TEMPLATE_LOOK = { workshop: ['timer', 'Agenda, group work with timer and draw, a vote'], lecture: ['presentation', 'Contents, key terms, diagram, formula, quiz'], report: ['chart', 'Key figure, chart, planned and achieved, risks'] }
 const open = go(openProject)
 // first visit (no flag, no projects): offer the tour once; starting or dismissing it stores the flag
 const offerTour = ref((() => { try { return !localStorage.getItem(TOUR_KEY) } catch { return false } })())
@@ -110,11 +112,12 @@ const when = d => new Intl.DateTimeFormat(lang.value, { dateStyle: 'medium', tim
         <label class="start-card" tabindex="0" role="button"><Icon name="markdown" :size="28" /><b>{{ t('Open slides written as text') }}</b><small>{{ t('Markdown files (.md), e.g. written by an AI assistant') }}</small>
           <input type="file" accept=".md,text/markdown" multiple hidden @change="emit('import', [...$event.target.files]); $event.target.value = ''" /></label>
       </div>
-      <p class="start-more templates">{{ t('Or start from a template:') }}
-        <button v-for="(name, id) in TEMPLATES" :key="id" class="tb small" :data-template="id" @click="fromTemplate(id)"><Icon name="file" :size="16" />{{ t(name) }}</button>
-      </p>
+      <h2>{{ t('Templates') }}</h2>
+      <div class="start-grid templates">
+        <button v-for="(name, id) in TEMPLATES" :key="id" class="start-card compact" :data-template="id" @click="fromTemplate(id)"><Icon :name="TEMPLATE_LOOK[id][0]" :size="22" /><span><b>{{ t(name) }}</b><small>{{ t(TEMPLATE_LOOK[id][1]) }}</small></span></button>
+      </div>
       <!-- for people who write slides as code: a Slidev folder; the tutorial for everyone new to Markdown -->
-      <p class="start-more">
+      <p class="start-more">{{ t('Markdown and Slidev') }}:
         <button class="tb small" :title="t('Learn Slidev Markdown by doing it, in 5 minutes: type a little, get finished slides')" @click="openTutorial()"><Icon name="book" :size="16" />{{ t('Markdown tutorial') }}</button>
         <label class="tb small" tabindex="0" role="button" :title="t('A folder with slides.md, also a Slidev or Git project exported from Slidecko: decks, images, theme and Git versions are imported')"><Icon name="folder" :size="16" />{{ t('Open Slidev project folder …') }}
           <input type="file" webkitdirectory hidden @change="emit('import', [...$event.target.files]); $event.target.value = ''" /></label>

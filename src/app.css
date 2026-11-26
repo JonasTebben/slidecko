@@ -346,6 +346,9 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 .start-card svg { color: var(--ui-accent); }
 .start-card b { font-size: 14px; }
 .start-card small { color: var(--ui-muted); line-height: 1.45; }
+.start-card.compact { flex-direction: row; align-items: center; gap: 12px; padding: 12px 14px; }
+.start-card.compact span { display: grid; gap: 2px; }
+.start-more .tb:first-child { margin-left: 4px; }
 .start-card.primary { background: #2f6fed; border: 0; color: #fff; font-weight: 400; }
 .start-card.primary svg, .start-card.primary small { color: #fff; }
 .start-card.primary svg { opacity: 0.9; }
