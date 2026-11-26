@@ -301,3 +301,9 @@ test('notes edited on an unchanged imported slide reach the export (the rest sta
   none.hash = slideHash(none)
   assert.equal(parseSlidev(toSlidev({ title: 'T', theme: 'hell', slides: [{ ...none, notes: 'added' }] }).files['slides.md']).at(-1).notes, 'added')
 })
+
+// stored in every imported project: a change to slideHash (or to what cleanEl outputs, key order included) marks every
+// imported slide as changed, so its Slidev export is no longer byte for byte. Change this value only on purpose.
+test('slideHash stays the same for the same slide', () => {
+  assert.equal(slideHash({ layout: 'default', elements: [{ id: 'a', type: 'text', x: 56, y: 40, w: 868, h: 40, html: '<h1>Hi</h1>', title: true }, { id: 'b', type: 'shape', shape: 'rect', x: 1, y: 2, w: 3, h: 4, fill: '#ff0000' }] }), 1833458702)
+})
