@@ -315,6 +315,7 @@ export default {
   "Markdown with all decks, images and theme": "Markdown met alle diareeksen, afbeeldingen en thema",
   "Match case": "Hoofdlettergevoelig",
   "Match whole word": "Alleen hele woorden",
+  "Slidev theme “{0}” is missing: laid out with “{1}”. Import its theme file first, then this folder again.": "Slidev-thema ‘{0}’ ontbreekt: opgemaakt met ‘{1}’. Importeer eerst het themabestand en daarna deze map opnieuw.",
   "missing files: {0}": "ontbrekende bestanden: {0}",
   "Mixed": "Gemengd",
   "More formats …": "Meer formaten …",

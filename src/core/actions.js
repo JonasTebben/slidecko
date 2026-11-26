@@ -427,7 +427,9 @@ async function importReport(r) {
     (r.missingFiles.length ? ' · ' + t('missing files: {0}', r.missingFiles.join(', ')) : '')
 }
 // the editor theme matching a Slidev headmatter `theme:`
+let missingTheme = ''
 function detectTheme(md) {
+  missingTheme = ''
   const head = md.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] || ''
   const t = head.match(/^theme:\s*['"]?([^'"\s]+)/m)?.[1] || 'default'
   // a Slidev theme package one of the editor's themes stands for (e.g. an imported JBT Theme); a project-local theme: the first such theme
@@ -435,6 +437,7 @@ function detectTheme(md) {
   const hit = pkg.find(id => THEMES[id].slidev === t) || ((t.startsWith('.') || t.startsWith('/')) && pkg[0])
   if (hit) return hit
   if (/seriph/.test(t)) return 'serif'
+  if (t !== 'default') missingTheme = t // a theme package Slidecko has no theme for: laid out with Hell, told in the import report
   return /colorSchema:\s*dark/.test(head) ? 'dunkel' : 'hell'
 }
 const TEXT_FILE = /\.(vue|ts|js|mjs|cjs|css|scss|json|ya?ml|html|txt|md|sh)$|(^|\/)\.(gitignore|editorconfig|npmrc)$/
@@ -472,7 +475,9 @@ export const importProject = (files, entry, replace) => run(async () => {
   const title = source || entry.replace(/\.md$/, '')
   await createProject({ title, source, theme, entry, aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: await projectFiles(files, slideFiles) }, replace)
   const git = map.has('.git/HEAD') ? await gitVersions(map, entry, title, source) : ''
-  toast(await importReport(r) + git, 8000)
+  // measured with the wrong theme, the slides do not fit once the right one is chosen; importing again after the theme file lays them out anew
+  const hint = missingTheme ? ' · ' + t('Slidev theme “{0}” is missing: laid out with “{1}”. Import its theme file first, then this folder again.', missingTheme, t(THEMES[theme].name)) : ''
+  toast(await importReport(r) + hint + git, hint ? 15000 : 8000)
 })
 // a Git repository in the folder: its older commits become the project's version history (the folder itself is the current state)
 async function gitVersions(map, entry, title, source) {

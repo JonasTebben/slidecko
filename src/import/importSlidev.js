@@ -111,7 +111,7 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
       const centered = CENTERED.includes(baseOf(s.layout))
       const slide = Object.assign(document.createElement('div'), { className: `slide theme-${theme} layout-${baseOf(s.layout)}` })
       for (const [k, v] of Object.entries(themeStyle(theme))) slide.style.setProperty(k, v)
-      Object.assign(slide.style, { width: size.w + 'px', height: size.h + 'px' })
+      Object.assign(slide.style, { width: size.w + 'px', height: size.h + 'px', overflowWrap: 'break-word' }) // text boxes break long words (slide.css): measured the same way, so the box holds the extra line
       slide.innerHTML = `<div class="flow${centered ? ' center' : ''}">${centered ? `<div class="center-wrap">${htmls[i]}</div>` : htmls[i]}</div>`
       // Slidev's image-left/-right: the picture (frontmatter image:) takes one half, the content the other
       const half = { 'image-left': 'left', 'image-right': 'right', 'iframe-left': 'left', 'iframe-right': 'right' }[baseOf(s.layout)]
@@ -321,6 +321,8 @@ function measure(slide, parsed) {
       Object.assign(el, {
         type: 'table', preset: wrap?.dataset.table || 'theme', header: !!t.tHead,
         rows: [...t.rows].map(row => [...row.cells].map(c => clean(c.innerHTML.trim()))),
+        // column widths as measured (Slidev sizes columns by content; without them the table renders with equal columns and grows taller)
+        ...(t.rows[0] && [...t.rows].every(row => [...row.cells].every(c => c.colSpan === 1)) && t.offsetWidth && { widths: [...t.rows[0].cells].map(c => Math.round(c.offsetWidth / t.offsetWidth * 1000) / 10) }),
         align: [...(t.rows[0]?.cells || [])].map(c => c.getAttribute('align') || c.style.textAlign || ''),
         // as written (the CSSOM would turn #006b96 into rgb(0, 107, 150))
         fills: [...t.rows].map(row => [...row.cells].map(c => c.getAttribute('style')?.match(/background(?:-color)?:\s*([^;]+)/)?.[1].trim() || '')),

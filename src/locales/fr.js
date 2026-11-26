@@ -315,6 +315,7 @@ export default {
   "Markdown with all decks, images and theme": "Markdown avec tous les jeux de diapositives, images et thème",
   "Match case": "Respecter la casse",
   "Match whole word": "Mot entier uniquement",
+  "Slidev theme “{0}” is missing: laid out with “{1}”. Import its theme file first, then this folder again.": "Thème Slidev « {0} » manquant : mis en page avec « {1} ». Importez d’abord son fichier de thème, puis ce dossier à nouveau.",
   "missing files: {0}": "fichiers manquants : {0}",
   "Mixed": "Mixte",
   "More formats …": "Autres formats …",
