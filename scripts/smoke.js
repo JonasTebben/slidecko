@@ -101,6 +101,8 @@ const open = async (url, label, viewport = { width: 1280, height: 800 }, device 
   return page
 }
 // waits for the palette and clicks the command itself: typing ahead of the UI, or a similar command ranked higher, picks another one
+// waits for a state (polls an async check) instead of a fixed time: false when it never comes
+const until = async (f, ms = 8000) => { for (const end = Date.now() + ms; !(await f());) { if (Date.now() > end) return false; await new Promise(r => setTimeout(r, 50)) } return true }
 const palette = async (page, cmd) => {
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape')
   await page.keyboard.press('ControlOrMeta+k')
@@ -192,7 +194,7 @@ await step('dev: create project', async () => {
 })
 await step('dev: icon picker', async () => {
   await page.evaluate(async () => { Object.assign((await import('/src/slide/icons.js')).picker, { open: true, target: null }) })
-  await page.waitForSelector('dialog[open]', { timeout: 10000 }); await page.keyboard.type('home'); await page.waitForTimeout(1000); await page.keyboard.press('Escape')
+  await page.waitForSelector('dialog[open]', { timeout: 10000 }); await page.keyboard.type('home'); await page.waitForSelector('dialog[open] .ip-grid button', { timeout: 20000 }); await page.keyboard.press('Escape')
 })
 await step('dev: Markdown tutorial', async () => {
   await page.evaluate(async () => { (await import('/src/editor/tutorial.js')).tutorial.open = true })
@@ -370,8 +372,8 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   await p.keyboard.press('t')
   await p.locator('.clock [data-more]').click()
   if ((await p.locator('.clock [data-face]').innerText()) !== '6:00') throw new Error('minutes not set')
-  await p.locator('.clock [data-face]').click(); await p.waitForTimeout(1200)
-  if ((await p.locator('.clock [data-face]').innerText()) !== '5:59') throw new Error('not running')
+  await p.locator('.clock [data-face]').click()
+  if (!(await until(async () => (await p.locator('.clock [data-face]').innerText()) === '5:59'))) throw new Error('not running')
   for (let k = 0; k < 4; k++) await p.keyboard.press('ArrowRight')
   const face = p.locator('.slide.on .picker-face')
   if (await face.count()) {
@@ -501,10 +503,10 @@ async function presenting(page, label, touch) {
     await start()
   })
   await step(`${label}: a timer waits for its tap, an auto one runs`, async () => { ok((await text(T1)) === '1:00' && !(await running(T1)), 'started by itself'); ok(await running(T2), 'auto timer stopped') })
-  await step(`${label}: a tap starts a timer and does not turn the slide`, async () => { await tap(T1); await page.waitForTimeout(1200); ok(await running(T1), 'not running'); ok((await shown()) === '1 / 2', 'slide turned') })
+  await step(`${label}: a tap starts a timer and does not turn the slide`, async () => { await tap(T1); ok(await until(() => running(T1)), 'not running'); ok((await shown()) === '1 / 2', 'slide turned') })
   await step(`${label}: a tap on a code tab shows its code and does not turn the slide`, async () => {
-    await tap('.pv-slide .code-tabs [data-tab="1"]'); await page.waitForTimeout(200)
-    ok((await text('.pv-slide .el.code > pre.code:not([hidden])')).trim() === 'pnpm i', 'tab not shown'); ok((await shown()) === '1 / 2', 'slide turned')
+    await tap('.pv-slide .code-tabs [data-tab="1"]')
+    ok(await until(async () => (await text('.pv-slide .el.code > pre.code:not([hidden])')).trim() === 'pnpm i'), 'tab not shown'); ok((await shown()) === '1 / 2', 'slide turned')
   })
   await step(`${label}: a web page loads only after a tap, without turning the slide`, async () => {
     ok(!(await page.locator('.pv-slide .web iframe').count()), 'loaded by itself')
@@ -552,33 +554,36 @@ async function presenting(page, label, touch) {
   await step(`${label}: the bar's own timer`, async () => {
     await tap('.pv-bar button[aria-label=Timer]'); await tap('.pv-clock button[aria-label="One minute more"]')
     ok((await text('.pv-clock-face')) === '6:00', await text('.pv-clock-face'))
-    await tap('.pv-clock-face'); await page.waitForTimeout(1200)
-    ok((await text('.pv-clock-face')) === '5:59', await text('.pv-clock-face'))
+    await tap('.pv-clock-face')
+    ok(await until(async () => (await text('.pv-clock-face')) === '5:59'), await text('.pv-clock-face'))
   })
   if (!touch) await step(`${label}: the audience window shows the slide, takes the keys and can be closed`, async () => {
     await page.locator('.pv-bar:not(.pv-ink-bar)').evaluate(n => (n.style.opacity = 1))
     const [pop] = await Promise.all([page.waitForEvent('popup'), tap('.pv-bar button[aria-label="Audience window"]')])
     await pop.waitForSelector('.audience .pv-slide .slide')
     ok((await pop.locator('.audience .el.timer').count()) === 2, 'not the current slide')
-    await pop.keyboard.press('ArrowRight'); await pop.waitForTimeout(400)
-    ok((await shown()) === '2 / 2' && (await pop.locator('.audience .pv-slide').last().innerText()).includes('Two'), 'did not follow')
-    await pop.keyboard.press('ArrowLeft'); await pop.waitForTimeout(400)
-    await pop.close(); await page.waitForTimeout(800)
+    await pop.keyboard.press('ArrowRight')
+    ok(await until(async () => (await shown()) === '2 / 2' && (await pop.locator('.audience .pv-slide').last().innerText()).includes('Two')), 'did not follow')
+    await pop.keyboard.press('ArrowLeft')
+    ok(await until(async () => (await shown()) === '1 / 2'), 'did not go back')
+    await pop.close()
+    ok(await until(async () => !(await page.locator('.audience').count())), 'window not closed')
     ok((await shown()) === '1 / 2' && (await page.locator('.presenter').count()), 'presenting ended with the window')
     await tap('.pv-bar button[aria-label="Presenter view"]')
   })
   await step(`${label}: after editing, notes and drawing are kept as set, timers wait for a tap`, async () => {
     await leave()
-    await page.waitForTimeout(300)
-    const els = await page.evaluate(async () => (await import('/src/core/store.js')).deck.slides[0].elements.map(e => [e.type, e.html || '']))
+    const elsNow = () => page.evaluate(async () => (await import('/src/core/store.js')).deck.slides[0].elements.map(e => [e.type, e.html || '']))
+    await until(async () => (await elsNow()).some(([t]) => t === 'image'))
+    const els = await elsNow()
     ok(els.some(([, h]) => h.includes('Kept one')), 'kept notes lost')
     ok(els.some(([, h]) => h === '<p>Temp</p>'), 'temporary notes saved')
     ok(els.filter(([t]) => t === 'image').length === 1, 'drawing not kept')
     await page.waitForTimeout(1000)
     await start()
     const t2 = await text(T2)
-    await page.waitForTimeout(1200)
-    ok(!(await running(T1)) && (await text(T2)) !== t2, 'timers')
+    ok(await until(async () => (await text(T2)) !== t2), 'auto timer not running')
+    ok(!(await running(T1)), 'timer started by itself')
     ok(!(await text('.pv-slide .el.board >> nth=1')).includes('two'), 'temporary notes still shown')
     await draw()
     await leave()
