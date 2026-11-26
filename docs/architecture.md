@@ -102,6 +102,10 @@ All built-in themes meet WCAG AA (text 4.5:1, large text 3:1) on every layout, c
 - `slides-builder` is the storage prefix (existing user data), not a leftover name.
 - Slides keep their theme colours in dark mode; only the app chrome follows `src/core/scheme.js`.
 
+## Releases
+
+The hosted site deploys a version of this repository's `main`; when it is live, that commit gets a tag `v<date>` and `.github/workflows/release.yml` turns the tag into a GitHub release listing the commits since the previous one. So commit subjects are the changelog: say what changed for the user.
+
 ## Agent skill
 
 `skills/slidecko/SKILL.md` tells AI agents which Slidev Markdown Slidecko reads; `.claude-plugin/` makes the repository installable as a Claude Code plugin. When the Markdown import learns or drops something, update the skill: `src/import/skill.test.js` reads its example deck and checks layouts, notes, columns and diagrams.

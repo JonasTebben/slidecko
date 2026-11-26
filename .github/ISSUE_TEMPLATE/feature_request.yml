@@ -1,0 +1,19 @@
+name: 💡 Idea
+description: Suggest something Slidecko could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you want to do?
+      description: The situation and the goal, e.g. "In class I want to …". We will figure out the best way together.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+      description: Optional. Sketches, examples from other tools, how it should look in PowerPoint, PDF or Slidev.
+  - type: markdown
+    attributes:
+      value: Slidecko runs entirely in the browser (no server, no account, no upload of anyone's slides), so ideas have to fit that.

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 What Slidecko can do
+    url: https://github.com/JonasTebben/slidecko/blob/main/docs/features.md
+    about: Every feature in detail, and what each export format gets.
+  - name: 🚧 Known limitations
+    url: https://github.com/JonasTebben/slidecko/blob/main/docs/limitations.md
+    about: Where formats or browsers set limits.

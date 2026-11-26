@@ -4,7 +4,7 @@ Welcome, and thank you for thinking about helping! Slidecko is a presentation ed
 
 ## Ways to help
 
-- **Report a bug**: open an issue and tell us what you did, what you expected and what happened, plus your browser and device. A small sample file helps a lot for import and export problems (leave out anything private).
+- **Report a bug**: open an issue (the form asks for what is needed) and tell us what you did, what you expected and what happened, plus your browser and device. A small sample file helps a lot for import and export problems (leave out anything private).
 - **Suggest an idea**: open an issue and describe what you want to do with it. We'll talk about how it could work before anyone writes code.
 - **Translate**: the interface is in English, German, French, Dutch and Spanish. Better wording or a new language is very welcome (see "Translations" in [docs/architecture.md](docs/architecture.md)).
 - **Fix or build something**: small fixes can go straight to a pull request; for bigger changes, open an issue first so your work fits in.

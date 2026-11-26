@@ -1,0 +1,49 @@
+name: 🐞 Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please leave out anything private from texts and sample files.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Insert a timer
+        2. Present and tap it
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      multiple: true
+      options: [Editing, Presenting, Import, Export, Markdown / Slidev, Start page, Other]
+    validations:
+      required: true
+  - type: input
+    id: format
+    attributes:
+      label: File format involved
+      placeholder: e.g. PowerPoint export opened in LibreOffice, Slidev project import
+  - type: input
+    id: device
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Safari on iPad (touch), Chrome on Windows (mouse)
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample file
+      description: For import and export problems, attach a small file that shows it (drag it in here).
