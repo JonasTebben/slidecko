@@ -159,7 +159,13 @@ async function editor(page, label) {
     for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight')
     await page.keyboard.press('Escape')
   })
-  await step(`${label}: rehearse`, async () => { await palette(page, 'Rehearse'); await page.waitForTimeout(1000); await page.keyboard.press('Escape'); await page.keyboard.press('Escape') })
+  await step(`${label}: rehearse: the presenter view runs against the clock, Esc shows the result`, async () => {
+    await palette(page, 'Rehearse'); await page.waitForSelector('.presenter.pv', { timeout: 10000 })
+    await page.waitForFunction(() => /[1-9]/.test(document.querySelector('.rh-clock b')?.textContent || ''), null, { timeout: 10000 }) // a second of the run has passed
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('dialog.wide[open]', { timeout: 10000 }) // the result: opens only for a recorded run
+    await page.keyboard.press('Escape')
+  })
   await step(`${label}: export dialog`, () => dialog(page, 'Export …'))
   const files = {}
   for (const [cmd, key] of EXPORTS) await step(`${label}: ${cmd}`, async () => { files[key] = await download(page, () => palette(page, cmd), `${label}-${key}`) })
