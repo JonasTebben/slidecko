@@ -6,6 +6,7 @@ import { parseRatio } from '../slide/format.js'
 import { clock } from '../present/timer.js'
 import { chartSvg } from '../slide/chart.js'
 import { clickSteps, stepOf } from '../present/clicks.js'
+import { morphPairs } from '../present/morph.js'
 import { linkTarget, slideNumbers } from '../slide/links.js'
 import { MARKS, toVMark } from '../slide/marks.js'
 import { iconTag, iconSet, ICON_SETS, ICONIFY_JSON } from '../slide/icons.js'
@@ -104,6 +105,7 @@ function boxStyle(el, extra = '') {
   if (el.locked) s += ';--locked:1' // the editor's lock; Slidev ignores it
   if (el.group) s += `;--group:${el.group}` // the editor's group, likewise
   if (el.morph) s += `;--morph:${el.morph}` // Magic move name, likewise
+  if (curMorph.has(el.id)) s += `;view-transition-name:${curMorph.get(el.id)}`
   if (el.board) s += el.liveTemp ? ';--board:2' : ';--board:1' // editable while presenting (2: what is typed is not kept), likewise
   if (el.line != null) s += `;--lh:${el.line}` // line and paragraph spacing: SPACING_CSS in style.css applies them
   if (el.para != null) s += `;--ps:${el.para}px`
@@ -163,6 +165,21 @@ export function shapeSvg(el) {
 
 let curShapeFont = {} // toSlidev()'s shapeFont while it runs
 let curTheme // the deck's theme while toSlidev() runs: code blocks pick syntax colours for their background
+let curMorph = new Map() // element id -> view-transition-name while toSlidev() runs
+// Magic move in Slidev: `transition: view-transition`, and the elements it pairs share a view-transition-name
+// (an element paired on both sides keeps the name it got from the slide before, so each slide's names stay unique)
+function morphNames(slides, def) {
+  const names = new Map()
+  let n = 0
+  slides.forEach((s, i) => {
+    if (!slides[i + 1] || (s.transition || def) !== 'morph') return
+    for (const [a, b] of morphPairs(s.elements, slides[i + 1].elements)) {
+      const name = names.get(a) || `mm-${++n}`
+      names.set(a, name).set(b, name)
+    }
+  })
+  return names
+}
 function elementMd(el, flat, at = 0) { // at: step of the first list item (list items one by one)
   switch (el.type) {
     case 'image': {
@@ -364,13 +381,14 @@ function slideMd(slide) {
 
 // the slide's own frontmatter, with `layout:` following the layout chosen in the editor and `hide:` the hidden switch
 // `transition:` follows the editor; one the editor does not offer (slide-right …) stays while the slide follows the project default
-// Magic move: Slidev gets `transition: fade` and `slidecko-transition: morph`, which brings it back on import
+// Magic move: Slidev's `transition: view-transition` (the import reads it back as Magic move)
 function withTransition(fm, v) {
-  if (trOf(fm) === v || (!v && !TRANSITIONS.includes(trOf(fm)))) return fm
+  if (trOf(fm) === v && !/^slidecko-transition:/m.test(fm || '')) return fm
+  if (!v && !TRANSITIONS.includes(trOf(fm))) return fm
   fm = fm?.replace(/^slidecko-transition:.*(\n|$)/m, '').trim()
-  const cur = fmGet(fm, 'transition'), to = v === 'morph' ? 'fade' : v
+  const cur = fmGet(fm, 'transition'), to = v === 'morph' ? 'view-transition' : v
   if (cur !== to) fm = cur ? fm.replace(/^transition:.*(\n|$)/m, to ? `transition: ${to}$1` : '').trim() : [fm, `transition: ${to}`].filter(Boolean).join('\n')
-  return v === 'morph' ? `${fm}\nslidecko-transition: morph` : fm
+  return fm
 }
 // first: the deck's first slide, which Slidev shows as a cover when it names no layout
 function slideFm(slide, first) {
@@ -426,6 +444,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   curTheme = theme
   curShapeFont = shapeFont
   curNums = slideNumbers(slides)
+  curMorph = morphNames(slides, transition)
   const { slidev: own, pkg } = themeOf(theme)
   // consecutive slides of the same file form one part
   const head = transition !== 'none' ? transition : undefined // Slidev's default is no transition

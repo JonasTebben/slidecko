@@ -44,15 +44,25 @@ test('transitions: project default in the headmatter, own ones in the slide fron
   assert.equal(headFormat(plain).transition, undefined)
 })
 
-test('Magic move: Slidev gets a fade plus a marker that brings it back, an unchanged slide stays as written', () => {
-  const hi = { id: 'h', type: 'text', ...box, html: '<p>Hi</p>' }
-  const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'morph', slides: [{ layout: 'default', elements: [hi] }, { layout: 'default', transition: 'morph', elements: [{ ...hi, morph: 'logo' }] }, { layout: 'default', transition: 'fade', fm: 'transition: fade\nslidecko-transition: morph', elements: [hi] }] }, {}).files['slides.md']
-  assert.match(md, /transition: fade\nslidecko-transition: morph/)
+test('Magic move: Slidev\'s view-transition, paired elements share a view-transition-name; the older marker is read and replaced', () => {
+  const t = (id, html, x = 0) => ({ id, type: 'text', ...box, x, html })
+  const slides = [
+    { layout: 'default', elements: [t('a', '<p>Hi</p>'), t('b', '<p>Only here</p>')] },
+    { layout: 'default', transition: 'morph', elements: [t('c', '<p>Hi</p>', 300), t('d', '<p>New</p>')] },
+    { layout: 'default', transition: 'fade', fm: 'transition: fade\nslidecko-transition: morph', elements: [t('e', '<p>Hi</p>', 600)] },
+    { layout: 'default', elements: [t('f', '<p>Hi</p>')] },
+  ]
+  const md = toSlidev({ title: 'T', theme: 'hell', entry: 'slides.md', transition: 'morph', slides }, {}).files['slides.md']
   assert.equal(headFormat(md).transition, 'morph')
-  assert.deepEqual(parseSlidev(md).map(s => s.transition), ['morph', 'morph', 'fade'])
-  assert.match(md, /--morph:logo/)
-  const s = { layout: 'default', fm: 'transition: fade\nslidecko-transition: morph', transition: 'morph', elements: [hi] }
-  assert.equal(slideToMarkdown(s).split('---')[1].trim(), s.fm)
+  assert.match(md.split('\n---')[0], /^transition: view-transition$/m)
+  assert.deepEqual(parseSlidev(md).map(s => s.transition), ['morph', 'morph', 'fade', undefined])
+  assert.doesNotMatch(md, /slidecko-transition/)
+  // "Hi" glides over slides 1 → 2 → 3 under one name; the fade after slide 3 pairs nothing
+  const names = [...md.matchAll(/view-transition-name:([\w-]+)/g)].map(m => m[1])
+  assert.deepEqual(names, ['mm-1', 'mm-1', 'mm-1'])
+  const old = { layout: 'default', fm: 'transition: fade\nslidecko-transition: morph', transition: 'morph', elements: [t('a', '<p>Hi</p>')] }
+  assert.equal(parseSlidev(slideToMarkdown(old))[0].transition, 'morph')
+  assert.match(slideToMarkdown(old), /^transition: view-transition$/m)
 })
 
 test('a new slide in its preset arrangement is plain Markdown until it is moved', async () => {

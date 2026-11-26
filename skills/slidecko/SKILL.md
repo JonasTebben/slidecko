@@ -21,7 +21,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 ## Deck and slides
 
 - `---` on its own line separates slides. A `key: value` block between two `---` right after a separator is that slide's frontmatter. The first block of the file is the headmatter of the deck and the first slide's frontmatter.
-- **Headmatter**: `title:`, `aspectRatio: 16/9` (or `4/3`), `transition: fade` (also `slide-left`, `slide-up`, `none`), `duration: 20min` (planned talk length for rehearsing), `colorSchema: dark` (dark theme) or `theme: seriph` (serif paper theme). The user picks one of 13 themes in the editor anyway; do not style slides yourself.
+- **Headmatter**: `title:`, `aspectRatio: 16/9` (or `4/3`), `transition: fade` (also `slide-left`, `slide-right`, `slide-up`, `slide-down`, `view-transition` for Magic move, `none`), `duration: 20min` (planned talk length for rehearsing), `colorSchema: dark` (dark theme) or `theme: seriph` (serif paper theme). The user picks one of 13 themes in the editor anyway; do not style slides yourself.
 - **Layouts** (`layout:`): `cover` (title slide), `intro`, `section` (chapter), `statement`, `fact` (one big number), `quote`, `center` and `end` are centred; `default` (or none) is a title with content. For two columns use the grid below, not Slidev's `two-cols` slots.
 - **Per slide**: `transition:`, `hide: true` (skipped when presenting and exporting), `hideInToc: true`, `plannedTime: 90` (seconds, for rehearsing), `title:` and `level:` (its entry in the table of contents).
 - **Speaker notes**: an HTML comment as the very last thing on the slide, `<!-- … -->`. A `[click]` in the notes starts the part for the next click step. Write notes generously: what to say, not what is on the slide.

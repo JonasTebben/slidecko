@@ -18,8 +18,8 @@ export const fmGet = (fm, key) => fm?.match(new RegExp(`^${key}:\\s*(.*)$`, 'm')
 // Slidev hides a slide with `hide: true` (alias `disabled: true`)
 // slide transitions the editor offers (Slidev's built-in names); 'none' turns the project's default off for one slide
 export const TRANSITIONS = ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'morph']
-// Magic move (Slidecko's own) is written as `transition: fade` plus this key, which Slidev ignores
-export const trOf = fm => (fmGet(fm, 'slidecko-transition') === 'morph' ? 'morph' : fmGet(fm, 'transition'))
+// Magic move is Slidev's `view-transition` (older exports wrote `transition: fade` plus `slidecko-transition: morph`)
+export const trOf = fm => (fmGet(fm, 'slidecko-transition') === 'morph' || fmGet(fm, 'transition') === 'view-transition' ? 'morph' : fmGet(fm, 'transition'))
 // Slidev's v-click value -> click step: "2" is that step, an empty one (or "+1") the step after the last one
 export const clickOf = (v, last) => (v = String(v).trim().replace(/^['"]|['"]$/g, ''), /^\d+$/.test(v) ? +v : last + (+v || 1))
 // an element's Slidev click attributes (attr(name): value or null) -> { click, clickUntil, last: the new last step }:
