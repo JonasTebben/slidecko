@@ -8,7 +8,7 @@
   --code-bg: #f5f5f5; --code-fg: #1b1b1b; --code-size: 12px; --code-line: 18px;
   --stripe: color-mix(in srgb, var(--fg) 6%, transparent);
   --border: color-mix(in srgb, var(--fg) 16%, transparent);
-  position: relative; width: var(--slide-w, 980px); height: var(--slide-h, 552px); overflow: hidden; transform-origin: 0 0;
+  position: relative; width: var(--slide-w, 980px); height: var(--slide-h, 552px); overflow: hidden; overflow: clip; /* clip: a caret below the slide's edge (a text box longer than the slide) must not scroll the slide */ transform-origin: 0 0;
   box-sizing: border-box; text-align: left;
   font-family: var(--font, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif);
   font-size: 17.6px; line-height: 1.5; color: var(--fg); background-color: var(--bg);

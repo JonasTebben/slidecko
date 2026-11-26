@@ -326,6 +326,7 @@ function setCustomRatio() {
 }
 // project-wide font sizes (Inspector › Schrift für alle Folien)
 const typoStyle = document.head.appendChild(document.createElement('style'))
+typoStyle.dataset.typo = '' // found by freshImport() in actions.js
 watchEffect(() => { typoStyle.textContent = typoCss('.slide', deck.typo) })
 // utility classes (Slidev's UnoCSS) of everything on the slides
 let unoTimer

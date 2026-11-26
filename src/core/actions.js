@@ -57,11 +57,17 @@ export const newPresentation = (theme = DEFAULT_THEME) => createProject({
   title: t('New presentation'), theme,
   slides: ['title', 'content'].map(id => { const p = SLIDE_PRESETS.find(x => x.id === id); return { layout: p.layout, elements: p.make().map(prompted) } }),
 })
+// a new project starts without the open project's font sizes (App.vue's style[data-typo]): its slides are measured without them too
+async function freshImport(...args) {
+  const typo = document.querySelector('style[data-typo]')
+  if (typo) typo.disabled = true
+  try { return await importSlidev(...args) } finally { if (typo) typo.disabled = false }
+}
 // a template: a finished presentation in Slidev Markdown (src/templates/<id>.<lang>.md), read by the Markdown import
 export const TEMPLATES = { workshop: 'Workshop', lecture: 'Lecture', report: 'Quarterly report' }
 export const newFromTemplate = id => run(async () => {
   const md = await import(`../templates/${id}.${lang.value}.md?raw`).catch(() => import(`../templates/${id}.en.md?raw`))
-  const r = await importSlidev('slides.md', new Map([['slides.md', md.default]]), DEFAULT_THEME)
+  const r = await freshImport('slides.md', new Map([['slides.md', md.default]]), DEFAULT_THEME)
   if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition
   await createProject({ title: t(TEMPLATES[id]), theme: DEFAULT_THEME, entry: 'slides.md', aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: {} })
 })
@@ -468,7 +474,7 @@ export const importProject = (files, entry, replace) => run(async () => {
   toast(t('Importing …'), 0)
   const map = filesMap(files)
   const theme = detectTheme(await map.get(entry).text())
-  const r = await importSlidev(entry, map, theme)
+  const r = await freshImport(entry, map, theme)
   if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition // the headmatter's transition is the project default, not slide 1's own
   const slideFiles = new Set([entry, ...r.slides.map(s => s.file)])
   const source = files[0]?.webkitRelativePath?.split('/')[0] || ''
@@ -488,7 +494,7 @@ async function gitVersions(map, entry, title, source) {
     for (const c of commits.slice(1)) {
       if (!c.files.has(entry)) continue // that version had no such entry file
       toast(t('Reading version {0} of {1} …', snaps.length + 1, commits.length - 1), 0)
-      const md = await c.files.get(entry).text(), theme = detectTheme(md), v = await importSlidev(entry, c.files, theme)
+      const md = await c.files.get(entry).text(), theme = detectTheme(md), v = await freshImport(entry, c.files, theme)
       Object.assign(assets, v.assets)
       // Git keeps whole seconds: versions from the same second still get their own time (restore finds them by it)
       const at = Math.min(c.at, (snaps.at(-1)?.at ?? Infinity) - 1)
@@ -606,7 +612,7 @@ export const importDecksAsProject = (files, paths) => run(async () => {
   let missing = 0
   for (const p of [...paths].sort(byName)) {
     toast(t('Importing {0} …', p), 0)
-    const r = await importSlidev(p, map, detectTheme(await map.get(p).text()))
+    const r = await freshImport(p, map, detectTheme(await map.get(p).text()))
     Object.assign(assets, r.assets)
     format.aspectRatio ??= r.aspectRatio ?? '16/9' // the first deck's format (shortcut: decks of other formats keep their measured coordinates)
     format.canvasWidth ??= r.canvasWidth ?? 980
