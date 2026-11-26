@@ -367,8 +367,18 @@ function relink(slide, md) {
     return !no ? m : a ? a + no + b : c + no + d
   }) : md
 }
+// notes edited on an otherwise unchanged slide: its last comment (Slidev's notes) is replaced, or added
+const LAST_NOTE = /<!--((?:(?!<!--)[\s\S])*?)-->\s*$/
+const noteBlock = n => `<!--\n${n.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->`
+function withNotes(md, notes) {
+  if (notes == null) return md
+  const old = md.match(LAST_NOTE)?.[1].trim() || ''
+  if (old === notes.trim()) return md
+  const rest = old || LAST_NOTE.test(md) ? md.replace(LAST_NOTE, '').trimEnd() : md.trimEnd()
+  return notes.trim() ? `${rest}\n\n${noteBlock(notes)}\n` : rest + '\n'
+}
 function slideMd(slide) {
-  if (slide.md != null && slide.hash === slideHash(slide)) return relink(slide, slide.md)
+  if (slide.md != null && slide.hash === slideHash(slide)) return relink(slide, withNotes(slide.md, slide.notes))
   const flow = slide.flow != null && slide.flow === flowHash(slide)
   // the picture Slidev's image layouts draw from the frontmatter (image:) is not written twice
   const pic = /^image(-left|-right)?$/.test(slide.layout) && fmGet(slide.fm, 'image')
@@ -380,7 +390,7 @@ function slideMd(slide) {
   const steps = clickSteps(slide)
   const body = escapeMustache(els.map(e => withClick(e, withTo(e, elementMd(e, flow, stepOf(slide, e, steps))), steps)).join('\n\n') + slideStyle(slide))
   // a "---" line in the notes would end the slide (Slidev splits there even inside a comment)
-  return slide.notes ? `${body}\n\n<!--\n${slide.notes.replace(/-->/g, '—>').replace(/^---(?=\s*$)/gm, ' ---')}\n-->` : body
+  return slide.notes ? `${body}\n\n${noteBlock(slide.notes)}` : body
 }
 
 // the slide's own frontmatter, with `layout:` following the layout chosen in the editor and `hide:` the hidden switch

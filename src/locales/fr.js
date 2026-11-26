@@ -1367,4 +1367,5 @@ export default {
   "Loading a theme needs a connection.": "Le chargement d’un thème nécessite une connexion.",
   "Theme “{0}” updated": "Thème « {0} » mis à jour",
   "The theme could not be loaded: {0}": "Le thème n’a pas pu être chargé : {0}",
+  "This project is also open in another tab. Edit it in one tab only: each tab saves its own state.": "Ce projet est aussi ouvert dans un autre onglet. Modifiez-le dans un seul onglet : chaque onglet enregistre son propre état.",
 }

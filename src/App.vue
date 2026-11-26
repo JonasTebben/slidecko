@@ -484,7 +484,7 @@ async function showView(v) {
   if (v.home) { ui.home = true; return }
   if (v.project !== deck.id) {
     if (!library.list.some(p => p.id === v.project)) return // deleted or from another browser: stay where we are
-    try { if (!(await openProject(v.project))) return } catch { return }
+    try { if (!(await openProject(v.project))) return } catch (e) { ui.status = t('Saved projects could not be loaded: {0}', e.message); return }
   }
   ui.home = false
   ui.slide = Math.max(0, Math.min(v.slide, deck.slides.length - 1))

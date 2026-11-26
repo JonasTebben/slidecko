@@ -223,6 +223,13 @@ await step('dev: untrusted content stays on its slide: theme CSS, slide HTML, fo
   await q.goto(DEV + '?lang=constructor'); await q.waitForSelector('.home, .editor, header', { timeout: 20000 })
   await q.goto(DEV + '?lang=en'); await q.close()
 })
+await step('dev: the same project in a second tab says so (both tabs would save over each other)', async () => {
+  const id = await page.evaluate(async () => (await import('/src/core/store.js')).deck.id)
+  const q = await page.context().newPage()
+  await q.goto(DEV + '?lang=en#' + id + '/1')
+  await q.waitForFunction(async () => /also open in another tab/.test((await import('/src/core/store.js')).ui.status), null, { timeout: 20000 })
+  await q.close()
+})
 await step('dev: a link with ?tutorial opens the tutorial once', async () => {
   const q = await page.context().newPage()
   await q.goto(DEV + '?tutorial&lang=en'); await q.waitForSelector('dialog[open]', { timeout: 20000 })

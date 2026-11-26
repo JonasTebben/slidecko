@@ -585,7 +585,16 @@ const get = k => idb('readonly', s => s.get(k))
 const put = (k, v) => idb('readwrite', s => s.put(v, k))
 const del = k => idb('readwrite', s => s.delete(k))
 const saveFailed = e => { ui.save = 'failed'; ui.status = t('Saving in the browser failed – please save as a file! ({0})', e.message) }
-const remember = id => { try { localStorage.setItem('slides-builder:last', id) } catch {} }
+// the open project holds a lock: a second tab with the same project says so (both would save over each other)
+let unlock = () => {}
+const claim = id => {
+  unlock()
+  navigator.locks?.request('slidecko:' + id, { ifAvailable: true }, lock => {
+    if (!lock) { ui.status = t('This project is also open in another tab. Edit it in one tab only: each tab saves its own state.'); return }
+    return new Promise(r => { unlock = r })
+  }).catch(() => {})
+}
+const remember = id => { try { localStorage.setItem('slides-builder:last', id) } catch {} claim(id) }
 
 function meta() {
   return { id: deck.id, title: deck.title, source: deck.source, theme: deck.theme, slides: deck.slides.length, decks: decks.value.filter(d => d.file !== deck.entry).length, updated: Date.now() }
@@ -645,7 +654,7 @@ const queue = (job, assets) => {
   })
 }
 // closing the tab while a write is still running would lose it
-globalThis.addEventListener?.('beforeunload', e => { if (pending) e.preventDefault() })
+globalThis.addEventListener?.('beforeunload', e => { if (pending || ui.save === 'failed') e.preventDefault() }) // failed: the only current copy is in this tab
 // after a release an open page asks for code files that are gone (new names): save, then reload once to get the
 // new ones; false when it just did (within a minute), so a real outage does not reload forever
 export function reloadForUpdate() {
@@ -687,10 +696,11 @@ export async function openProject(id) {
     await saveList().catch(saveFailed)
     return false
   }
+  const data = JSON.parse(json) // a broken record throws here, before the open project is touched
   deck.assets = {}
   deck.files = {}
   deck.id = id
-  loadDeck({ ...JSON.parse(json), assets, files })
+  loadDeck({ ...data, assets, files })
   startHistory()
   assetKey = usedKey() // what a: holds
   ui.home = false
@@ -719,6 +729,7 @@ export async function removeProject(id) {
     clearTimeout(timer)
     due = false
     deck.id = ''
+    unlock()
     ui.home = true
     await saving
   }

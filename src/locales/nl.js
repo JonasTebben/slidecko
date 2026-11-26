@@ -1388,4 +1388,5 @@ export default {
   "Loading a theme needs a connection.": "Voor het laden van een thema is een verbinding nodig.",
   "Theme “{0}” updated": "Thema ‘{0}’ bijgewerkt",
   "The theme could not be loaded: {0}": "Het thema kon niet worden geladen: {0}",
+  "This project is also open in another tab. Edit it in one tab only: each tab saves its own state.": "Dit project is ook in een ander tabblad geopend. Bewerk het in één tabblad: elk tabblad slaat zijn eigen stand op.",
 }

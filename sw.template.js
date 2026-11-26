@@ -20,7 +20,9 @@ self.addEventListener('install', e => e.waitUntil((async () => {
 })()))
 
 self.addEventListener('activate', e => e.waitUntil((async () => {
-  for (const k of await caches.keys()) if (k.startsWith('slidecko-') && k !== CACHE) await caches.delete(k)
+  // the version before stays: a tab still running it (another tab updated) loads its later parts from there
+  const old = (await caches.keys()).filter(k => k.startsWith('slidecko-') && k !== CACHE)
+  for (const k of old.slice(0, -1)) await caches.delete(k)
   await self.clients.claim() // the first install: the open page works offline at once
 })()))
 
@@ -34,6 +36,8 @@ self.addEventListener('fetch', e => {
     // the app's address (/app/, /app/?x, /app/#12) is its start page
     const hit = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' && await cache.match(at('index.html')))
     if (hit) return hit
+    const prev = new URL(req.url).pathname.includes('/assets/') && await caches.match(req) // a file of the version before
+    if (prev) return prev
     const res = await fetch(req)
     const f = req.url.slice(self.registration.scope.length)
     if (res.ok && LAZY.has(f)) await cache.put(req, res.clone())

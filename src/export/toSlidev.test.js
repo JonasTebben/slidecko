@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { parseSlidev, headFormat } from '../import/parseSlidev.js'
-import { toSlidev, slideToMarkdown, imagePath, flowHash, slidevNames } from './toSlidev.js'
+import { toSlidev, slideToMarkdown, imagePath, flowHash, slidevNames, slideHash } from './toSlidev.js'
 
 const box = { x: 0, y: 0, w: 400, h: 100 }
 
@@ -288,4 +288,16 @@ test('a code group is written as ::code-group with the tab names, and MDC switch
   const md = files['slides.md']
   expect(md).toMatch(/^mdc: true$/m)
   expect(md).toContain('::code-group\n\n```sh [npm] {1}\nnpm i\n```\n\n```sh [pnpm]\npnpm i\n```\n\n```js [js]\nx\n```\n\n::')
+})
+
+test('notes edited on an unchanged imported slide reach the export (the rest stays byte for byte)', () => {
+  const slide = { layout: 'default', md: '# Hi\n\n<!-- old -->\n', notes: 'old', elements: [] }
+  slide.hash = slideHash(slide)
+  const out = n => toSlidev({ title: 'T', theme: 'hell', slides: [{ ...slide, notes: n }] }).files['slides.md']
+  assert.match(out('old'), /# Hi\n\n<!-- old -->/)
+  assert.equal(parseSlidev(out('new\n--- line')).at(-1).notes.replace(/\s+/g, ' '), 'new --- line')
+  assert.doesNotMatch(out(''), /old/)
+  const none = { layout: 'default', md: '# Hi\n', notes: '', elements: [] }
+  none.hash = slideHash(none)
+  assert.equal(parseSlidev(toSlidev({ title: 'T', theme: 'hell', slides: [{ ...none, notes: 'added' }] }).files['slides.md']).at(-1).notes, 'added')
 })
