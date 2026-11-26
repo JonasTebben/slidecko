@@ -227,7 +227,7 @@ function measure(slide, parsed) {
     const img = n.tagName === 'IMG' ? n : isImageOnly(n) ? n.firstElementChild : null
 
     if (n.dataset.shape) {
-      Object.assign(el, { type: 'shape', shape: n.dataset.shape, fill: n.dataset.fill || 'none', stroke: n.dataset.stroke || 'none', strokeWidth: +n.dataset.sw || 0, radius: +n.dataset.radius || 0, ...(n.dataset.alpha && { fillAlpha: +n.dataset.alpha }) })
+      Object.assign(el, { type: 'shape', shape: n.dataset.shape, fill: n.dataset.fill || 'none', stroke: n.dataset.stroke || 'none', strokeWidth: +n.dataset.sw || 0, radius: +n.dataset.radius || 0, ...(n.dataset.alpha && { fillAlpha: +n.dataset.alpha }), ...(n.dataset.slope && { slope: n.dataset.slope }), ...(n.dataset.head && { head: n.dataset.head }) })
       const text = n.querySelector('.shape-text > div') || n.querySelector('.shape-text') // written by toSlidev for text in shapes
       if (text?.textContent.trim()) el.html = text.innerHTML
     } else if (n.dataset.video) {

@@ -100,6 +100,7 @@ const UNSAFE_SVG = /<\s*\/?\s*(script|style|foreignobject|iframe|image|a|animate
 export const cleanIconBody = b => (typeof b === 'string' && b.length < 50000 && !UNSAFE_SVG.test(b)
   ? String(DOMPurify.sanitize(`<svg xmlns="http://www.w3.org/2000/svg">${b}</svg>`, { USE_PROFILES: { svg: true } })).replace(/^<svg[^>]*>|<\/svg>$/g, '') || undefined : undefined)
 export const SHAPES = ['rect', 'rounded', 'ellipse', 'triangle', 'arrow', 'line']
+export const LINE_SLOPES = ['down', 'up'], LINE_HEADS = ['end', 'start', 'both']
 
 // image crop: the visible part as fractions of the picture {x, y, w, h}; the whole picture is no crop
 export function cleanCrop(c) {
@@ -181,7 +182,9 @@ export function cleanEl(e) {
     }
     case 'shape': return {
       ...base, shape: SHAPES.includes(e.shape) ? e.shape : 'rect', fill: color(e.fill) || 'none', stroke: color(e.stroke) || 'none',
-      strokeWidth: num(e.strokeWidth, 0, 40), radius: num(e.radius, 0, 300), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(SLIDE_ID.test(e.to) && { to: e.to }), // to: a slide id, jumped to on click
+      strokeWidth: num(e.strokeWidth, 0, 40), radius: num(e.radius, 0, 300),
+      // a line: slope down (top left to bottom right) or up (bottom left to top right), else straight; arrowheads at its ends
+      ...(e.shape === 'line' && LINE_SLOPES.includes(e.slope) && { slope: e.slope }), ...(e.shape === 'line' && LINE_HEADS.includes(e.head) && { head: e.head }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(SLIDE_ID.test(e.to) && { to: e.to }), // to: a slide id, jumped to on click
       // text inside the shape (centred), with its own colour
       ...(e.shape !== 'line' && str(e.html)?.trim() && { html: clean(e.html) }), ...(color(e.color) && { color: color(e.color) }), ...(ALIGN.includes(e.align) && { align: e.align }),
     }

@@ -53,6 +53,7 @@ Nothing is uploaded; the deck stays in the user's browser.
 - **Callout**: `<div data-callout="info">` (also `tip`, `warn`, `danger`), a blank line, `**Note:** text`, a blank line, `</div>`.
 - **Hand-drawn mark** on words: `<span v-mark.circle.orange="1">words</span>`. Marks: `underline`, `circle`, `box`, `highlight`, `strike-through`, `crossed-off`, `bracket`; colours: `red`, `orange`, `yellow`, `lime`, `green`, `teal`, `cyan`, `blue`, `indigo`, `purple`, `pink`, `gray`, `black`, `white`; `="1"` draws it on click 1 (leave it out to draw it at once).
 - **Icon**: `<lucide-sprout />` on a line of its own. Sets: `lucide`, `tabler`, `mdi`, `carbon`, `ph` (Phosphor), names as on [icones.js.org](https://icones.js.org). Unknown names are dropped, so use common ones.
+- **Arrow** pointing at something: `<Arrow x1="620" y1="300" x2="760" y2="220" />` in slide coordinates (980 × 552 at 16:9, from the top left corner); optional `two-way`, `width="4"`, `color="#dc2626"`. Use sparingly, the layout may move text.
 - **YouTube**: `<Youtube id="VIDEO_ID_11" />` with the 11-character id from the video link.
 - **Pictures**: `![What the picture shows](images/plant.jpg)` with a path inside the project folder (or its `public/`), and the same kind of path for `background: images/plant.jpg` in a slide's frontmatter (`backgroundDim: 40` darkens it). Pictures from the web are not downloaded: without files, leave pictures out and tell the user where one would help (Insert → Image in the editor).
 

@@ -70,7 +70,7 @@ export class OdpDoc {
     const fillImages = [...(this.fillImages || new Map())].map(([data, name]) => `<draw:fill-image draw:name="${name}" xlink:href="${this.image(data)}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>`).join('')
 
     const content = `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS}><office:automatic-styles>${auto(s => s.family !== 'list' && !s.name.startsWith('M'))}${lists}</office:automatic-styles><office:body><office:presentation>${pages}</office:presentation></office:body></office:document-content>`
-    const styles = `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS}><office:styles>${fillImages}<style:default-style style:family="graphic"><style:graphic-properties draw:stroke="none" draw:fill="none"/></style:default-style></office:styles><office:automatic-styles><style:page-layout style:name="PM1"><style:page-layout-properties fo:margin-top="0in" fo:margin-bottom="0in" fo:margin-left="0in" fo:margin-right="0in" fo:page-width="${inch(width)}" fo:page-height="${inch(height)}" style:print-orientation="${width < height ? 'portrait' : 'landscape'}"/></style:page-layout>${auto(s => s.name.startsWith('M'))}</office:automatic-styles><office:master-styles>${masterXml}<style:master-page style:name="Standard" style:page-layout-name="PM1" draw:style-name="${standard}"/></office:master-styles></office:document-styles>`
+    const styles = `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS}><office:styles>${fillImages}<draw:marker draw:name="Arrow" svg:viewBox="0 0 20 30" svg:d="M10 0l-10 30h20z"/><style:default-style style:family="graphic"><style:graphic-properties draw:stroke="none" draw:fill="none"/></style:default-style></office:styles><office:automatic-styles><style:page-layout style:name="PM1"><style:page-layout-properties fo:margin-top="0in" fo:margin-bottom="0in" fo:margin-left="0in" fo:margin-right="0in" fo:page-width="${inch(width)}" fo:page-height="${inch(height)}" style:print-orientation="${width < height ? 'portrait' : 'landscape'}"/></style:page-layout>${auto(s => s.name.startsWith('M'))}</office:automatic-styles><office:master-styles>${masterXml}<style:master-page style:name="Standard" style:page-layout-name="PM1" draw:style-name="${standard}"/></office:master-styles></office:document-styles>`
     const meta = `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${NS}><office:meta><dc:title>${esc(this.title || '')}</dc:title><meta:generator>Slidecko</meta:generator></office:meta></office:document-meta>`
 
     const zip = new JSZip()
@@ -120,10 +120,13 @@ class OdpSlide {
   addShape(kind, o) {
     const d = this.doc, add = x => this.items.push(withClick(x, o))
     const stroke = o.line && o.line.type !== 'none' && o.line.color ? `draw:stroke="solid" svg:stroke-color="${color(o.line.color)}" svg:stroke-width="${pt(o.line.width || 1)}"${o.line.transparency ? ` svg:stroke-opacity="${100 - o.line.transparency}%"` : ''}${kind === 'custGeom' ? ' draw:stroke-linejoin="round" svg:stroke-linecap="round"' : ''}` : 'draw:stroke="none"'
-    const st = d.style('graphic', `<style:graphic-properties ${stroke} ${kind === 'line' ? 'draw:fill="none"' : d.fill(o.fill)} ${shadow(o)}/>`, 'gr')
+    // arrowheads (begin/endArrowType as in pptxgenjs): Impress markers, about three line widths wide
+    const mw = `${(Math.max(0.5, o.line?.width || 1) * 3 / 72 * 2.54).toFixed(2)}cm`
+    const marks = kind === 'line' ? ['begin', 'end'].map(k => (o.line?.[k + 'ArrowType'] ? ` draw:marker-${k === 'begin' ? 'start' : 'end'}="Arrow" draw:marker-${k === 'begin' ? 'start' : 'end'}-width="${mw}"` : '')).join('') : ''
+    const st = d.style('graphic', `<style:graphic-properties ${stroke}${marks} ${kind === 'line' ? 'draw:fill="none"' : d.fill(o.fill)} ${shadow(o)}/>`, 'gr')
     const pos = `svg:x="${inch(o.x)}" svg:y="${inch(o.y)}" svg:width="${inch(o.w)}" svg:height="${inch(o.h)}"`
     const poly = pts => `<draw:polygon draw:style-name="${st}" ${pos} svg:viewBox="0 0 1000 1000" draw:points="${pts}"/>`
-    if (kind === 'line') add(`<draw:line draw:style-name="${st}" svg:x1="${inch(o.x)}" svg:y1="${inch(o.y)}" svg:x2="${inch(o.x + o.w)}" svg:y2="${inch(o.y + o.h)}"/>`)
+    if (kind === 'line') add(`<draw:line draw:style-name="${st}" svg:x1="${inch(o.x)}" svg:y1="${inch(o.y + (o.flipV ? o.h : 0))}" svg:x2="${inch(o.x + o.w)}" svg:y2="${inch(o.y + (o.flipV ? 0 : o.h))}"/>`)
     else if (kind === 'ellipse') add(`<draw:ellipse draw:style-name="${st}" ${pos}/>`)
     // freeform (pptxgenjs points in inches from the shape's corner; moveTo starts a new stroke): a path in 1/1000 in
     else if (kind === 'custGeom') add(`<draw:path draw:style-name="${st}" ${pos} svg:viewBox="0 0 ${Math.round(o.w * 1000) || 1} ${Math.round(o.h * 1000) || 1}" svg:d="${o.points.map((q, i) => `${!i || q.moveTo ? 'M' : 'L'}${Math.round(q.x * 1000)} ${Math.round(q.y * 1000)}`).join(' ')}"/>`)

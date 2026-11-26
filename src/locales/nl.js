@@ -1299,4 +1299,13 @@ export default {
   "Export lists": "Lijsten exporteren",
   "Add the name lists from a file": "Namenlijsten uit een bestand toevoegen",
   "Import lists …": "Lijsten importeren …",
+  "Direction": "Richting",
+  "Straight": "Horizontaal",
+  "Falling": "Dalend",
+  "Rising": "Stijgend",
+  "Arrowheads": "Pijlpunten",
+  "No arrowheads": "Geen pijlpunten",
+  "Arrowhead at the end": "Pijlpunt aan het eind",
+  "Arrowhead at the start": "Pijlpunt aan het begin",
+  "Arrowheads at both ends": "Pijlpunten aan beide uiteinden",
 }

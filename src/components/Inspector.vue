@@ -569,6 +569,15 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <label v-if="el.shape !== 'line'" class="row-ico" :title="t('Font size')"><Icon name="fontSize" :size="16" />
             <select :aria-label="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined"><option value="">{{ t('Theme') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
           </label>
+          <!-- a line: its direction (corner to corner for any angle, set by the box) and arrowheads -->
+          <template v-if="el.shape === 'line'">
+            <div class="btn-row" role="group" :aria-label="t('Direction')">
+              <button v-for="[v, label, sym] in [[undefined, 'Straight', '—'], ['down', 'Falling', '↘'], ['up', 'Rising', '↗']]" :key="label" class="ib grow" :class="{ on: el.slope === v }" :aria-pressed="el.slope === v" :title="t(label)" :aria-label="t(label)" @click="el.slope = v; if (v && el.h < 40) el.h = Math.round(el.w / 2)">{{ sym }}</button>
+            </div>
+            <div class="btn-row" role="group" :aria-label="t('Arrowheads')">
+              <button v-for="[v, label, sym] in [[undefined, 'No arrowheads', '—'], ['end', 'Arrowhead at the end', '→'], ['start', 'Arrowhead at the start', '←'], ['both', 'Arrowheads at both ends', '↔']]" :key="label" class="ib grow" :class="{ on: el.head === v }" :aria-pressed="el.head === v" :title="t(label)" :aria-label="t(label)" @click="el.head = v">{{ sym }}</button>
+            </div>
+          </template>
           <label v-if="el.shape === 'rect'" class="slider" :title="t('Corner radius')"><Icon name="radius" :size="16" /><input type="range" min="0" max="80" :aria-label="t('Corner radius')" :value="el.radius || 0" @input="el.radius = +$event.target.value" /><output>{{ el.radius || 0 }} px</output></label>
         </Sec>
         <Sec id="colors" icon="fill" :title="t('Fill & outline')">

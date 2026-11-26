@@ -515,9 +515,13 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
         const line = m.shape === 'line'
         const stroke = gs && hex(gs.stroke)
         slide.addShape(SHAPE[m.shape] || 'rect', {
-          ...box(el), ...(line && { y: (el.offsetTop + el.offsetHeight / 2) * IN, h: 0 }),
+          // a line: straight through the middle, or corner to corner (rising: flipped); arrowheads as PowerPoint's line ends
+          ...box(el), ...(line && !m.slope && { y: (el.offsetTop + el.offsetHeight / 2) * IN, h: 0 }), ...(line && m.slope === 'up' && { flipV: true }),
           ...(!line && gs && fillOf(gs.fill) ? { fill: (f => +gs.fillOpacity < 1 ? { ...f, transparency: Math.round(100 - (100 - (f.transparency || 0)) * gs.fillOpacity) } : f)(fillOf(gs.fill)) } : {}),
-          line: stroke ? { color: stroke, width: Math.max(0.5, (parseFloat(gs.strokeWidth) || (line ? 3 : 0)) * PT) } : { type: 'none' },
+          line: stroke ? {
+            color: stroke, width: Math.max(0.5, (parseFloat(gs.strokeWidth) || (line ? 3 : 0)) * PT),
+            ...(line && /start|both/.test(m.head) && { beginArrowType: 'triangle' }), ...(line && /end|both/.test(m.head) && { endArrowType: 'triangle' }),
+          } : { type: 'none' },
           ...(m.shape === 'rounded' && { rectRadius: Math.min(el.offsetWidth, el.offsetHeight) / 4 * IN }),
           ...(m.shape === 'rect' && m.radius && { rectRadius: m.radius * IN }), ...sh, ...toSlide(m.to),
         })

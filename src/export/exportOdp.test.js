@@ -110,3 +110,15 @@ test('click animations: the objects get ids, each step is one click of Impress',
   assert.match(clicks[1], /on-click" presentation:preset-class="exit"[^]*targetElement="s1o0"[^]*with-previous" presentation:preset-class="entrance"[^]*targetElement="s1o1"/)
   assert.match(xml, /xmlns:anim=/)
 })
+
+test('a rising line with arrowheads runs corner to corner and gets Impress markers', async () => {
+  const d = new OdpDoc()
+  d.defineLayout({ width: 10, height: 5.633 })
+  d.addSlide().addShape('line', { x: 1, y: 1, w: 2, h: 1, flipV: true, line: { color: '334455', width: 2, endArrowType: 'triangle' } })
+  const zip = await JSZip.loadAsync(await (await d.write()).arrayBuffer())
+  const content = await zip.file('content.xml').async('string'), styles = await zip.file('styles.xml').async('string')
+  assert.match(content, /<draw:line [^>]*svg:x1="1.0000in" svg:y1="2.0000in" svg:x2="3.0000in" svg:y2="1.0000in"/)
+  assert.match(content, /draw:marker-end="Arrow"/)
+  assert.doesNotMatch(content, /draw:marker-start=/)
+  assert.match(styles, /<draw:marker draw:name="Arrow"/)
+})

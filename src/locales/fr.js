@@ -1278,4 +1278,13 @@ export default {
   "Export lists": "Exporter les listes",
   "Add the name lists from a file": "Ajouter les listes de noms d’un fichier",
   "Import lists …": "Importer des listes …",
+  "Direction": "Direction",
+  "Straight": "Horizontale",
+  "Falling": "Descendante",
+  "Rising": "Montante",
+  "Arrowheads": "Pointes de flèche",
+  "No arrowheads": "Sans pointe",
+  "Arrowhead at the end": "Pointe à la fin",
+  "Arrowhead at the start": "Pointe au début",
+  "Arrowheads at both ends": "Pointes aux deux extrémités",
 }

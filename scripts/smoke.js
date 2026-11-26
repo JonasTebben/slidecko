@@ -68,6 +68,7 @@ const DECK = {
       { type: 'text', x: 56, y: 130, w: 400, h: 30, click: 1, html: '<p>Some <span data-mark="circle" data-mark-color="orange">marked</span> words, slide <span data-field="page">#</span></p>' },
       { type: 'shape', shape: 'ellipse', fill: '#2563eb', stroke: 'none', strokeWidth: 0, radius: 0, x: 480, y: 70, w: 120, h: 80 },
       { type: 'table', header: true, rows: [['A', 'B'], ['1', '2']], x: 620, y: 70, w: 300, h: 90 },
+      { type: 'shape', shape: 'line', slope: 'up', head: 'end', fill: 'none', stroke: '#334155', strokeWidth: 4, radius: 0, x: 170, y: 370, w: 160, h: 60 },
       { type: 'icon', icon: 'lucide:sprout', x: 56, y: 180, w: 60, h: 60 },
       { type: 'video', youtube: 'VIDEO_ID_11', x: 140, y: 180, w: 320, h: 180 },
       { type: 'toc', x: 480, y: 180, w: 440, h: 160 },
@@ -218,15 +219,15 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   await p.close()
 })
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
-const ALL = ['chart', 'code', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
-const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['image', 'shape', 'table', 'text', 'text+click'] }
+const ALL = ['shape+up-end', 'chart', 'code', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
+const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
     const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
     // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
-    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.click ? '+click' : '')))
+    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
     return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
   const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))

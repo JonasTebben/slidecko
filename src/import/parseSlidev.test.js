@@ -272,3 +272,11 @@ test('code snippets (<<<) become fenced code from the project file', () => {
   assert.equal(snippets('<<< ./b.ts', p => files[p], '', 'deck'), '```ts\nlet b\n```')
   assert.equal(snippets('<<< @/missing.js', p => files[p]), '<<< @/missing.js') // a missing file stays as written
 })
+
+test("Slidev's <Arrow> becomes a positioned line with arrowheads in its direction", () => {
+  const box = a => slidevComponents(a).match(/data-slope="(\w+)"|data-head="(\w+)"|left:(\d+)px;top:(\d+)px;width:(\d+)px;height:(\d+)px/g).join(' ')
+  assert.equal(box('<Arrow x1="100" y1="50" x2="300" y2="150" />'), 'data-slope="down" data-head="end" left:100px;top:50px;width:200px;height:100px')
+  assert.equal(box('<Arrow x1="300" y1="50" x2="100" y2="150" two-way />'), 'data-slope="up" data-head="both" left:100px;top:50px;width:200px;height:100px')
+  assert.equal(box('<Arrow :x1="300" :y1="80" :x2="100" :y2="80" />'), 'data-head="start" left:100px;top:70px;width:200px;height:20px')
+  assert.match(slidevComponents('<Arrow x1="1" y1="1" x2="9" y2="9" color="#f00" width="4" />'), /data-stroke="#f00" data-sw="4"/)
+})

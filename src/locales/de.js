@@ -1299,4 +1299,13 @@ export default {
   "Export lists": "Listen exportieren",
   "Add the name lists from a file": "Namenslisten aus einer Datei hinzufügen",
   "Import lists …": "Listen importieren …",
+  "Direction": "Richtung",
+  "Straight": "Waagrecht",
+  "Falling": "Fallend",
+  "Rising": "Steigend",
+  "Arrowheads": "Pfeilspitzen",
+  "No arrowheads": "Keine Pfeilspitzen",
+  "Arrowhead at the end": "Pfeilspitze am Ende",
+  "Arrowhead at the start": "Pfeilspitze am Anfang",
+  "Arrowheads at both ends": "Pfeilspitzen an beiden Enden",
 }

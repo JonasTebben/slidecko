@@ -55,10 +55,22 @@ export function headFormat(md) {
 // Slidev components that would otherwise vanish (outside code): the slide number and count become Slidecko's fields,
 // <AutoFitText> its text, <LightOrDark> its light part (slides stay light), every <v-switch> step one after the other,
 // the ::code-group markers go (its code blocks stay, one below the other)
-const COMPS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<(SlideCurrentNo|SlidesTotal)\s*\/>|\{\{\s*\$(?:slidev\.)?(?:nav\.)?(currentPage|total|configs\.title)\s*\}\}|<AutoFitText\b([^>]*?)\/>|<LightOrDark>([\s\S]*?)<\/LightOrDark>|<template\s+(?:#|v-slot:)[\w-]+\s*>|<\/template>|^::code-group[ \t]*$|^::[ \t]*$/gm
+const COMPS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<(SlideCurrentNo|SlidesTotal)\s*\/>|\{\{\s*\$(?:slidev\.)?(?:nav\.)?(currentPage|total|configs\.title)\s*\}\}|<AutoFitText\b([^>]*?)\/>|<LightOrDark>([\s\S]*?)<\/LightOrDark>|<template\s+(?:#|v-slot:)[\w-]+\s*>|<\/template>|<Arrow\b([^>]*?)\/>|^::code-group[ \t]*$|^::[ \t]*$/gm
+// Slidev's <Arrow x1 y1 x2 y2 width color two-way> -> a positioned line with arrowheads (slope and heads from its direction)
+function arrowBox(a) {
+  const [x1, y1, x2, y2] = ['x1', 'y1', 'x2', 'y2'].map(k => +attrOf(a, k))
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return
+  const flat = Math.abs(y2 - y1) < 1, back = x2 < x1 // drawn right to left: the head is at the line's start
+  const slope = flat ? '' : (y2 > y1) !== back ? 'down' : 'up'
+  const head = /\btwo-way\b|\btwoWay\b/.test(a) ? 'both' : back ? 'start' : 'end'
+  const sw = +attrOf(a, 'width') || 2, color = attrOf(a, 'color') || '#334155'
+  const h = flat ? 20 : Math.abs(y2 - y1), y = flat ? y1 - 10 : Math.min(y1, y2)
+  return `<div data-shape="line" data-fill="none" data-stroke="${color.replace(/"/g, '')}" data-sw="${sw}" data-radius="0"${slope ? ` data-slope="${slope}"` : ''} data-head="${head}" style="position:absolute;left:${Math.min(x1, x2)}px;top:${y}px;width:${Math.max(4, Math.abs(x2 - x1))}px;height:${h}px"></div>`
+}
 const FIELD_OF = { SlideCurrentNo: 'page', currentPage: 'page', SlidesTotal: 'total', total: 'total', 'configs.title': 'title' }
-export const slidevComponents = md => md.replace(COMPS, (m, f, c, no, nav, fit, lod) => {
+export const slidevComponents = md => md.replace(COMPS, (m, f, c, no, nav, fit, lod, arrow) => {
   if (f || c) return m
+  if (arrow != null) return arrowBox(arrow) ?? ''
   if (no || nav) return `<span data-field="${FIELD_OF[no || nav]}">#</span>`
   if (fit != null) return `<p>${(fit.match(/modelValue=["']([^"']*)["']/)?.[1] ?? '')}</p>`
   if (lod != null) return (lod.match(/<template\s+(?:#|v-slot:)light\s*>([\s\S]*?)<\/template>/)?.[1] ?? lod.replace(/<template\s+(?:#|v-slot:)dark\s*>[\s\S]*?<\/template>/, '')).trim()

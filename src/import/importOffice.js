@@ -580,8 +580,17 @@ export async function importPptx(file) {
       // the editor's own line is horizontal and solid
       const plain = kind && !arrows.some(Boolean) && !DASH[dash] && (kind !== 'line' || !ecy) && (!turned || quarter || (['rect', 'rounded', 'ellipse'].includes(kind) && !(turn.rot % 180)))
       const asSvg = r => { const id = uid(); assets[id] = r.svg; out.push({ type: 'image', x: Math.round(box.x + (box.w - r.w) / 2), y: Math.round(box.y + (box.h - r.h) / 2), w: Math.round(r.w), h: Math.round(r.h), asset: id, src: `/images/${id}-form.svg` }) }
+      // a straight line or arrow at any angle (not turned, not dashed): the editor's line, corner to corner. PowerPoint's
+      // line runs from its start corner (flipH: right, flipV: bottom); a line drawn right to left swaps its ends
+      const asLine = (geom === 'line' || geom === 'straightConnector1') && !(turn.rot % 360) && !DASH[dash] && stroke
       if (!(fill || stroke)) { /* invisible: text only */ }
-      else if (cust) { const r = custSvg(cust, box.w, box.h, fill, stroke, sw, turn); if (r) asSvg(r) } // freeform: its path as an SVG picture
+      else if (asLine) {
+        const [atStart, atEnd] = turn.fh ? [arrows[1], arrows[0]] : arrows
+        out.push({
+          type: 'shape', ...box, ...(!ecy && { y: box.y + Math.round(box.h / 2) - 10, h: 20 }), shape: 'line', fill: 'none', stroke, strokeWidth: Math.round(sw), radius: 0,
+          ...(ecy && { slope: turn.fh !== turn.fv ? 'up' : 'down' }), ...((atStart || atEnd) && { head: atStart && atEnd ? 'both' : atStart ? 'start' : 'end' }),
+        })
+      } else if (cust) { const r = custSvg(cust, box.w, box.h, fill, stroke, sw, turn); if (r) asSvg(r) } // freeform: its path as an SVG picture
       else if (plain) {
         const sbox = quarter ? { x: Math.round(box.x + (box.w - box.h) / 2), y: Math.round(box.y + (box.h - box.w) / 2), w: box.h, h: box.w } : box
         out.push({
@@ -773,7 +782,16 @@ export async function importOdp(file) {
         : { rect: 'rect', ellipse: 'ellipse', circle: 'ellipse', line: 'line', polygon: 'rect', path: 'rect' }[n.localName]
       const fill = gp('draw:fill') === 'solid' ? gp('draw:fill-color') : null
       const stroke = gp('draw:stroke') && gp('draw:stroke') !== 'none' ? gp('svg:stroke-color') || '#000000' : null
-      if (geom && (fill || stroke)) out.push({ type: 'shape', ...box, shape: at(n, 'draw:corner-radius') ? 'rounded' : geom, fill: geom === 'line' ? 'none' : fill || 'none', stroke: stroke || 'none', strokeWidth: stroke ? Math.max(1, Math.round(px(gp('svg:stroke-width') || '1pt'))) : 0, radius: 0 })
+      // a line: corner to corner when it slopes (drawn right to left: its ends swap), arrowheads from its markers
+      const lineOf = () => {
+        const [x1, y1, x2, y2] = ['svg:x1', 'svg:y1', 'svg:x2', 'svg:y2'].map(a => px(at(n, a))), back = x2 < x1
+        const [atStart, atEnd] = (back ? ['draw:marker-end', 'draw:marker-start'] : ['draw:marker-start', 'draw:marker-end']).map(k => !!gp(k))
+        return {
+          ...(Math.abs(y2 - y1) >= 1 ? { slope: (y2 > y1) !== back ? 'down' : 'up' } : { y: box.y + Math.round(box.h / 2) - 10, h: 20 }),
+          ...((atStart || atEnd) && { head: atStart && atEnd ? 'both' : atStart ? 'start' : 'end' }),
+        }
+      }
+      if (geom && (fill || stroke)) out.push({ type: 'shape', ...box, shape: at(n, 'draw:corner-radius') ? 'rounded' : geom, fill: geom === 'line' ? 'none' : fill || 'none', stroke: stroke || 'none', strokeWidth: stroke ? Math.max(1, Math.round(px(gp('svg:stroke-width') || '1pt'))) : 0, radius: 0, ...(n.localName === 'line' && lineOf()) })
       else if (tb && fill) out.push({ type: 'shape', ...box, shape: 'rect', fill, stroke: 'none', strokeWidth: 0, radius: 0 })
       const paras = paragraphs(tb || n, st)
       const va = VALIGN[gp('draw:textarea-vertical-align')]
