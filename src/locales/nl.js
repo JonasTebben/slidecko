@@ -960,6 +960,8 @@ export default {
   "Add font file …": "Lettertypebestand toevoegen …",
   "Remove font {0} from the project": "Lettertype {0} uit het project verwijderen",
   "{0}: font files can be at most 5 MB": "{0}: lettertypebestanden mogen maximaal 5 MB groot zijn",
+  "Video or audio file …": "Video- of audiobestand …",
+  "{0}: video and audio files can be at most 50 MB": "{0}: video- en audiobestanden mogen maximaal 50 MB groot zijn",
   "{0}: not a font file (.woff2, .woff, .ttf or .otf)": "{0}: geen lettertypebestand (.woff2, .woff, .ttf of .otf)",
   "Font file {0} could not be loaded": "Lettertypebestand {0} kon niet worden geladen",
   // a11y check
@@ -1285,6 +1287,7 @@ export default {
   "Link (⌘K)": "Link (⌘K)",
   "Theme": "Thema",
   "Video": "Video",
+  "Audio": "Audio",
   "H": "H",
   "Pen colour": "Penkleur",
   "Start over": "Opnieuw beginnen",

@@ -524,7 +524,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, '--out-h': el.outH ? el.outH + 'px' : null, ...(el.type === 'image' && cropVars(el)) }"
       :tabindex="editable && !decor(el) ? 0 : null"
       :role="!editable && el.title && !/<h[1-6][\s>]/i.test(el.html || '') ? 'heading' : null" :aria-level="!editable && el.title ? 1 : null"
-      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random draw', chart: 'Chart', diagram: 'Diagram', toc: 'Table of contents', icon: 'Icon', math: 'Formula' }[el.type]) : null"
+      :aria-label="editable && !decor(el) ? t({ text: 'Text box', code: 'Code block', image: 'Image', table: 'Table', shape: 'Shape', video: 'Video', timer: 'Timer', quiz: 'Quiz', picker: 'Random draw', chart: 'Chart', diagram: 'Diagram', toc: 'Table of contents', icon: 'Icon', math: 'Formula', media: el.kind === 'audio' ? 'Audio' : 'Video' }[el.type]) : null"
       @pointerdown="down($event, el)" @dblclick="edit($event, el)" @focus="editable && !ui.sel.includes(el.id) && (ui.sel = members(el))"
     >
       <div
@@ -578,6 +578,12 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       </template>
       <div v-else-if="el.type === 'icon'" class="icon-box" v-html="iconSvg(el)" />
       <!-- a web page: nothing is loaded until a tap while presenting (or in the HTML file), as the page's site sees the viewer -->
+      <!-- a video or sound file of the project: plays while presenting (its own controls, a tap there does not turn the slide); a still face in the editor and in exported pictures -->
+      <div v-else-if="el.type === 'media'" class="media" :data-kind="el.kind" :data-asset="el.asset" :title="el.name">
+        <video v-if="live && el.kind === 'video'" :src="deck.assets[el.asset]" controls playsinline preload="metadata" @pointerdown.stop @click.stop />
+        <audio v-else-if="live" :src="deck.assets[el.asset]" controls preload="metadata" @pointerdown.stop @click.stop />
+        <span v-else class="media-face"><i class="media-icon" />{{ el.name }}</span>
+      </div>
       <div v-else-if="el.type === 'video' && el.url" class="video web" :data-offline="t('Offline: the web page needs an internet connection.')">
         <iframe v-if="live && webOn[el.id]" :src="el.url" :title="hostOf(el.url)" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer" allow="fullscreen" />
         <button v-else class="web-load" :data-url="el.url" :data-host="hostOf(el.url)" @pointerdown="live && $event.stopPropagation()" @click="live && (online && (webOn[el.id] = true), $event.stopPropagation())">{{ hostOf(el.url) }}<small>{{ t('Web page: tap to load it (this sends data to its site)') }}</small></button>

@@ -303,3 +303,13 @@ test('prompt: a layout text not yet edited keeps its mark in the project file, o
   assert.equal(S.cleanEl({ type: 'text', html: '<h1>Mine</h1>' }).prompt, undefined)
   assert.equal(S.cleanEl({ type: 'shape', shape: 'rect', prompt: true }).prompt, undefined)
 })
+
+test('a video or sound file is kept with its stored file and a known kind, its name capped', () => {
+  S.deck.assets.m1 = 'data:video/mp4;base64,AAAA'
+  const el = S.cleanEl({ type: 'media', kind: 'video', asset: 'm1', src: '/media/a.mp4', name: 'a.mp4', x: 0, y: 0, w: 480, h: 270 })
+  assert.deepEqual([el.kind, el.asset, el.src, el.name], ['video', 'm1', '/media/a.mp4', 'a.mp4'])
+  assert.equal(S.cleanEl({ type: 'media', kind: 'image', asset: 'm1' }), null)
+  assert.equal(S.cleanEl({ type: 'media', kind: 'audio', asset: 'gone' }), null)
+  assert.equal(S.cleanEl({ type: 'media', kind: 'audio', asset: 'm1', name: 'x'.repeat(300) }).name.length, 200)
+  delete S.deck.assets.m1
+})

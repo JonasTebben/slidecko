@@ -37,7 +37,7 @@ const clicky = el => ['v-click', 'v-click.hide', 'v-after'].some(a => el.hasAttr
 const soleIn = (p, n) => /^V-(CLICK|AFTER)$/.test(p?.tagName) && p.children.length === n
 const compAttr = c => k => (c.tagName === 'V-AFTER' ? (k === 'v-after' ? '' : null)
   : k === (c.hasAttribute('hide') ? 'v-click.hide' : 'v-click') ? c.getAttribute('at') ?? '' : null)
-const special = el => el.dataset.toc || el.dataset.shape || el.dataset.video || el.dataset.web || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
+const special = el => el.dataset.media || el.dataset.toc || el.dataset.shape || el.dataset.video || el.dataset.web || el.dataset.timer || el.dataset.picks || el.dataset.quiz || el.dataset.chart || el.dataset.table || el.dataset.callout || el.dataset.icon || el.dataset.math
 
 // path: the markdown file to import; files: Map of project-relative path -> File (markdown files it
 // embeds via `src:` and all images are read from it).
@@ -133,6 +133,20 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
         // Firefox may reject decode() for big off-screen images; measuring before the load gives tiny boxes
         if (!img.complete || !img.naturalWidth) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 5000) })
       }))
+      // video and sound files: stored like pictures; measured as their box (a bare <video> gets the size it has when inserted), the file is not loaded for that
+      for (const v of slide.querySelectorAll('video[src], audio[src]')) {
+        const src = v.getAttribute('src'), id = await asset(src), kind = v.tagName.toLowerCase()
+        let box = v.closest('[data-media]')
+        if (!box) {
+          box = Object.assign(document.createElement('div'), { title: decodeURI(src.split(/[/?#]/).filter(Boolean).pop() || '') })
+          box.style.cssText = `width:${kind === 'video' ? 480 : 360}px;height:${kind === 'video' ? 270 : 56}px`
+          v.replaceWith(box)
+        }
+        if (!id) { missing++; box.remove(); continue }
+        Object.assign(box.dataset, { media: kind, asset: id, src })
+        if (!savedBox(box) && box.offsetHeight < 8) box.style.height = (kind === 'video' ? 270 : 56) + 'px'
+        box.replaceChildren()
+      }
       // icons of bundled sets get their SVG; unknown names are left out (the slide's Markdown keeps them), a picker keeps its die
       const elements = (await Promise.all(measure(slide, s).map(async e => (e.type === 'icon' || (e.type === 'picker' && e.icon) ? Object.assign(e, await getIcon(e.icon).catch(() => null)) : e)))).filter(e => e.type !== 'icon' || e.body)
       // the picture of Slidev's image layouts (image:) as an image element; toSlidev leaves it out while the layout shows it
@@ -246,6 +260,8 @@ function measure(slide, parsed) {
       Object.assign(el, { type: 'icon', icon: n.dataset.icon, ...readIconStyle(n.style), ...(n.dataset.label && { label: n.dataset.label }) })
       const c = getComputedStyle(n).color // a colour class (text-red-500)
       if (el.color === 'currentColor' && c !== getComputedStyle(n.parentElement).color) el.color = c
+    } else if (n.dataset.media) {
+      Object.assign(el, { type: 'media', kind: n.dataset.media === 'audio' ? 'audio' : 'video', asset: n.dataset.asset, src: n.dataset.src, ...(n.title && { name: n.title }) })
     } else if (n.dataset.timer) {
       Object.assign(el, { type: 'timer', seconds: +n.dataset.timer || 0, face: n.dataset.face, accent: n.dataset.accent, fill: n.dataset.fill, warn: n.dataset.warn === '1', auto: n.dataset.auto === '1', silent: n.dataset.silent === '1' }) // cleanEl checks them
     } else if (n.dataset.picks) {

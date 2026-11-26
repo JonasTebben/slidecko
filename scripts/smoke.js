@@ -75,9 +75,16 @@ const DECK = {
       { type: 'toc', x: 480, y: 180, w: 440, h: 160 },
       { type: 'image', asset: 'P1', src: '/images/p.png', alt: 'A dot', x: 56, y: 380, w: 100, h: 100 },
       { type: 'text', board: true, x: 480, y: 380, w: 440, h: 120, html: '<p>Notes box</p>' }] },
+    // a video and a sound file of the project (last, so the steps that count slides above keep their numbers)
+    { layout: 'default', elements: [
+      { type: 'text', title: true, x: 56, y: 40, w: 868, h: 40, html: '<h1>Media</h1>' },
+      { type: 'media', kind: 'video', asset: 'M1', src: '/media/clip.mp4', name: 'clip.mp4', x: 56, y: 120, w: 480, h: 270 },
+      { type: 'media', kind: 'audio', asset: 'A1', src: '/media/tone.wav', name: 'tone.wav', x: 580, y: 120, w: 340, h: 56 }] },
   ],
   // a 1×1 PNG for the image element
-  assets: { P1: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' },
+  // M1: the start of an MP4 (not playable, enough to be carried along), A1: an empty WAV
+  assets: { P1: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    M1: 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=', A1: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=' },
 }
 
 const browser = await chromium.launch()
@@ -224,6 +231,21 @@ await step('dev: Export Git project', async () => {
   files.git = await download(page, () => page.evaluate(async () => { (await import('/src/core/actions.js')).slidev({ git: true }) }), 'dev-git')
 })
 await step('dev: insert text, shape, table', () => page.evaluate(async () => { const A = await import('/src/core/actions.js'); for (const k of ['text', 'shape', 'table']) A.insert(k) }))
+await step('dev: a sound file goes onto the slide; video and sound play while presenting, a tap on their player does not turn the slide', async () => {
+  await go(page, DECK.slides.length - 1)
+  const n = await page.evaluate(async () => {
+    const A = await import('/src/core/actions.js')
+    await A.addImages([new File([Uint8Array.from(atob('UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='), c => c.charCodeAt(0))], 'beep.wav', { type: 'audio/wav' })])
+    return document.querySelectorAll('.stage .el.media').length
+  })
+  if (n !== 3) throw new Error(`${n} media elements`)
+  await page.evaluate(async () => { const S = await import('/src/core/store.js'), s = S.deck.slides[S.ui.slide]; s.elements = s.elements.filter(e => e.name !== 'beep.wav') }) // the deck stays as the exports expect it
+  await page.locator('.right .tb.primary').click(); await page.waitForSelector('.presenter .el.media video')
+  if (!(await page.locator('.presenter .el.media audio').count())) throw new Error('no sound player')
+  await page.locator('.presenter .el.media video').click()
+  if ((await page.locator('.presenter .el.media video').count()) !== 1) throw new Error('the tap turned the slide')
+  await page.keyboard.press('Escape'); await page.waitForSelector('.presenter', { state: 'detached' })
+})
 await step('dev: the agent skill example imports with every element it describes', async () => {
   const md = readFileSync(new URL('../skills/slidecko/SKILL.md', import.meta.url), 'utf8').match(/````markdown\n([\s\S]*?)\n````/)[1]
   const types = await page.evaluate(async md => {
@@ -259,7 +281,7 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
   await p.close()
 })
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
-const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video', 'video+web']
+const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'media', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video', 'video+web']
 const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {

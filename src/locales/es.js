@@ -960,6 +960,8 @@ export default {
   "Add font file …": "Añadir archivo de fuente …",
   "Remove font {0} from the project": "Quitar la fuente {0} del proyecto",
   "{0}: font files can be at most 5 MB": "{0}: los archivos de fuente pueden pesar como máximo 5 MB",
+  "Video or audio file …": "Archivo de vídeo o audio …",
+  "{0}: video and audio files can be at most 50 MB": "{0}: los archivos de vídeo y audio pueden pesar como máximo 50 MB",
   "{0}: not a font file (.woff2, .woff, .ttf or .otf)": "{0}: no es un archivo de fuente (.woff2, .woff, .ttf u .otf)",
   "Font file {0} could not be loaded": "No se pudo cargar el archivo de fuente {0}",
   // a11y check
@@ -1285,6 +1287,7 @@ export default {
   "Link (⌘K)": "Enlace (⌘K)",
   "Theme": "Tema",
   "Video": "Vídeo",
+  "Audio": "Audio",
   "H": "H",
   "Pen colour": "Color del lápiz",
   "Start over": "Empezar de nuevo",

@@ -225,6 +225,11 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
       const props = [columns && ` columns="${columns}"`, minDepth && ` minDepth="${minDepth}"`, maxDepth && ` maxDepth="${maxDepth}"`].filter(Boolean).join('')
       return `<div data-toc="${esc(JSON.stringify({ minDepth, maxDepth, columns, current, look }))}" style="${boxStyle(el)}">\n<Toc${props} />\n</div>`
     }
+    // a video or sound file: the browser's player (Slidev renders the HTML as it is); data-media brings it back on import
+    case 'media': {
+      const tag = el.kind === 'audio' ? 'audio' : 'video'
+      return `<div data-media="${tag}"${el.name ? ` title="${esc(el.name)}"` : ''} style="${boxStyle(el)}">\n<${tag} src="${esc(el.src)}" controls class="w-full h-full"></${tag}>\n</div>`
+    }
     case 'video':
       if (el.url) return `<div data-web="${esc(el.url)}" style="${boxStyle(el)}">\n<iframe src="${esc(el.url)}" class="w-full h-full" />\n</div>`
       return `<div data-video="${el.youtube}" style="${boxStyle(el)}">\n<Youtube id="${el.youtube}" width="100%" height="100%" />\n</div>`
@@ -271,7 +276,7 @@ function layerHtml(el) {
   const html = el.type === 'text' ? `<div${el.color ? ' data-color' : ''} style="${boxStyle(el)}">${el.html}</div>`
     : el.type === 'code' ? `<pre style="${boxStyle(el)};margin:0;overflow:hidden"><code>${esc(el.code)}</code></pre>`
       : el.type === 'table' ? `<div data-table="${el.preset || 'theme'}" style="${boxStyle(el)}">${tableMd({ ...el, fills: el.fills || [] })}</div>` // fills: always the HTML table
-        : ['image', 'shape', 'video', 'chart', 'icon'].includes(el.type) ? elementMd(el) : ''
+        : ['image', 'shape', 'video', 'media', 'chart', 'icon'].includes(el.type) ? elementMd(el) : ''
   return '    ' + escapeMustache(html).replace(FIELD, (_, a, k, b) => a + FIELD_VUE[k] + b)
 }
 // the data rides along in a comment, so a re-import gets the editable master and layouts back
@@ -405,7 +410,7 @@ export function imageMap(slides) {
   const images = {}
   for (const s of slides) if (s.bg) images[imagePath(s.bg.src)] = s.bg.asset // a slide's background picture
   for (const s of slides) for (const el of s.elements) {
-    if (el.type === 'image' && el.src) images[imagePath(el.src)] = el.asset
+    if ((el.type === 'image' || el.type === 'media') && el.src) images[imagePath(el.src)] = el.asset // pictures, video and sound files
     for (const m of JSON.stringify(el.html || el.rows || '').matchAll(/<img[^>]*?>/g)) {
       const id = m[0].match(/data-asset=\\"([^"\\]+)/)?.[1], src = m[0].match(/src=\\"([^"\\]+)/)?.[1]
       if (id && src && !/^(data|https?):/.test(src)) images[imagePath(src)] = id

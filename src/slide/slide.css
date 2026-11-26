@@ -134,6 +134,17 @@
 .slide .el.video .web-load { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border: 0; border-radius: 8px; background: #f1f5f9; color: #0f172a; font: 600 18px system-ui, sans-serif; cursor: pointer; max-width: 90%; overflow-wrap: anywhere; }
 .slide .el.video .web-load small { font-weight: 400; font-size: 12px; color: #334155; }
 .slide .el.video .play { position: absolute; inset: 0; margin: auto; width: 64px; height: 44px; border-radius: 12px; background: #e00; }
+/* a video or sound file: dark like a player for video, a slim bar for sound; the face (editor, exports) names the file */
+.slide .el.media .media { width: 100%; height: 100%; display: flex; border-radius: 6px; overflow: hidden; }
+.slide .el.media .media[data-kind=video] { background: #111; }
+.slide .el.media video, .slide .el.media audio { width: 100%; height: 100%; }
+.slide .el.media .media-face { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; font-size: 14px; color: #fff; text-align: center; overflow-wrap: anywhere; }
+.slide .el.media .media[data-kind=audio] { background: #f1f5f9; border: 1px solid #94a3b8; }
+.slide .el.media .media[data-kind=audio] .media-face { flex-direction: row; color: #0f172a; }
+.slide .el.media .media-icon { width: 48px; height: 48px; flex: none; border-radius: 50%; background: #fff; clip-path: none; position: relative; }
+.slide .el.media .media-icon::after { content: ''; position: absolute; inset: 0; margin: auto; width: 0; height: 0; border-style: solid; border-width: 10px 0 10px 16px; border-color: transparent transparent transparent #111; transform: translateX(2px); }
+.slide .el.media .media[data-kind=audio] .media-icon { width: 32px; height: 32px; background: #0f172a; }
+.slide .el.media .media[data-kind=audio] .media-icon::after { border-width: 7px 0 7px 11px; border-left-color: #fff; }
 /* timer: digits that do not jump while counting; a run-out countdown blinks (off with reduced motion) */
 .slide .el.timer .timer-face { display: flex; align-items: center; justify-content: center; height: 100%; font-weight: 700; font-variant-numeric: tabular-nums; user-select: none; }
 .slide .el.timer .timer-face p { margin: 0; }

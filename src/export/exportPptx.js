@@ -477,7 +477,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
     for (const el of node.querySelectorAll('.el')) {
       marks.push({ at: count(), click: +el.dataset.click || 0, until: +el.dataset.until || 0 })
       const m = model.get(el.dataset.el) || {}
-      const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
+      const type = el.classList.contains('diagram') ? 'image' : ['image', 'code', 'table', 'shape', 'video', 'media', 'chart', 'icon'].find(t => el.classList.contains(t)) || 'text' // a diagram is its rendered picture
       // the element's shadow (straight down, black), in points
       const sh = SHADOWS[m.shadow] && { shadow: { type: 'outer', angle: 90, blur: SHADOWS[m.shadow].blur * PT, offset: SHADOWS[m.shadow].y * PT, color: '000000', opacity: SHADOWS[m.shadow].a } }
       // a timer with a ring, bar or background and the draw card: the same picture route (their text as alt text)
@@ -544,6 +544,10 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       } else if (type === 'video' && m.url) { // a web page: its address as a link (Office files cannot show one)
         slide.addText([{ text: new URL(m.url).host, options: { bold: true, fontSize: 18, color: '0F172A', breakLine: true } }, { text: m.url, options: { hyperlink: { url: m.url }, fontSize: 12, color: '1D4ED8' } }],
           { ...box(el), align: 'center', valign: 'middle', fill: { color: 'F1F5F9' }, line: { color: '94A3B8', width: 0.75 } })
+      } else if (type === 'media') { // a video or sound file: embedded with a play button (PowerPoint, LibreOffice); Google Slides and OpenDocument cannot hold one, they get its name
+        const data = deck.assets[m.asset], sub = data?.match(/^data:\w+\/([\w.+-]+)/)?.[1]
+        if (data && !google && !odp) slide.addMedia({ type: m.kind, data: data.slice(5), extn: { quicktime: 'mov', mpeg: m.kind === 'audio' ? 'mp3' : 'mpg', 'x-m4a': 'm4a', 'x-wav': 'wav' }[sub] || sub, ...box(el) })
+        else slide.addText([{ text: (m.kind === 'audio' ? '♪  ' : '▶  ') + (m.name || t('Video')), options: { color: 'FFFFFF', bold: true, fontSize: 16 } }], { ...box(el), align: 'center', valign: 'middle', fill: { color: '111111' } })
       } else if (type === 'video') {
         const link = `https://www.youtube.com/watch?v=${m.youtube}`
         slide.addText([{ text: '▶  ' + t('Watch the YouTube video'), options: { hyperlink: { url: link }, color: 'FFFFFF', bold: true, fontSize: 16 } }],

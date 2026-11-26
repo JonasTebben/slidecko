@@ -89,6 +89,7 @@ They are not part of Slidev, so they are written as `data-*` blocks. JSON goes i
 - **Random name picker** ("who's next?"): `<div data-picks='["Ana","Ben","Cem"]' data-heading="Who answers?"></div>`. Optional `data-repeat="1"` (a name may come up again), `data-look="outline"` (`solid`, `outline`, `plain`), `data-heading=""` (no text above). For workshops, seminars and lessons; the user can also keep name lists in the app.
 - **Quiz**: `<div data-quiz='{"question":"What do roots need?","answers":[{"text":"Light"},{"text":"Air and water","correct":true}],"look":"colors"}'></div>`. 2 to 6 answers, one or more `correct`; `look` `list`, `colors` or `plain`. While presenting, taps mark the group's vote and Q reveals the answer.
 - **Chart**: `<div data-chart='{"kind":"column","categories":["2023","2024"],"series":[{"name":"Sales","values":[12,19]}],"title":"Sales"}'></div>`. `kind`: `column`, `bar`, `line`, `pie`, `donut` (one series for pie and donut); optional `"legend":true`, `"stacked":true`, `"percent":true`.
+- **Video or sound file**: `<video src="clip.mp4" controls></video>` or `<audio src="talk.mp3" controls></audio>`, the file next to the Markdown file (or in `public/`). It is stored in the project and plays offline; only files the person has, no web addresses (use the YouTube component for those).
 - Made only in the editor: live notes boxes (answers typed while presenting), shapes, the slide master (logo, footer, slide numbers). Suggest them where they help.
 
 ## Good slides

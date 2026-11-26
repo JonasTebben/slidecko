@@ -1,7 +1,7 @@
 import { toggleList } from '../editor/lists.js'
 import { freeSpot } from '../editor/spacing.js'
 import { computed, nextTick, ref } from 'vue'
-import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
+import { W, H, deck, ui, uid, cleanEl, regroup, cleanSlides, newSlide, storeImage, storeMedia, deckData, deckFile, createProject, fileOf, decks, deckName, readDataUrl, imageSize, cleanCrop, library, projectFile, restoreProject, safePath, shownSlides, removeLayout, snapshotsWithData, importSnapshots, SNAP_MAX } from './store.js'
 import { ELEMENTS, SLIDE_PRESETS } from '../slide/presets.js'
 import { importSlidev } from '../import/importSlidev.js'
 import { formatSize, parseRatio } from '../slide/format.js'
@@ -76,9 +76,16 @@ export function addElement(el, place = true) {
   return el
 }
 export const insert = (kind, ...args) => addElement(ELEMENTS[kind](...args))
+// pictures, videos and sound files (picked, dropped or pasted) onto the slide
 export const addImages = files => run(async () => {
   for (const f of files) {
-    if (!f.type.startsWith('image/')) continue
+    const kind = f.type.split('/')[0]
+    if (kind === 'video' || kind === 'audio') {
+      const { id, path, name } = await storeMedia(f), [w, h] = kind === 'video' ? [480, 270] : [360, 56]
+      addElement({ type: 'media', kind, asset: id, src: path, name, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h })
+      continue
+    }
+    if (kind !== 'image') continue
     const { id, path, size } = await storeImage(f)
     const k = Math.min(1, 420 / size.w, 320 / size.h)
     const w = Math.round(size.w * k), h = Math.round(size.h * k)
@@ -571,7 +578,7 @@ export const appendPresentations = files => run(async () => {
     toast(t('Importing {0} …', f.name), 0)
     const r = await read[ext](f, (i, k) => toast(t('{0}: page {1} of {2} …', f.name, i, k), 0))
     if (!Array.isArray(r?.slides)) throw new Error(t('Not a valid project file'))
-    for (const [k, v] of Object.entries(r.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:image\//.test(v)) deck.assets[k] = v
+    for (const [k, v] of Object.entries(r.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:(image|video|audio)\//.test(v)) deck.assets[k] = v
     const file = deck.slides[pos - 1]?.file
     const slides = cleanSlides(r.slides).map(s => ({ ...s, file }))
     // another slide size: scaled to fit and centred

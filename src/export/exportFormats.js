@@ -129,7 +129,7 @@ body[data-tool=arrow] .deck * { pointer-events: none; }
 // arrows/space/click/swipe navigate, F = full screen, the URL hash keeps the slide number
 const viewerJs = () => `
 const project = JSON.parse(document.getElementById('slides-builder-project').textContent), assets = project.assets
-for (const img of document.querySelectorAll('img[data-a]')) img.src = assets[img.dataset.a]
+for (const img of document.querySelectorAll('img[data-a], video[data-a], audio[data-a]')) img.src = assets[img.dataset.a]
 for (const s of document.querySelectorAll('[data-bg]')) s.style.backgroundImage = s.style.backgroundImage.replace(/url\\(["']?#bg["']?\\)/, 'url("' + assets[s.dataset.bg] + '")')
 const slides = [...document.querySelectorAll('.deck > .slide')], no = document.querySelector('.hud span')
 let i = Math.min(slides.length, Math.max(1, parseInt(location.hash.slice(1)) || 1)) - 1
@@ -178,6 +178,7 @@ function go(n, back) {
   reveal()
   if (from) playMorph(from, slides[i], pairs)
   slides.forEach((s, j) => s.classList.toggle('on', j === i))
+  for (const m of document.querySelectorAll('.slide:not(.on) :is(video, audio)')) m.pause() // a film or sound stops with its slide
   no.textContent = (i + 1) + ' / ' + slides.length
   history.replaceState(null, '', '#' + (i + 1))
 }
@@ -366,7 +367,7 @@ if (runnerSrc) for (const pre of document.querySelectorAll('pre[data-run]')) {
     runBox.contentWindow.postMessage({ run: id, code: pre.dataset.run }, '*')
   })
 }
-document.querySelector('.deck').addEventListener('click', e => { if (!tool && !e.target.closest('a, iframe, video')) step(1) })
+document.querySelector('.deck').addEventListener('click', e => { if (!tool && !e.target.closest('a, iframe, video, audio')) step(1) })
 let x0 = null
 addEventListener('touchstart', e => { x0 = e.touches[0].clientX }, { passive: true })
 addEventListener('touchend', e => { if (!tool && x0 != null && Math.abs(e.changedTouches[0].clientX - x0) > 40) step(e.changedTouches[0].clientX < x0 ? 1 : -1); x0 = null })
@@ -444,7 +445,7 @@ export async function htmlDeck(root, title, list, files) {
   const rules = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules].map(r => r.cssText).filter(keep) } catch { return [] } })
   // every image is stored once, in the project JSON; the slides point to it (data-a) and the viewer fills src in
   const data = JSON.parse(deckFile(list)), byData = new Map(Object.entries(data.assets).map(([id, d]) => [d, id]))
-  const ext = d => ({ 'svg+xml': 'svg', jpeg: 'jpg', 'x-icon': 'ico' })[d.match(/^data:(?:image|font)\/([\w.+-]+)/)?.[1]] || d.match(/^data:(?:image|font)\/(\w+)/)?.[1] || 'bin'
+  const ext = d => ({ 'svg+xml': 'svg', jpeg: 'jpg', 'x-icon': 'ico', quicktime: 'mov', mpeg: 'mp3', 'x-m4a': 'm4a', 'x-wav': 'wav' })[d.match(/^data:(?:image|font|video|audio)\/([\w.+-]+)/)?.[1]] || d.match(/^data:(?:image|font|video|audio)\/(\w+)/)?.[1] || 'bin'
   if (files) for (const [id, d] of Object.entries(data.assets)) { files[`images/${id}.${ext(d)}`] = d; data.assets[id] = `images/${id}.${ext(d)}` }
   const project = JSON.stringify(data)
   // runnable code blocks: the runner (public/runner.js) rides along and runs in a sandboxed srcdoc iframe
@@ -460,6 +461,15 @@ export async function htmlDeck(root, title, list, files) {
       const id = byData.get(img.getAttribute('src'))
       if (id && files) img.setAttribute('src', data.assets[id])
       else if (id) { img.removeAttribute('src'); img.dataset.a = id }
+    }
+    // video and sound files: a player, the file stored once like the images
+    for (const m of c.querySelectorAll('.media[data-asset]')) {
+      const id = m.dataset.asset, p = document.createElement(m.dataset.kind === 'audio' ? 'audio' : 'video')
+      if (!data.assets[id]) continue
+      Object.assign(p, { controls: true, preload: 'metadata', playsInline: true })
+      if (files) p.src = data.assets[id]
+      else p.dataset.a = id
+      m.replaceChildren(p)
     }
     // a background picture is stored once too (data-bg; the viewer fills it in)
     const bg = c.style.backgroundImage.match(/url\("?(data:[^")]+)"?\)/)?.[1], bgId = bg && byData.get(bg)

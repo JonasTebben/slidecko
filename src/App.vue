@@ -569,7 +569,7 @@ function dupChoice() {
 // files dropped anywhere in the editor: images onto the slide, presentations appended, Markdown as decks
 const PRESENTATION = /\.(pptx|potx|odp|otp|pdf|md|json|zip|html?)$/i // what Home accepts besides images
 function dropFiles(files) {
-  const images = files.filter(f => f.type.startsWith('image/')), rest = files.filter(f => !images.includes(f))
+  const images = files.filter(f => /^(image|video|audio)\//.test(f.type)), rest = files.filter(f => !images.includes(f))
   const md = rest.filter(f => /\.md$/i.test(f.name)), pres = rest.filter(f => PRESENTATION.test(f.name) && !md.includes(f))
   if (images.length) A.addImages(images)
   if (md.length) pickImport(md, 'decks')
@@ -667,6 +667,14 @@ function toggleAudience() {
   presenterView.value = true
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {}) // the presenter view in a window; the slides are full screen over there
   fitPresenter()
+}
+// with an audience window the presenter's player is the remote: the audience's copy follows it and plays the sound
+// (if that window may not start sound on its own, the presenter's copy keeps it)
+function mirrorMedia(e) {
+  const m = e.target, id = m.closest?.('.media')?.dataset.asset, twin = id && audience.value?.root.querySelector(`.media[data-asset="${id}"] > :is(video, audio)`)
+  if (!twin) return
+  if (Math.abs(twin.currentTime - m.currentTime) > 0.3) twin.currentTime = m.currentTime
+  if (e.type === 'play') { m.muted = true; twin.play().catch(() => { m.muted = false }) } else if (e.type === 'pause') twin.pause()
 }
 function closeAudience() { audience.value?.close(); audience.value = null }
 // the laser's point on the slide (it moves over this window's slide), for the audience's copy of it
@@ -1100,7 +1108,7 @@ function onClipboard(e) {
       const d = JSON.parse(e.clipboardData.getData(CLIP)) // untrusted: an old array of elements or { elements, assets }
       const list = Array.isArray(d) ? d : Array.isArray(d?.elements) ? d.elements : []
       // only images this project lacks, and only image data (the loadDeck rule)
-      for (const [k, v] of Object.entries(Array.isArray(d) ? {} : d?.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:image\//.test(v)) deck.assets[k] = v
+      for (const [k, v] of Object.entries(Array.isArray(d) ? {} : d?.assets || {})) if (!deck.assets[k] && typeof v === 'string' && /^data:(image|video|audio)\//.test(v)) deck.assets[k] = v
       const els = regroup(cleanSlides([{ elements: list }])[0].elements.map(el => ({ ...el, x: el.x + 16, y: el.y + 16 })))
       slide.value.elements.push(...els)
       ui.sel = els.map(el => el.id)
@@ -1187,6 +1195,7 @@ function onClipboard(e) {
             <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
             <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>{{ kbd('insertVideo') }}</kbd></button>
             <button class="mi" @click="ytUrl = 'https://'; openDlg(ytDialog)"><Icon name="globe" />{{ t('Web page …') }}</button>
+            <label class="mi" tabindex="0" role="button"><Icon name="music" />{{ t('Video or audio file …') }}<input type="file" accept="video/*,audio/*" multiple hidden @change="A.addImages([...$event.target.files]); $event.target.value = ''" /></label>
             <hr />
             <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
             <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
@@ -1276,6 +1285,7 @@ function onClipboard(e) {
           <button class="mi" @click="openIcons"><Icon name="smile" />{{ t('Icon …') }}</button>
           <button class="mi" @click="ytUrl = ''; openDlg(ytDialog)"><Icon name="video" />{{ t('YouTube video …') }}<kbd>Y</kbd></button>
           <button class="mi" @click="ytUrl = 'https://'; openDlg(ytDialog)"><Icon name="globe" />{{ t('Web page …') }}</button>
+          <label class="mi" tabindex="0" role="button"><Icon name="music" />{{ t('Video or audio file …') }}<input type="file" accept="video/*,audio/*" multiple hidden @change="A.addImages([...$event.target.files]); $event.target.value = ''" /></label>
           <hr />
           <button class="mi" @click="A.insert('chart')"><Icon name="chart" />{{ t('Chart') }}</button>
           <button class="mi" @click="A.insert('diagram')"><Icon name="diagram" />{{ t('Diagram (Mermaid)') }}</button>
@@ -1824,7 +1834,7 @@ function onClipboard(e) {
     <KeysDialog ref="keysDialog" :commands="commands" />
   </template>
 
-  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, 'notes-below': notesBelow, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick"
+  <div v-if="presenting" ref="presenter" class="presenter" :class="{ pv: presenterView, 'notes-below': notesBelow, laser: tool === 'laser' }" tabindex="0" role="application" :aria-label="t('Slide {0} of {1}', ui.slide + 1, deck.slides.length)" @keydown="presentKey" @click="presentClick" @play.capture="mirrorMedia" @pause.capture="mirrorMedia" @seeked.capture="mirrorMedia"
     @pointerdown="swipeDown" @pointermove="e => { swipeMove(e); if (tool === 'laser') laser = [e.clientX, e.clientY] }" @pointerup="swipeUp" @pointercancel="swipeUp">
     <div class="pv-main" :style="{ width: format.w * presentScale + 'px', height: format.h * presentScale + 'px' }">
       <Transition :name="'tr-' + transition" :css="transition !== 'none' && transition !== 'morph'">

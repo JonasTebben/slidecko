@@ -205,6 +205,10 @@ export function cleanEl(e) {
     // TeX source of a formula, rendered by KaTeX (math.js, no trust: no links or pictures); capped like typed code
     case 'math': return { ...base, tex: (str(e.tex) || '').slice(0, 5000), ...(color(e.color) && { color: color(e.color) }) }
     // a YouTube video, or a web page (https only) shown in a frame while presenting
+    // a video or audio file of the project (stored like an image, so it plays offline); src: its path in a Slidev export
+    case 'media': return deck.assets[e.asset] && ['video', 'audio'].includes(e.kind) ? {
+      ...base, asset: e.asset, kind: e.kind, src: str(e.src) || '/media/' + e.kind, ...(str(e.name) && { name: e.name.slice(0, 200) }),
+    } : null
     case 'video': return /^[\w-]{6,20}$/.test(str(e.youtube) ?? '') ? { ...base, youtube: e.youtube } : webUrl(e.url) ? { ...base, url: webUrl(e.url) } : null
     // countdown length in seconds (0: a stopwatch), started by a click while presenting; face: ring or bar around the digits
     // in accent (default: the theme's), fill: its background, warn: a countdown's last minute in red, auto, silent
@@ -362,7 +366,7 @@ export function stepMove(slides, i, k, d) {
 export function loadDeck(d) {
   if (!Array.isArray(d?.slides)) throw new Error(t('Not a valid project file'))
   if (d.styles) mergeTextStyles(d.styles)
-  for (const [k, v] of Object.entries(d.assets || {})) if (/^data:(image|font)\//.test(v)) deck.assets[k] = v
+  for (const [k, v] of Object.entries(d.assets || {})) if (/^data:(image|font|video|audio)\//.test(v)) deck.assets[k] = v
   deck.fonts = cleanFonts(d.fonts, deck.assets) // before the slides: their font references are checked against it
   if (d.files && typeof d.files === 'object') deck.files = Object.fromEntries(Object.entries(d.files).filter(([k, v]) => typeof v === 'string' && /^[\w.@/ -]+$/.test(k) && safePath(k)).map(([k, v]) => [safePath(k), v]))
   deck.title = String(d.title || t('Presentation')).slice(0, 200)
@@ -446,7 +450,7 @@ export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
 export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
 
-const MIME = { woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
+const MIME = { mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', ogv: 'video/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const readDataUrl = blob => new Promise((res, rej) => {
   // files from folder picks sometimes come without a type (svg, webp, …): take it from the extension
   const type = !blob.type && MIME[blob.name?.split('.').pop().toLowerCase()]
@@ -471,6 +475,16 @@ export async function storeImage(file) {
   let path = '/images/' + (file.name || 'image.png').replace(/[^\w.-]+/g, '_')
   if (deck.slides.some(s => s.elements.some(e => e.src === path))) path = path.replace(/([^/]+)$/, id + '-$1')
   return { id, path, size }
+}
+// stores a video or audio file (at most MEDIA_MAX: it lives in the browser's storage and in every saved file)
+export const MEDIA_MAX = 50 * 1024 * 1024
+export async function storeMedia(file) {
+  if (file.size > MEDIA_MAX) throw new Error(t('{0}: video and audio files can be at most 50 MB', file.name))
+  const id = uid(), name = (file.name || 'media').replace(/[^\w.-]+/g, '_')
+  deck.assets[id] = await readDataUrl(file)
+  let path = '/media/' + name
+  if (deck.slides.some(s => s.elements.some(e => e.src === path))) path = '/media/' + id + '-' + name
+  return { id, path, name: file.name || name }
 }
 // stores an uploaded font in the project (checked: font file, at most FONT_MAX); returns its FONTS key
 export async function storeFont(file) {
