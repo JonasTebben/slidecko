@@ -269,6 +269,13 @@ for (const q of document.querySelectorAll('.el > .quiz')) {
   q.append(b)
   for (const tile of q.querySelectorAll('.quiz-tile')) tile.addEventListener('click', e => { e.stopPropagation(); tile.classList.toggle('picked') })
 }
+// code groups: a tab shows its code
+for (const b of document.querySelectorAll('.code-tabs [data-tab]')) b.addEventListener('click', e => {
+  e.stopPropagation()
+  const el = b.closest('.el')
+  for (const x of el.querySelectorAll('.code-tabs [data-tab]')) { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b) }
+  el.querySelectorAll(':scope > pre.code:not(.run-out)').forEach((p, k) => { p.hidden = k !== +b.dataset.tab })
+})
 addEventListener('keydown', e => { if (e.key.toLowerCase() === 'q' && !e.metaKey && !e.ctrlKey && !e.altKey) for (const b of slides[i].querySelectorAll('.quiz-reveal')) b.click() })
 // random pickers: a click draws a name, nobody twice until everyone was drawn (data-repeat: anyone each time), the button at the edge starts over (same as in the editor)
 for (const f of document.querySelectorAll('.picker-face')) {

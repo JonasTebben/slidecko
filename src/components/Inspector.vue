@@ -447,6 +447,17 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
             <button class="grow" :disabled="!el.output" @click="el.output = undefined">{{ t('Clear output') }}</button>
           </div>
         </template>
+        <!-- a code group (tabs): the code on the slide is the first tab, the others are edited here -->
+        <label v-if="el.tabs?.length" class="field">{{ t('Tab name') }} <input :value="el.label || ''" :placeholder="el.lang" @input="el.label = $event.target.value || undefined" /></label>
+        <div v-for="(tb, k) in el.tabs || []" :key="k" class="field">
+          <div class="btn-row">
+            <input class="grow" :value="tb.label || ''" :placeholder="tb.lang" :aria-label="t('Tab name')" :title="t('Tab name')" @input="tb.label = $event.target.value || undefined" />
+            <select v-model="tb.lang" :aria-label="t('Language')" :title="t('Language')"><option v-for="l in langs" :key="l">{{ l }}</option></select>
+            <button class="ib" :title="t('Remove tab')" :aria-label="t('Remove tab')" @click="el.tabs.splice(k, 1); if (!el.tabs.length) { el.tabs = undefined; el.label = undefined }">✕</button>
+          </div>
+          <textarea v-model="tb.code" rows="4" spellcheck="false" :aria-label="t('Code')" style="font-family: var(--mono, monospace)" />
+        </div>
+        <button @click="el.tabs = [...(el.tabs || []), { code: '', lang: el.lang }]">+ {{ t('Add tab') }}</button>
         <div class="chips">
           <span class="chip" :style="chip(el.fill, 'var(--ui-panel)')"><Menu icon="fill" :label="t('Background')" :title="t('Background')">
             <div class="swatches pop-sw">

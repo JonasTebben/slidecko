@@ -262,7 +262,7 @@ test('Slidev components that have no element of their own keep their content', (
   assert.equal(slidevComponents('<AutoFitText :max="200" modelValue="Fit me" />'), '<p>Fit me</p>')
   assert.equal(slidevComponents('<LightOrDark>\n  <template #dark>D</template>\n  <template #light>L</template>\n</LightOrDark>'), 'L')
   assert.equal(slidevComponents('<v-switch>\n<template #1>One</template>\n</v-switch>'), '<v-switch>\n<div>One</div>\n</v-switch>')
-  assert.equal(slidevComponents('::code-group\n\n```sh [a]\nx\n```\n\n::'), '\n\n```sh [a]\nx\n```\n\n')
+  assert.equal(slidevComponents('::code-group\n\n```sh [a]\nx\n```\n\n::'), '<div data-tabs>\n\n```sh [a]\nx\n```\n\n</div>')
   assert.equal(slidevComponents('`<SlidesTotal />`'), '`<SlidesTotal />`')
 })
 

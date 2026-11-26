@@ -1308,4 +1308,7 @@ export default {
   "Arrowhead at the end": "Punta al final",
   "Arrowhead at the start": "Punta al principio",
   "Arrowheads at both ends": "Puntas en ambos extremos",
+  "Tab name": "Nombre de la pestaña",
+  "Add tab": "Añadir pestaña",
+  "Remove tab": "Quitar pestaña",
 }

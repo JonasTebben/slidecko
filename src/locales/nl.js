@@ -1308,4 +1308,7 @@ export default {
   "Arrowhead at the end": "Pijlpunt aan het eind",
   "Arrowhead at the start": "Pijlpunt aan het begin",
   "Arrowheads at both ends": "Pijlpunten aan beide uiteinden",
+  "Tab name": "Naam van het tabblad",
+  "Add tab": "Tabblad toevoegen",
+  "Remove tab": "Tabblad verwijderen",
 }

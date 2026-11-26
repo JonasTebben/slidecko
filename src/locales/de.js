@@ -1308,4 +1308,7 @@ export default {
   "Arrowhead at the end": "Pfeilspitze am Ende",
   "Arrowhead at the start": "Pfeilspitze am Anfang",
   "Arrowheads at both ends": "Pfeilspitzen an beiden Enden",
+  "Tab name": "Name des Tabs",
+  "Add tab": "Tab hinzufügen",
+  "Remove tab": "Tab entfernen",
 }

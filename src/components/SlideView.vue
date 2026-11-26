@@ -1,6 +1,6 @@
 <script setup>
 import { gapSnaps, nearestGap } from '../editor/spacing.js'
-import { computed, nextTick, ref, watch, onBeforeUnmount, onMounted, onUpdated } from 'vue'
+import { computed, nextTick, reactive, ref, watch, onBeforeUnmount, onMounted, onUpdated } from 'vue'
 import { W, H, deck, ui, clean, withGroups, clickSteps, revealed, stepOf, untilOf, markItems, codeStage, codeStages, underlay } from '../core/store.js'
 import { themeStyle, fontStack, codeDark, shadowCss, themeOf } from '../slide/themes.js'
 import { chartSvg } from '../slide/chart.js'
@@ -484,6 +484,8 @@ const markShown = m => props.step == null || !m.at || revealed({ click: m.at }, 
 const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
 // runnable code while presenting: a click on the code edits it (the deck keeps its code until "Keep changes"), ⌘/Ctrl+Enter runs
 const runEdit = ref(null)
+const shownTab = reactive({}) // the tab each code group shows while presenting
+const tabOf = el => (props.live && shownTab[el.id] <= (el.tabs?.length || 0) && shownTab[el.id]) || 0
 const runOf = el => (runs[el.id] ??= { code: el.code, out: el.output || [] })
 const runShown = el => (props.live && runs[el.id]) || { code: el.code, out: el.output || [] }
 const run = el => { runOf(el); runLive(el, t('Stopped after 3 seconds (endless loop?)')) }
@@ -510,7 +512,7 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
     <div
       v-for="el in all" :key="(decor(el) ? 'u' : '') + el.id" :data-el="el.id"
       :data-click="(el.click && stepOf(slide, el, steps)) || null" :data-until="untilOf(el, steps) || null" :data-unshown="(step != null && !revealed(el, steps, step)) || null"
-      class="el" :class="[el.type, { run: el.type === 'code' && isRun(el.meta), 'out-right': el.outPos === 'right', cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
+      class="el" :class="[el.type, { run: el.type === 'code' && isRun(el.meta), tabbed: el.type === 'code' && el.tabs?.length, 'out-right': el.outPos === 'right', cropped: el.type === 'image' && el.crop, cropping: editable && ui.crop === el.id, title: el.title, colored: el.color, filled: el.fill || el.stroke, locked: editable && el.locked, selected: selected(el), decor: editable && decor(el), placeholder: editable && el.placeholder, editing: editable && ui.editing === el.id, board: el.board }]"
       :style="{ left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', fontSize: el.fontSize ? el.fontSize + 'px' : null,
         color: el.color || null, textAlign: el.align || null, fontFamily: fontStack(el.font) || null, '--heading-font': fontStack(el.font) || null, '--code-size': el.type === 'code' && el.fontSize ? el.fontSize + 'px' : null,
         '--code-line': el.type === 'code' && el.fontSize ? Math.round(el.fontSize * 1.4) + 'px' : null, ...(el.type === 'code' && codeVars(el)), '--shadow': shadowCss(el.shadow) || null, '--out-h': el.outH ? el.outH + 'px' : null, ...(el.type === 'image' && cropVars(el)) }"
@@ -527,9 +529,16 @@ if (props.live) for (const el of props.slide.elements) if (el.type === 'code' &&
       />
       <div v-else-if="el.type === 'toc'" class="content toc" :class="el.look && 'look-' + el.look" :style="{ columns: el.columns || null }" v-html="tocHtml(tocEntries(deck.slides, el), el, slide.id)" />
       <template v-else-if="el.type === 'code'">
+        <!-- a code group: one tab per code; presenting (and the HTML file) switches, everything else shows the first -->
+        <div v-if="el.tabs?.length && !(editable && ui.editing === el.id)" class="code-tabs" role="tablist">
+          <button v-for="(l, k) in [el.label || el.lang, ...el.tabs.map(tb => tb.label || tb.lang)]" :key="k" role="tab" :class="{ on: tabOf(el) === k }" :aria-selected="tabOf(el) === k" :data-tab="k" @click="live && ((shownTab[el.id] = k), $event.stopPropagation())">{{ l }}</button>
+        </div>
         <textarea v-if="editable && ui.editing === el.id" v-model="el.code" class="code" spellcheck="false" aria-label="Code" @blur="ui.editing = null" @keydown="codeKey($event, el)" />
         <textarea v-else-if="live && runEdit === el.id" v-model="runOf(el).code" class="code" spellcheck="false" :aria-label="t('Code')" @blur="endRunEdit" @keydown.stop="runKey($event, el)" @click.stop />
-        <pre v-else class="code" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" :data-ts="isRun(el.meta) && !editable && isTs(el.lang) || null" :data-stages="stageStarts(el)" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta, stageOf(el))]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }" :data-on="lineStages(el, i)"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <pre v-else class="code" :hidden="tabOf(el) > 0" :class="{ dark: codeDarkOf(el) }" :data-run="isRun(el.meta) && !editable ? el.code : null" :data-ts="isRun(el.meta) && !editable && isTs(el.lang) || null" :data-stages="stageStarts(el)" @click="live && isRun(el.meta) && (editRun(el), $event.stopPropagation())"><code v-for="o in [codeOpts(el.meta, stageOf(el))]" :key="0"><span v-for="(l, i) in hlLines(runShown(el).code, el.lang)" :key="i" class="line" :class="{ dim: o.marked && !o.marked.has(i + 1) }" :data-on="lineStages(el, i)"><span v-if="o.lines" class="ln">{{ lineNo(el, i, o.start) }}</span><span v-html="l" />{{ '\n' }}</span></code></pre>
+        <template v-if="el.tabs?.length && !(editable && ui.editing === el.id)">
+          <pre v-for="(tb, k) in el.tabs" :key="k" class="code" :class="{ dark: codeDarkOf(el) }" :hidden="tabOf(el) !== k + 1"><code><span v-for="(l, n) in hlLines(tb.code, tb.lang)" :key="n" class="line"><span v-html="l" />{{ '\n' }}</span></code></pre>
+        </template>
         <!-- runnable: the output panel (the last kept run in the editor and exports, the live one while presenting) -->
         <template v-if="isRun(el.meta)">
           <pre class="code run-out" :class="{ dark: codeDarkOf(el) }" :aria-live="live ? 'polite' : null" :aria-label="t('Output')"><span v-for="(l, i) in runShown(el).out" :key="i" :class="'out-' + l.k">{{ outLine(l) }}{{ '\n' }}</span></pre>

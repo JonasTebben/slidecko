@@ -1287,4 +1287,7 @@ export default {
   "Arrowhead at the end": "Pointe à la fin",
   "Arrowhead at the start": "Pointe au début",
   "Arrowheads at both ends": "Pointes aux deux extrémités",
+  "Tab name": "Nom de l’onglet",
+  "Add tab": "Ajouter un onglet",
+  "Remove tab": "Supprimer l’onglet",
 }

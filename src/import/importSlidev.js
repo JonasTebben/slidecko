@@ -219,6 +219,7 @@ function measure(slide, parsed) {
   const elements = []
   let titled = false, clicks = 0
   const wrapClicks = new Map() // <div v-click> around several elements: they all take its one step
+  const tabGroups = new Map() // <div data-tabs> -> the code element its blocks become tabs of
   for (let i = 0; i < leaves.length; i++) {
     const n = leaves[i], box = boxOf(n), r = rect(n)
     if (r.r - r.x < 1 && r.b - r.y < 1) continue
@@ -270,6 +271,18 @@ function measure(slide, parsed) {
       Object.assign(el, codeEl((code || n).textContent.replace(/\n$/, ''), code?.className.match(/language-(\S+)/)?.[1]))
       if (codeMeta[codeIndex] && el.type === 'code') el.meta = codeMeta[codeIndex]
       codeIndex++
+      // a code group (::code-group): the tab's name in brackets; the group's later blocks become tabs of its first
+      const label = el.meta?.match(/\[([^\]\n]*)\]/)?.[1]?.trim()
+      if (el.meta) el.meta = el.meta.replace(/\[[^\]\n]*\]/, '').trim() || undefined
+      const group = el.type === 'code' && n.closest('[data-tabs]')
+      if (group && tabGroups.has(group)) {
+        const first = tabGroups.get(group)
+        if (!box && !first.tabs.length) first.h += 32 // room for the tab names
+        first.tabs.push({ code: el.code, lang: el.lang, ...(label && { label }) })
+        if (!box) first.h = Math.max(first.h, Math.ceil(r.b - r.y) + 32)
+        continue
+      }
+      if (group) { tabGroups.set(group, el); el.tabs = []; if (label) el.label = label }
       // a diagram measured as its source text: at least a usable height for the picture
       if (el.type === 'diagram' && !box) { sized(el, [r]); el.h = Math.max(el.h, Math.min(320, slide.clientHeight - el.y - 20)) }
       // own background, opacity and corners (written by toSlidev as Slidev's code variables)

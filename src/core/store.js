@@ -153,6 +153,10 @@ export function cleanEl(e) {
       // background (undefined = theme), its opacity in % and the corner radius in px
       ...(color(e.fill) && { fill: color(e.fill) }), ...(e.fillAlpha != null && { fillAlpha: num(e.fillAlpha, 0, 100) }), ...(e.radius != null && { radius: num(e.radius, 0, 60) }),
       // runnable code ({monaco-run} in meta): the last kept output (plain text lines, capped), the panel's side and size in px
+      // a code group: the element's own code is the first tab (label), more tabs follow
+      ...(Array.isArray(e.tabs) && e.tabs.length && {
+        tabs: e.tabs.slice(0, 8).filter(tb => tb && typeof tb === 'object').map(tb => ({ code: String(tb.code ?? ''), lang: String(tb.lang || 'plaintext').replace(/[^\w+#-]/g, ''), ...(str(tb.label)?.trim() && { label: tb.label.trim().slice(0, 40) }) })),
+      }), ...(str(e.label)?.trim() && Array.isArray(e.tabs) && e.tabs.length && { label: e.label.trim().slice(0, 40) }),
       ...(cleanOutput(e.output)?.length && { output: cleanOutput(e.output) }), ...(e.outPos === 'right' && { outPos: 'right' }), ...(e.outH != null && { outH: num(e.outH, 20, 400) }),
     }
     case 'image': return deck.assets[e.asset] ? {

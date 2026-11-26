@@ -54,7 +54,7 @@ export function headFormat(md) {
 
 // Slidev components that would otherwise vanish (outside code): the slide number and count become Slidecko's fields,
 // <AutoFitText> its text, <LightOrDark> its light part (slides stay light), every <v-switch> step one after the other,
-// the ::code-group markers go (its code blocks stay, one below the other)
+// a ::code-group a <div data-tabs> around its code blocks (the import makes them one code element with tabs)
 const COMPS = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[`~]*[ \t]*$|(`+)[^`\n][\s\S]*?\2|<(SlideCurrentNo|SlidesTotal)\s*\/>|\{\{\s*\$(?:slidev\.)?(?:nav\.)?(currentPage|total|configs\.title)\s*\}\}|<AutoFitText\b([^>]*?)\/>|<LightOrDark>([\s\S]*?)<\/LightOrDark>|<template\s+(?:#|v-slot:)[\w-]+\s*>|<\/template>|<Arrow\b([^>]*?)\/>|^::code-group[ \t]*$|^::[ \t]*$/gm
 // Slidev's <Arrow x1 y1 x2 y2 width color two-way> -> a positioned line with arrowheads (slope and heads from its direction)
 function arrowBox(a) {
@@ -68,8 +68,10 @@ function arrowBox(a) {
   return `<div data-shape="line" data-fill="none" data-stroke="${color.replace(/"/g, '')}" data-sw="${sw}" data-radius="0"${slope ? ` data-slope="${slope}"` : ''} data-head="${head}" style="position:absolute;left:${Math.min(x1, x2)}px;top:${y}px;width:${Math.max(4, Math.abs(x2 - x1))}px;height:${h}px"></div>`
 }
 const FIELD_OF = { SlideCurrentNo: 'page', currentPage: 'page', SlidesTotal: 'total', total: 'total', 'configs.title': 'title' }
-export const slidevComponents = md => md.replace(COMPS, (m, f, c, no, nav, fit, lod, arrow) => {
+export const slidevComponents = md => { let groups = 0; return md.replace(COMPS, (m, f, c, no, nav, fit, lod, arrow) => {
   if (f || c) return m
+  if (m.startsWith('::code-group')) return groups++, '<div data-tabs>'
+  if (m.startsWith('::')) return groups ? (groups--, '</div>') : ''
   if (arrow != null) return arrowBox(arrow) ?? ''
   if (no || nav) return `<span data-field="${FIELD_OF[no || nav]}">#</span>`
   if (fit != null) return `<p>${(fit.match(/modelValue=["']([^"']*)["']/)?.[1] ?? '')}</p>`
@@ -77,7 +79,7 @@ export const slidevComponents = md => md.replace(COMPS, (m, f, c, no, nav, fit, 
   if (m.startsWith('<template')) return '<div>'
   if (m === '</template>') return '</div>'
   return ''
-})
+}) }
 
 // Slidev's code snippets: a line `<<< @/snippets/a.js` (from the project root) or `<<< ./a.ts {2,3}` (next to the deck),
 // optionally with a language and line options -> a fenced block with the file's code; get(path): its text or undefined

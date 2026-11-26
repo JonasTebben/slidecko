@@ -218,6 +218,13 @@
 .presenter .quiz-q, .deck .quiz-q { padding-right: 6em; } /* room for the reveal button */
 /* runnable code: the code above (or left of) its output, the Run bar above the box (it covers nothing); errors and warnings in the syntax colours that stay AA on code backgrounds */
 .slide .el.code.run { display: flex; flex-direction: column; gap: 4px; }
+/* a code group: its tabs above the code (the shown tab underlined in the theme's accent) */
+.slide .el.code.tabbed { display: flex; flex-direction: column; }
+.slide .el.code.tabbed > pre.code { flex: 1; min-height: 0; height: auto; }
+.slide .el.code pre.code[hidden] { display: none; }
+.slide .code-tabs { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: max(11px, calc(var(--code-size) * .85)); }
+.slide .code-tabs button { border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; padding: 2px 8px 3px; cursor: pointer; }
+.slide .code-tabs button.on { border-bottom-color: var(--accent); font-weight: 700; }
 .slide .el.code.run.out-right { flex-direction: row; }
 .slide .el.code.run > .code:first-child { flex: 1; min-width: 0; min-height: 0; height: auto; }
 .slide .el.code.run pre.run-out { flex: none; width: auto; height: var(--out-h, 80px); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 2px solid var(--accent); }

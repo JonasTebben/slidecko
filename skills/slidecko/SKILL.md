@@ -31,6 +31,22 @@ Nothing is uploaded; the deck stays in the user's browser.
 - **Text**: `#` is the slide title; `##`/`###` sub-headings, paragraphs, bullet and numbered lists, **bold**, *italic*, `inline code`, [links](https://example.org), block quotes, tables (GFM).
 - **Link to a slide**: `<Link to="5">Back to the plan</Link>` (keeps pointing at that slide when slides move).
 - **Code**: fenced with a language, ` ```js `. Step through lines with ` ```js {2|4-5|all} `; ` ```js {monaco-run} ` makes JavaScript runnable on the slide.
+- **Code tabs** (the same task in several languages or tools): a code group, each block with its tab name in brackets:
+
+  ````md
+  ::code-group
+
+  ```sh [npm]
+  npm i slidecko
+  ```
+
+  ```sh [pnpm]
+  pnpm add slidecko
+  ```
+
+  ::
+  ````
+
 - **Diagram**: a ` ```mermaid ` block (flowchart, sequence, gantt, pie, mindmap …) becomes an editable diagram.
 - **Formulas**: `$…$` in a line, `$$…$$` on a line of its own, in TeX (KaTeX). Write `\$` for a dollar sign.
 - **Columns**: blank lines inside each `<div>`, so the Markdown in it is read:

@@ -282,3 +282,10 @@ test('styles of draws, quizzes and tables of contents; a draw keeps its heading 
   const none = S.cleanEl({ type: 'picker', names: ['a'], noIcon: true, icon: 'mdi:star', body: '<path/>' })
   assert.deepEqual([none.noIcon, none.icon], [true, undefined])
 })
+
+test('code groups: cleanEl keeps tabs with their code, language and label', () => {
+  const el = S.cleanEl({ type: 'code', code: 'npm i', lang: 'sh', label: ' npm ', tabs: [{ code: 'pnpm i', lang: 'sh<x>', label: 'pnpm' }, null, { code: 1 }] })
+  expect(el.label).toBe('npm')
+  expect(el.tabs).toEqual([{ code: 'pnpm i', lang: 'shx', label: 'pnpm' }, { code: '1', lang: 'plaintext' }])
+  expect(S.cleanEl({ type: 'code', code: 'x', label: 'a' }).label).toBeUndefined() // a label only in a group
+})

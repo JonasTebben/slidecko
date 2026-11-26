@@ -548,6 +548,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
       } else {
         let pre = type === 'code' && el.querySelector('pre')
         const out = pre && el.querySelector('pre.run-out') // runnable code: its output panel is a second code box
+        const bar = pre && el.querySelector('.code-tabs') // a code group: its tab names above the first tab's code
         const content = pre || el.querySelector('.content') || el
         // boxes inside the text (callouts, quiz box, answer tiles, framed groups): drawn as shapes behind it
         // a filled or framed text box (rounded, maybe with a border): its box as a shape behind everything else
@@ -567,7 +568,7 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
           // text inside a single padded wrapper starts at the wrapper's padding, as in the browser
           const only = main && !pre && c.children.length === 1 ? c.firstElementChild : null
           // runs() measures from the content box, so the text box starts there too (the element may be padded)
-          let area = main && (pre || c === el) ? (out ? rel(c, node) : box(el)) : rel(c, node)
+          let area = main && (pre || c === el) ? (out || bar ? rel(c, node) : box(el)) : rel(c, node)
           if (only && !cols.length && fillOf(getComputedStyle(only).backgroundColor)) {
             const os = getComputedStyle(only), r = rel(only, node), pad = k => parseFloat(os['padding' + k]) * IN
             area = { x: r.x + pad('Left'), y: r.y + pad('Top'), w: r.w - pad('Left') - pad('Right'), h: r.h - pad('Top') - pad('Bottom') }
@@ -594,6 +595,12 @@ export async function exportPptx(root, name = deck.title, slides = [], { format 
           for (const col of cols) emit(col, false)
         }
         emit(content, true)
+        if (bar) {
+          const bs = getComputedStyle(bar)
+          const look = { color: hex(bs.color), fontSize: parseFloat(bs.fontSize) * PT, fontFace: fontName(bs.fontFamily) }
+          slide.addText([...bar.children].map((b, k) => ({ text: (k ? '    ' : '') + b.textContent, options: { ...look, bold: b.classList.contains('on'), ...(b.classList.contains('on') && { underline: { style: 'sng' } }) } })),
+            { ...rel(bar, node), margin: 0, valign: 'middle', fit: 'none', wrap: false })
+        }
         if (out) { pre = out; emit(out, true) }
         // logos etc. inside the text: placed where the browser laid them out
         if (!pre) for (const img of content.querySelectorAll('img')) { const data = img.offsetWidth && pptxImage(img); if (data) slide.addImage({ data, ...rel(img, node) }) }

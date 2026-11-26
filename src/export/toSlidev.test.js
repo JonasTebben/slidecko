@@ -252,3 +252,11 @@ test("the picture of Slidev's image layouts is not written twice; after a layout
   assert.doesNotMatch(slideToMarkdown({ layout: 'image-right', fm: 'layout: image-right\nimage: /pic.png', elements: [pic, text] }), /pic\.png\)|<img/)
   assert.match(slideToMarkdown({ layout: 'default', fm: 'layout: image-right\nimage: /pic.png', elements: [pic, text] }), /pic\.png/)
 })
+
+test('a code group is written as ::code-group with the tab names, and MDC switched on', () => {
+  const el = { id: 'c', type: 'code', code: 'npm i', lang: 'sh', label: 'npm', meta: '{1}', tabs: [{ code: 'pnpm i', lang: 'sh', label: 'pnpm' }, { code: 'x', lang: 'js' }], x: 60, y: 120, w: 400, h: 150 }
+  const { files } = toSlidev({ title: 'T', theme: 'default', slides: [{ id: 's', elements: [el] }] })
+  const md = files['slides.md']
+  expect(md).toMatch(/^mdc: true$/m)
+  expect(md).toContain('::code-group\n\n```sh [npm] {1}\nnpm i\n```\n\n```sh [pnpm]\npnpm i\n```\n\n```js [js]\nx\n```\n\n::')
+})

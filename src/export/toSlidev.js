@@ -176,13 +176,18 @@ function elementMd(el, flat, at = 0) { // at: step of the first list item (list 
     }
     case 'code': {
       const size = el.fontSize ? `;--slidev-code-font-size:${el.fontSize}px;--slidev-code-line-height:${Math.round(el.fontSize * 1.4)}px` : ''
-      const fence = '`'.repeat(Math.max(3, ...(el.code.match(/`+/g) || []).map(t => t.length + 1)))
-      const info = [el.lang === 'plaintext' ? '' : el.lang, el.meta].filter(Boolean).join(' ')
+      // a code group: Slidev's ::code-group (MDC, switched on in the headmatter) with each tab's name in brackets
+      const fenced = (code, lang, label, meta) => {
+        const fence = '`'.repeat(Math.max(3, ...(code.match(/`+/g) || []).map(t => t.length + 1)))
+        return `${fence}${[lang === 'plaintext' && !label ? '' : lang, label && `[${label.replace(/[[\]\n]/g, '')}]`, meta].filter(Boolean).join(' ')}\n${code}\n${fence}`
+      }
       // own background, opacity and corners as Slidev's code variables; the class picks matching syntax colours
       const own = el.fill || el.fillAlpha != null
       const bg = own ? `;--slidev-code-background:${el.fillAlpha != null ? `color-mix(in srgb, ${el.fill || 'var(--code-bg, #f5f5f5)'} ${el.fillAlpha}%, transparent)` : el.fill}` : ''
       const look = bg + (el.radius != null ? `;--slidev-code-radius:${el.radius}px` : '') + (el.fill ? `;color:${codeDark(el, curTheme) ? '#e6edf3' : '#1f2328'}` : '')
-      const block = `${fence}${info}\n${el.code}\n${fence}`
+      const block = el.tabs?.length
+        ? `::code-group\n\n${[fenced(el.code, el.lang, el.label || el.lang, el.meta), ...el.tabs.map(tb => fenced(tb.code, tb.lang, tb.label || tb.lang))].join('\n\n')}\n\n::`
+        : fenced(el.code, el.lang, '', el.meta)
       if (flat) return block
       return `<div${el.fill ? ` class="${codeDark(el, curTheme) ? 'code-dark' : 'code-light'}"` : ''} style="${boxStyle(el, size + look)}">\n\n${block}\n\n</div>`
     }
@@ -467,6 +472,7 @@ export function toSlidev({ title, theme, entry, slides, typo, aspectRatio, canva
   first.fm = withTransition(first.fm, head) // Slidev: the headmatter's transition applies to every slide (shortcut: slide 1 cannot have its own)
   // the talk length is Slidev's `duration` (its presenter timer); a value that means the same stays as written
   if ((parseDuration(fmGet(first.fm, 'duration')) || 0) !== (duration || 0)) first.fm = [first.fm.replace(/^duration:.*\n?/m, '').trim(), duration && `duration: ${slidevDuration(duration)}`].filter(Boolean).join('\n')
+  if (slides.some(s => s.elements.some(e => e.tabs?.length)) && !fmGet(first.fm, 'mdc')) first.fm += '\nmdc: true' // for ::code-group
   write(entry, entrySlides)
   if (!own) files['style.css'] = slidevThemeCss(theme) + (projectFiles['style.css'] ? '\n' + projectFiles['style.css'] : '') // the project's own rules stay
   // project-wide font sizes: Slidev loads style.css from the project root for every slide

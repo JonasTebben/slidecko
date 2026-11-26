@@ -60,7 +60,7 @@ const DECK = {
       { type: 'text', title: true, x: 56, y: 40, w: 868, h: 40, html: '<h1>Picker</h1>' },
       { type: 'picker', names: ['x', 'y'], fontSize: 56, x: 56, y: 170, w: 440, h: 180 },
       { type: 'timer', seconds: 60, fontSize: 56, x: 560, y: 170, w: 364, h: 180 },
-      { type: 'code', lang: 'js', code: 'const a = 1\nconsole.log(a)', x: 56, y: 380, w: 500, h: 120 }] },
+      { type: 'code', lang: 'js', code: 'const a = 1\nconsole.log(a)', label: 'JavaScript', tabs: [{ lang: 'py', code: 'a = 1\nprint(a)', label: 'Python' }], x: 56, y: 380, w: 500, h: 150 }] },
     // every other kind of element, so each export's round trip can be checked element by element (ROUND_TRIP)
     { layout: 'default', elements: [
       { type: 'text', title: true, x: 56, y: 20, w: 868, h: 40, html: '<h1>Everything else</h1>' },
@@ -216,10 +216,13 @@ await step('dev: HTML presentation: its own timer (T), a draw starts over with i
     await face.locator('.pick-reset').click()
     if (await face.locator('.pick').count()) throw new Error('not started over')
   } else throw new Error('no picker on slide 5')
+  // a code group's second tab replaces the first
+  const tabs = await p.evaluate(() => { const b = document.querySelector('.code-tabs [data-tab="1"]'); b?.click(); return b && [...b.closest('.el').querySelectorAll(':scope > pre.code')].map(x => x.hidden).join() })
+  if (tabs !== 'true,false') throw new Error(`code tab not switched: ${tabs}`)
   await p.close()
 })
 // what each format brings back of the deck's elements (see "Formats" in AGENTS.md): Office files what Office has
-const ALL = ['shape+up-end', 'chart', 'code', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
+const ALL = ['shape+up-end', 'chart', 'code+tabs', 'diagram', 'icon', 'image', 'math', 'picker', 'quiz', 'shape', 'table', 'text', 'text+callout', 'text+mark+field+click', 'text+board', 'timer', 'toc', 'video']
 const ROUND_TRIP = { html: ALL, slidev: ALL, git: ALL, json: ALL, pptx: ['shape+up-end', 'chart', 'image', 'shape', 'table', 'text', 'text+click'], odp: ['shape+up-end', 'image', 'shape', 'table', 'text', 'text+click'] }
 for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[key]) await step(`dev: import ${key} export again`, async () => {
   const [opened, slides, kinds] = await page.evaluate(async ({ b64, name }) => {
@@ -227,7 +230,7 @@ for (const key of ['pptx', 'odp', 'html', 'slidev', 'git', 'json']) if (files[ke
     const before = S.deck.id
     await A.importPresentations([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name)])
     // each element as its type, plus what makes it special (callout, mark, field, live box, a click step)
-    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
+    const kinds = S.deck.slides.flatMap(s => s.elements.map(e => e.type + (/data-callout/.test(e.html) ? '+callout' : '') + (/data-mark/.test(e.html) ? '+mark' : '') + (/data-field/.test(e.html) ? '+field' : '') + (e.board ? '+board' : '') + (e.tabs?.length ? '+tabs' : '') + (e.head ? `+${e.slope}-${e.head}` : '') + (e.click ? '+click' : '')))
     return [S.deck.id !== before, S.deck.slides.length, [...new Set(kinds)]]
   }, { b64: readFileSync(files[key].path).toString('base64'), name: files[key].name })
   const lost = ROUND_TRIP[key].filter(k => !kinds.includes(k))
@@ -254,7 +257,8 @@ const LIVE = { title: 'Live', theme: 'ozean', slides: [
     { type: 'timer', seconds: 120, auto: true, fontSize: 56, x: 400, y: 40, w: 300, h: 120 },
     { type: 'picker', names: ['Ana', 'Ben'], repeat: true, look: 'solid', heading: 'Your turn', fontSize: 48, x: 40, y: 220, w: 400, h: 140 },
     { type: 'text', board: true, html: '<p>Kept</p>', x: 500, y: 200, w: 400, h: 120 },
-    { type: 'text', board: true, liveTemp: true, html: '<p>Temp</p>', x: 500, y: 360, w: 400, h: 120 }] },
+    { type: 'text', board: true, liveTemp: true, html: '<p>Temp</p>', x: 500, y: 360, w: 400, h: 120 },
+    { type: 'code', lang: 'sh', code: 'npm i', label: 'npm', tabs: [{ lang: 'sh', code: 'pnpm i', label: 'pnpm' }], x: 40, y: 400, w: 400, h: 110 }] },
   { layout: 'default', elements: [{ type: 'text', html: '<p>Two</p>', x: 40, y: 40, w: 400, h: 80 }] }] }
 async function presenting(page, label, touch) {
   const tap = async sel => { const b = await page.locator(sel).first().boundingBox({ timeout: 10000 }).catch(() => null); if (!b) throw new Error(`${sel} not shown`); const x = b.x + b.width / 2, y = b.y + b.height / 2; touch ? await page.touchscreen.tap(x, y) : await page.mouse.click(x, y) }
@@ -273,6 +277,10 @@ async function presenting(page, label, touch) {
   })
   await step(`${label}: a timer waits for its tap, an auto one runs`, async () => { ok((await text(T1)) === '1:00' && !(await running(T1)), 'started by itself'); ok(await running(T2), 'auto timer stopped') })
   await step(`${label}: a tap starts a timer and does not turn the slide`, async () => { await tap(T1); await page.waitForTimeout(1200); ok(await running(T1), 'not running'); ok((await shown()) === '1 / 2', 'slide turned') })
+  await step(`${label}: a tap on a code tab shows its code and does not turn the slide`, async () => {
+    await tap('.pv-slide .code-tabs [data-tab="1"]'); await page.waitForTimeout(200)
+    ok((await text('.pv-slide .el.code > pre.code:not([hidden])')).trim() === 'pnpm i', 'tab not shown'); ok((await shown()) === '1 / 2', 'slide turned')
+  })
   await step(`${label}: a double tap sets a timer back`, async () => { await page.waitForTimeout(400); await dbl(T1); await page.waitForTimeout(150); ok((await text(T1)) === '1:00' && !(await running(T1)), await text(T1)) })
   await step(`${label}: a draw shows its own text, then names without a count`, async () => {
     ok((await text(P)).includes('Your turn') && !(await text(P)).includes('Click to draw'), 'card text')
