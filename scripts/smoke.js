@@ -435,6 +435,20 @@ await step('ipad portrait, German: the top bar wraps instead of pushing Export a
   await ctx.close()
 })
 
+await step('template: the German workshop opens with its slides; timer and name picker written in Markdown get a usable size', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
+  const q = await ctx.newPage()
+  await q.goto(PROD + '?lang=de'); await q.waitForSelector('.home', { timeout: 20000 })
+  await q.locator('[data-template=workshop]').click(); await q.waitForSelector('.stage .slide')
+  await q.waitForFunction(() => document.querySelectorAll('.thumb').length === 9, null, { timeout: 15000 })
+  if (!(await q.title()).startsWith('Workshop')) throw new Error('title: ' + await q.title())
+  await q.locator('.thumb').nth(5).click(); await q.waitForSelector('.stage .el.timer')
+  const h = await q.evaluate(() => ['timer', 'picker'].map(k => document.querySelector(`.stage .el.${k}`)?.offsetHeight))
+  if (!(h[0] > 60 && h[1] > 60)) throw new Error('heights: ' + h)
+  await ctx.close()
+})
+
 await step('laptop: layout prompts stay out of the presentation, a new shape goes into free space, More formats, presenter view uses the screen', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))

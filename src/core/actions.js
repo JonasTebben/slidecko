@@ -57,6 +57,14 @@ export const newPresentation = (theme = DEFAULT_THEME) => createProject({
   title: t('New presentation'), theme,
   slides: ['title', 'content'].map(id => { const p = SLIDE_PRESETS.find(x => x.id === id); return { layout: p.layout, elements: p.make().map(prompted) } }),
 })
+// a template: a finished presentation in Slidev Markdown (src/templates/<id>.<lang>.md), read by the Markdown import
+export const TEMPLATES = { workshop: 'Workshop', lecture: 'Lecture', report: 'Quarterly report' }
+export const newFromTemplate = id => run(async () => {
+  const md = await import(`../templates/${id}.${lang.value}.md?raw`).catch(() => import(`../templates/${id}.en.md?raw`))
+  const r = await importSlidev('slides.md', new Map([['slides.md', md.default]]), DEFAULT_THEME)
+  if (r.slides[0]?.transition === r.transition) delete r.slides[0].transition
+  await createProject({ title: t(TEMPLATES[id]), theme: DEFAULT_THEME, entry: 'slides.md', aspectRatio: r.aspectRatio, canvasWidth: r.canvasWidth, transition: r.transition, duration: r.duration, slides: r.slides, assets: r.assets, files: {} })
+})
 
 // --- elements ---
 // place: into the free space of the slide (not over its text); off for boxes with a fixed spot (a footer field)

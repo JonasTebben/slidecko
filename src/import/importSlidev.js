@@ -155,7 +155,11 @@ export async function importSlidev(path, files, theme, known = {}, { slideIds } 
   return { slides, assets, missing, missingFiles, ...format }
 }
 
+// an empty block written by hand (<div data-timer="300"></div>) has no height of its own: it gets the height of
+// the element it becomes (as inserted in the editor), so it is usable and what follows moves below it
+const BLOCK_H = { timer: 110, picks: 160, chart: 300, quiz: 240 }
 function measure(slide, parsed) {
+  for (const [k, h] of Object.entries(BLOCK_H)) for (const n of slide.querySelectorAll(`[data-${k}]`)) if (!savedBox(n) && n.offsetHeight < 8) n.style.minHeight = h + 'px'
   const base = slide.getBoundingClientRect()
   const ox = base.left + slide.clientLeft, oy = base.top + slide.clientTop // inside the border, like `position:absolute`
   const rootAlign = getComputedStyle(slide).textAlign
@@ -247,7 +251,7 @@ function measure(slide, parsed) {
     } else if (n.dataset.picks) {
       let names = []
       try { names = JSON.parse(n.dataset.picks) } catch { /* a broken list: an empty picker, cleanEl checks the rest */ }
-      Object.assign(el, { type: 'picker', names, repeat: n.dataset.repeat === '1', look: n.dataset.look, heading: n.dataset.heading, noIcon: n.dataset.noicon === '1', icon: n.dataset.pickIcon }) // the icon's SVG from its set below
+      Object.assign(el, { type: 'picker', names, repeat: n.dataset.repeat === '1', look: n.dataset.look, heading: n.dataset.heading, noIcon: n.dataset.noicon === '1', icon: n.dataset.pickIcon, fontSize: 64 }) // the icon's SVG from its set below; the name's size as inserted in the editor (a saved box keeps its own)
     } else if (n.dataset.quiz) {
       let q = {}
       try { q = JSON.parse(n.dataset.quiz) } catch { /* broken data: an empty quiz, cleanEl checks the rest */ }
