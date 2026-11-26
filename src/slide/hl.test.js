@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hlLines, codeOpts, withLines } from './hl.js'
+import { hlLines, codeOpts, withLines, highlight } from './hl.js'
 
 test('hlLines keeps spans balanced on every line', () => {
   const lines = hlLines('/* a\nb */\nx = 1', 'js')
@@ -31,4 +31,10 @@ test('hlLines memo returns the same lines and stays bounded', () => {
   for (let i = 0; i < 300; i++) hlLines('x' + i, 'js')
   assert.notEqual(hlLines('const x = 1\nlog(x)', 'js'), a) // evicted, computed again
   assert.deepEqual(hlLines('const x = 1\nlog(x)', 'js'), a)
+})
+
+test('Astro: the frontmatter is highlighted as script, the template as HTML', () => {
+  const h = highlight('---\nconst title = "A";\n---\n<h1>{title}</h1>', 'astro')
+  assert.match(h, /^---\n<span class="hljs-keyword">const<\/span>/)
+  assert.match(h, /\n---\n<span class="hljs-tag">/)
 })

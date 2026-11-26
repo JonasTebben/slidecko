@@ -7,8 +7,12 @@ hljs.registerAliases(['astro', 'vue', 'svelte'], { languageName: 'xml' })
 
 export const LANGS = ['js', 'ts', 'html', 'astro', 'css', 'bash', 'json', 'http', 'sql', 'python', 'yaml', 'markdown', 'plaintext']
 // returns escaped HTML
-export const highlight = (code, lang) =>
-  hljs.highlight(code, { language: hljs.getLanguage(lang) ? lang : 'plaintext' }).value
+export const highlight = (code, lang) => {
+  // Astro: the frontmatter between the --- fences is JavaScript (TypeScript), the rest HTML
+  const m = lang === 'astro' && code.match(/^---(\r?\n[\s\S]*?\r?\n)---/)
+  if (m) return '---' + hljs.highlight(m[1], { language: 'ts' }).value + '---' + hljs.highlight(code.slice(m[0].length), { language: 'xml' }).value
+  return hljs.highlight(code, { language: hljs.getLanguage(lang) ? lang : 'plaintext' }).value
+}
 
 // highlighted HTML as one string per line: spans running over a line break are closed and reopened.
 // Memoized: every render of every thumbnail asks again; the newest 200 blocks are kept
