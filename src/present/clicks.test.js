@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { clickSteps, revealed, stepOf, untilOf, codeStage, codeStages, notesParts, perClick } from './clicks.js'
+import { clickSteps, revealed, stepOf, untilOf, codeStage, codeStages, notesParts, perClick, plainNotes } from './clicks.js'
 import { codeOpts } from '../slide/hl.js'
 import { clickAttrs } from '../import/parseSlidev.js'
 
@@ -53,4 +53,9 @@ test('one page per click step: a slide with n steps becomes n + 1 pages, quiz so
 test('runnable code: {monaco-run} is not a highlight step', () => {
   assert.equal(codeStages({ type: 'code', meta: '{monaco-run} {autorun:false}' }), 0)
   assert.equal(codeStages({ type: 'code', meta: '{monaco-run} {1|3}' }), 2)
+})
+
+test('notes for the handout: the [click] markers go, the text stays', () => {
+  assert.equal(plainNotes('Start here.\n[click] The first point.\n[click:3] Later.'), 'Start here.\n\nThe first point.\n\nLater.')
+  assert.equal(plainNotes(undefined), '')
 })

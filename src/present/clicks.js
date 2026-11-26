@@ -63,6 +63,8 @@ export function notesParts(notes = '') {
   }
   return out
 }
+// the notes as read on paper: without the [click] markers, paragraphs kept
+export const plainNotes = notes => String(notes || '').replace(/[ \t]*\[click(?::\d+)?\][ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 // static exports with "one page per click step" (Slidev's --with-clicks): a slide with n steps becomes n + 1 pages,
 // before the first click up to all shown (step: what SlideView reveals, no: the slide's page number)
 export const perClick = slides => slides.flatMap((s, no) => (s.id?.endsWith('-solution') || !clickSteps(s).length ? [s]

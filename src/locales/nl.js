@@ -1321,4 +1321,5 @@ export default {
   "The browser blocked the second window. Allow pop-ups for this site.": "De browser heeft het tweede venster geblokkeerd. Sta pop-ups toe voor deze site.",
   "Slides in a second window, for the projector (F there: full screen)": "Dia’s in een tweede venster, voor de beamer (daar F: volledig scherm)",
   "Audience window": "Venster voor het publiek",
+  "With speaker notes (A4 handout, a page per slide)": "Met sprekersnotities (A4-hand-out, een pagina per dia)",
 }

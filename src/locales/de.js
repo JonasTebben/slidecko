@@ -1321,4 +1321,5 @@ export default {
   "The browser blocked the second window. Allow pop-ups for this site.": "Der Browser hat das zweite Fenster blockiert. Erlaube Pop-ups für diese Seite.",
   "Slides in a second window, for the projector (F there: full screen)": "Folien in einem zweiten Fenster, für den Beamer (dort F: Vollbild)",
   "Audience window": "Fenster fürs Publikum",
+  "With speaker notes (A4 handout, a page per slide)": "Mit Sprechernotizen (A4-Handout, eine Seite pro Folie)",
 }

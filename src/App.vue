@@ -1,4 +1,5 @@
 <script setup>
+import { plainNotes } from './present/clicks.js'
 import { openAudience } from './present/audience.js'
 import { stayAwake } from './present/wake.js'
 import { ref, reactive, computed, watch, watchEffect, nextTick, onMounted, defineAsyncComponent, shallowRef } from 'vue'
@@ -235,6 +236,7 @@ const EXPORTS = [
 ]
 const exportDialog = ref(), exportScope = ref(''), exportFormat = ref((() => { try { return localStorage.getItem('slides-builder:export') } catch {} })() || 'pptx') // storage can throw (blocked site data)
 const exportClicks = ref(false) // PDF and images: one page per click step
+const exportWithNotes = ref(false) // PDF: a handout with the speaker notes
 function openExport(scope = '', format) {
   exportScope.value = scope
   if (format) exportFormat.value = format
@@ -243,7 +245,7 @@ function openExport(scope = '', format) {
 function doExport() {
   if (exportDialog.value.returnValue !== 'ok') return
   try { localStorage.setItem('slides-builder:export', exportFormat.value) } catch { /* private mode */ }
-  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value)
+  A.exportAs(exportFormat.value, exportScope.value || undefined, exportClicks.value, exportWithNotes.value)
 }
 const THUMB = computed(() => 176 / format.w)
 // one style object for all thumbnails: a new object per render would re-render every thumbnail
@@ -1698,6 +1700,7 @@ function onClipboard(e) {
           </label>
         </div>
         <label v-if="['pdf', 'png'].includes(exportFormat)" class="check"><input v-model="exportClicks" type="checkbox" /> {{ t('One page per click step') }}</label>
+        <label v-if="exportFormat === 'pdf'" class="check"><input v-model="exportWithNotes" type="checkbox" /> {{ t('With speaker notes (A4 handout, a page per slide)') }}</label>
         <p class="export-hint">{{ t('Keynote opens') }} <code>.pptx</code> {{ t('directly. For Google Slides pick its own variant and open it there via “File → Import”. For an exact look there, choose “PowerPoint as images”.') }}</p>
         <menu><button value="">{{ t('Cancel') }}</button><button class="primary" value="ok" :disabled="EXPORTS.find(f => f.id === exportFormat)?.project && !!exportScope">{{ t('Export') }}</button></menu>
       </form>
@@ -1867,8 +1870,17 @@ function onClipboard(e) {
     <div class="pv-progress" :style="{ width: ((ui.slide + 1) / deck.slides.length) * 100 + '%' }" />
   </div>
 
-  <div v-if="A.exportSlides.value" class="output">
+  <div v-if="A.exportSlides.value" class="output" :class="{ handout: A.exportNotes.value }">
     <!-- the id is the target of links to the slide (internal links in the PDF, jumps in the HTML presentation) -->
-    <SlideView v-for="(s, i) in A.exportSlides.value" :id="'slide-' + s.id" :key="s.id" :slide="s" :index="s.no ?? i" :step="s.step" />
+    <template v-for="(s, i) in A.exportSlides.value" :key="s.id">
+      <!-- handout: the slide at the width of an A4 page (182 mm = 688 px between its margins), its notes below; zoom, not a
+           transform: a transformed slide keeps its full width in the layout, and the browser would shrink the whole page -->
+      <section v-if="A.exportNotes.value" class="handout-page">
+        <div class="handout-shot" :style="{ width: 688 + 'px', height: Math.ceil(format.h * 688 / format.w) + 'px' }"><SlideView :id="'slide-' + s.id" :slide="s" :index="s.no ?? i" :step="s.step" :style="{ zoom: 688 / format.w }" /></div>
+        <p class="handout-no">{{ t('Slide {0}', (s.no ?? i) + 1) }}</p>
+        <div class="handout-notes">{{ plainNotes(s.notes) }}</div>
+      </section>
+      <SlideView v-else :id="'slide-' + s.id" :slide="s" :index="s.no ?? i" :step="s.step" />
+    </template>
   </div>
 </template>

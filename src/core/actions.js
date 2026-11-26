@@ -633,6 +633,7 @@ export async function markdownToSlides(text, file, slideIds) {
 
 // --- export ---
 export const exportSlides = ref(null) // slides rendered at 1:1 for print/PPTX, null when idle
+export const exportNotes = ref(false) // PDF as a handout: an A4 page per slide with its speaker notes
 const safe = s => s.replace(/[\\/:*?"<>|]/g, '_')
 export function download(blob, name) {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name })
@@ -658,11 +659,14 @@ async function renderOutput(file, all, solutions, clicks) {
 }
 // print CSS: one page per slide at the project format -> vector PDF with selectable text
 // clicks: one page per click step (Slidev's --with-clicks)
-export const pdf = (file, clicks) => run(async () => {
+// notes: a handout, an A4 page per slide with its speaker notes below (Slidev's export-notes, with the slide)
+export const pdf = (file, clicks, notes) => run(async () => {
+  exportNotes.value = !!notes
   await flattenBackgrounds(await renderOutput(file, false, true, clicks))
   const title = document.title
-  document.title = scopeName(file) // browsers use it as the PDF file name
-  addEventListener('afterprint', () => { exportSlides.value = null; document.title = title }, { once: true })
+  document.title = scopeName(file) + (notes ? ' – ' + t('Notes') : '') // browsers use it as the PDF file name
+  const page = notes && document.head.appendChild(Object.assign(document.createElement('style'), { textContent: '@page { size: A4 portrait; margin: 14mm; }' }))
+  addEventListener('afterprint', () => { exportSlides.value = null; exportNotes.value = false; page?.remove(); document.title = title }, { once: true })
   print()
 })
 export const pptx = file => exportAs('pptx', file)
@@ -683,8 +687,8 @@ export const FORMATS = {
     return zip.generateAsync({ type: 'blob' })
   }],
 }
-export const exportAs = (format, file, clicks) => {
-  if (format === 'pdf') return pdf(file, clicks)
+export const exportAs = (format, file, clicks, notes) => {
+  if (format === 'pdf') return pdf(file, clicks, notes)
   if (format === 'slidev') return slidev()
   if (format === 'git') return slidev({ git: true })
   const [label, ext, build] = FORMATS[format]

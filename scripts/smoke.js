@@ -187,6 +187,18 @@ await step('dev: Markdown tutorial', async () => {
   await page.evaluate(async () => { (await import('/src/editor/tutorial.js')).tutorial.open = false })
 })
 const files = await editor(page, 'dev')
+await step('dev: PDF handout: a page per slide with its notes, the page format restored after printing', async () => {
+  const r = await page.evaluate(async () => {
+    const A = await import('/src/core/actions.js'), S = await import('/src/core/store.js')
+    S.deck.slides[0].notes = 'Say hello.\n[click] Then the rest.'
+    const printed = new Promise(res => { window.print = () => { res([document.querySelectorAll('.output .handout-page').length, document.querySelector('.handout-notes')?.textContent, [...document.querySelectorAll('style')].some(x => /size: A4 portrait/.test(x.textContent)), A.exportSlides.value.length]); dispatchEvent(new Event('afterprint')) } })
+    A.exportAs('pdf', undefined, false, true)
+    const out = await printed
+    await new Promise(res => setTimeout(res, 100))
+    return [...out, !!document.querySelector('.output'), [...document.querySelectorAll('style')].some(x => /size: A4 portrait/.test(x.textContent))]
+  })
+  if (r[0] !== r[3] || r[1] !== 'Say hello.\n\nThen the rest.' || !r[2] || r[4] || r[5]) throw new Error(`handout: ${JSON.stringify(r)}`)
+})
 await step('dev: Export Git project', async () => {
   files.git = await download(page, () => page.evaluate(async () => { (await import('/src/core/actions.js')).slidev({ git: true }) }), 'dev-git')
 })

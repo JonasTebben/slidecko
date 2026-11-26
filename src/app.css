@@ -485,6 +485,9 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
 
 /* all slides at 1:1: off-screen as the PPTX source, and the only thing that prints */
 .output { position: fixed; left: -99999px; top: 0; }
+.handout-shot { overflow: hidden; border: 1px solid #ccc; box-sizing: content-box; }
+.handout-no { margin: 6px 0 10px; font-size: 9pt; color: #555; }
+.handout-notes { white-space: pre-wrap; max-width: 688px; }
 @page { size: 980px 552px; margin: 0; } /* 16:9 fallback; setFormat() writes the current size */
 @media print {
   html, body, #app { height: auto; }
@@ -492,6 +495,8 @@ dialog.palette { padding: 0; width: min(560px, calc(100vw - 32px)); margin-top: 
   .app, .home, .presenter, .toast { display: none !important; }
   .output { position: static; }
   .output .slide { position: relative !important; break-after: page; break-inside: avoid; }
+  .output.handout .slide { break-after: auto; }
+  .handout-page { break-after: page; font: 11pt/1.45 system-ui, sans-serif; color: #111; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
