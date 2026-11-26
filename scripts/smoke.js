@@ -223,6 +223,38 @@ await step('dev: untrusted content stays on its slide: theme CSS, slide HTML, fo
   await q.goto(DEV + '?lang=constructor'); await q.waitForSelector('.home, .editor, header', { timeout: 20000 })
   await q.goto(DEV + '?lang=en'); await q.close()
 })
+await step('dev: project files: a newer version and unreadable elements are reported, someone else\'s theme of the same id joins as a copy, undo and redo still work', async () => {
+  const q = await page.context().newPage()
+  await q.goto(DEV + '?lang=en'); await q.waitForSelector('.home, .stage', { timeout: 20000 })
+  const r = await q.evaluate(async () => {
+    const S = await import('/src/core/store.js'), T = await import('/src/slide/themes.js')
+    const text = { type: 'text', x: 0, y: 0, w: 100, h: 40, html: '<p>a</p>' }, ids = [], out = {}
+    const make = async d => { S.ui.status = ''; await S.createProject(d); ids.push(S.deck.id); return S.ui.status }
+    out.newer = await make({ version: 2, slides: [{ elements: [text] }] })
+    out.lost = await make({ version: 1, slides: [{ elements: [text, { type: 'hologram' }] }] })
+    T.importTheme({ id: 'smoke-mine', name: 'Mine', vars: { accent: '#111111' } })
+    await make({ version: 1, theme: 'smoke-mine', themeDef: { name: 'Mine', vars: { accent: '#222222' } }, slides: [{ elements: [text] }] })
+    out.theme = [S.deck.theme !== 'smoke-mine', T.THEMES['smoke-mine'].vars.accent, T.THEMES[S.deck.theme]?.vars.accent]
+    const copy = S.deck.theme
+    // undo and redo of one edit (the change undo causes is no new step)
+    const until = async f => { for (let i = 0; i < 200 && !f(); i++) await new Promise(r => setTimeout(r, 50)) }
+    S.deck.title = 'Edited'
+    await until(() => S.ui.save === 'saved' && !S.canRedo() && S.canUndo())
+    S.undo(); const undone = S.deck.title
+    await until(() => S.ui.save === 'saved')
+    await new Promise(r => setTimeout(r, 350)) // past the save delay: the change undo caused must not become a step
+    out.history = [undone, S.canRedo()]
+    S.redo(); out.history.push(S.deck.title)
+    for (const id of ids) await S.removeProject(id)
+    T.deleteTheme('smoke-mine'); T.deleteTheme(copy)
+    return out
+  })
+  await q.close()
+  if (!/newer Slidecko/.test(r.newer)) throw new Error('newer version: ' + r.newer)
+  if (!/^1 elements/.test(r.lost)) throw new Error('lost elements: ' + r.lost)
+  if (JSON.stringify(r.theme) !== '[true,"#111111","#222222"]') throw new Error('theme: ' + JSON.stringify(r.theme))
+  if (r.history[0] === 'Edited' || !r.history[1] || r.history[2] !== 'Edited') throw new Error('undo/redo: ' + JSON.stringify(r.history))
+})
 await step('dev: the same project in a second tab says so (both tabs would save over each other)', async () => {
   const id = await page.evaluate(async () => (await import('/src/core/store.js')).deck.id)
   const q = await page.context().newPage()

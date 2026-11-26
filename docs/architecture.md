@@ -7,7 +7,7 @@ How Slidecko is put together, for contributors and coding agents. [features.md](
 Slidecko is a static single-page app (Vue 3, plain JavaScript, Vite). Everything happens in the browser: editing, saving, importing and exporting. `server.js` only serves `dist/`. There is no backend, no account and no network call for the user's content.
 
 ```
- files, paste ──► import/ ──► cleanEl (store.js) ──► deck (reactive) ──► SlideView.vue ──► editor, presenting, thumbnails
+ files, paste ──► import/ ──► cleanEl (clean.js) ──► deck (reactive) ──► SlideView.vue ──► editor, presenting, thumbnails
                                      ▲                    │                    │
           inspector, menus, keys ──► actions.js ──────────┘                    └──► export/ (measures the rendered DOM)
                                                           │
@@ -16,7 +16,7 @@ Slidecko is a static single-page app (Vue 3, plain JavaScript, Vite). Everything
 
 ## One project model
 
-- `deck` in `src/core/store.js` is the whole open project: slides, master, layouts, theme, assets (images and fonts as data URLs), Slidev source files. Everything that is saved lives there; nothing else is.
+- `deck` in `src/core/state.js` (re-exported by `store.js`, like everything below) is the whole open project: slides, master, layouts, theme, assets (images and fonts as data URLs), Slidev source files. Everything that is saved lives there; nothing else is.
 - A slide has `elements`. An element is a plain object with a `type` (text, image, table, shape, code, chart, diagram, math, icon, video, timer, picker, quiz, toc) and a box (`x`, `y`, `w`, `h`) in **logical slide units** (`W`×`H` in `store.js`, 980×552 for 16:9; the slide format sets them). Views scale; they never store screen pixels.
 - **`cleanEl` is the trust boundary.** Every element passes through it when it is loaded, pasted, imported or restored: it keeps the known fields within their limits and drops the rest. A new field that is not in `cleanEl` is lost on the next load. HTML goes through DOMPurify (`clean`), SVG through `cleanSvg`/`cleanIconBody`.
 - Optional fields are left out instead of set to a default (`...(e.repeat === true && { repeat: true })`), so old projects stay valid and files stay small.
@@ -53,7 +53,7 @@ Touch counts as much as a mouse: a click handler must also work for a tap, and a
 
 For a new element type, field or style:
 
-1. `src/core/store.js` – `cleanEl`: accept and limit it (a test in `store.test.js`).
+1. `src/core/clean.js` – `cleanEl`: accept and limit it (a test in `store.test.js`). A new deck-level field also goes into `DECK_KEYS` in `store.js` (saved, undone and watched from that list).
 2. `src/slide/presets.js` – the defaults of a new element.
 3. `src/components/SlideView.vue` and `src/slide/slide.css` – how it looks; themes must stay WCAG AA ("Themes" below).
 4. `src/components/Inspector.vue` – the controls; every string in `t()` and in all `src/locales/*.js` ("Translations" below).
@@ -144,7 +144,8 @@ The hosted site deploys a version of this repository's `main`; when it is live, 
 | `src/slide/fonts.js`, `src/components/FontOptions.vue`, `public/fonts/` | included fonts (each with its `OFL.txt`) and uploaded ones: `@font-face` rules, file checks, the font menu |
 | `src/slide/themes.js`, `src/slide/slide.css` | theme loading and own themes, table and callout styles (shared by the editor and the Slidev export) |
 | `src/components/ThemeEditor.vue`, `src/components/CodeEditor.vue` | theme editor with preview, CSS editor (CodeMirror, loaded on first use) |
-| `src/core/store.js`, `src/core/actions.js` | project state, persistence, commands |
+| `src/core/state.js`, `src/core/clean.js`, `src/core/uid.js` | the open project and editor state; validation of untrusted data (`cleanEl`, `clean`); ids |
+| `src/core/store.js`, `src/core/actions.js` | format, undo, persistence (re-exports the three above), commands |
 | `src/core/keys.js`, `src/components/KeysDialog.vue` | keyboard shortcuts: defaults, user changes, the dialog |
 | `src/core/offline.js`, `sw.template.js`, `public/manifest.webmanifest` | offline use: the service worker (filled in by `vite.config.js`), connection state, updates; the app manifest |
 | `src/core/install.js` | "Slidecko as an app": the browser's install dialog, Safari's steps, the one-time hint |

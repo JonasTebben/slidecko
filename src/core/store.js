@@ -1,7 +1,7 @@
 import { reactive, watch, toRaw, computed } from 'vue'
 import { slideHash, layoutOf, decorations, readLayers } from '../export/toSlidev.js'
 import { TRANSITIONS } from '../import/parseSlidev.js'
-import { THEMES, FONTS, fontStack, setOwnFonts, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts } from '../slide/themes.js'
+import { THEMES, FONTS, fontStack, setOwnFonts, DEFAULT_THEME, validThemeId, importTheme, themeFile, themeLayouts, cleanTheme } from '../slide/themes.js'
 import { SLIDE_PRESETS } from '../slide/presets.js'
 import { parseRatio, formatSize } from '../slide/format.js'
 import { t } from './i18n.js'
@@ -114,8 +114,14 @@ export function loadDeck(d) {
   deck.source = typeof d.source === 'string' ? d.source.slice(0, 200) : '' // Slidev folder it was imported from
   // an own theme the project file carries joins this browser's unless one with that id exists already;
   // an unknown id stays (shown in the default theme), so importing that theme later brings the look back
-  if (d.themeDef && validThemeId(d.theme) && !THEMES[d.theme]) try { importTheme({ ...d.themeDef, id: d.theme }) } catch { /* broken definition: default look */ }
-  deck.theme = validThemeId(d.theme) ? d.theme : DEFAULT_THEME
+  // an own theme of that id that looks different (someone else's "my-theme") stays, the file's joins as a copy
+  let theme = validThemeId(d.theme) ? d.theme : DEFAULT_THEME
+  if (d.themeDef && validThemeId(d.theme)) try {
+    const same = THEMES[theme]?.custom && JSON.stringify(cleanTheme(THEMES[theme])) === JSON.stringify(cleanTheme(d.themeDef))
+    if (!THEMES[theme]) importTheme({ ...d.themeDef, id: theme })
+    else if (THEMES[theme].custom && !same) theme = importTheme({ ...d.themeDef, id: undefined })
+  } catch { /* broken definition: default look */ }
+  deck.theme = theme
   setFormat(d.aspectRatio, d.canvasWidth)
   deck.transition = TRANSITIONS.includes(d.transition) ? d.transition : 'none'
   deck.duration = validDuration(d.duration) ? Math.round(d.duration) : 0 // planned talk length in seconds
@@ -132,6 +138,13 @@ export function loadDeck(d) {
   for (const s of deck.slides) if (s.md != null) s.hash ??= slideHash(s)
   if (!deck.slides.length) deck.slides.push(newSlide())
   Object.assign(ui, { slide: 0, sel: [], editing: null, master: null })
+  // a project file (not an import) says when something was left out: a newer version's element, or a broken one
+  if (d.version != null) {
+    const count = list => (Array.isArray(list) ? list : []).reduce((n, s) => n + (Array.isArray(s?.elements) ? s.elements.length : 0), 0)
+    const lost = count(d.slides) - count(deck.slides)
+    if (+d.version > FILE_VERSION) ui.status = t('This file comes from a newer Slidecko. What this version does not know is left out.')
+    else if (lost > 0) ui.status = t('{0} elements could not be read and were left out.', lost)
+  }
 }
 
 export function newSlide(layout = 'default', elements) {
@@ -186,10 +199,14 @@ export function mergeTextStyles(list) {
   const add = cleanStyles(list).filter(p => !have.has(p.name))
   if (add.length) saveTextStyles([...textStyles.list, ...add])
 }
-const snapshot = () => JSON.stringify({ title: deck.title, source: deck.source, typo: deck.typo, theme: deck.theme, aspectRatio: deck.aspectRatio, canvasWidth: deck.canvasWidth, transition: deck.transition, duration: deck.duration, rehearsals: deck.rehearsals, entry: deck.entry, slides: deck.slides, master: deck.master, layouts: deck.layouts, fonts: deck.fonts })
+// what a project is (everything but assets and files): saved, undone and watched for changes from this one list
+const DECK_KEYS = ['title', 'source', 'typo', 'theme', 'aspectRatio', 'canvasWidth', 'transition', 'duration', 'rehearsals', 'entry', 'slides', 'master', 'layouts', 'fonts']
+const snapshot = () => JSON.stringify(Object.fromEntries(DECK_KEYS.map(k => [k, deck[k]])))
 export const deckData = () => JSON.parse(snapshot())
 // slides: only these (export of one deck)
-export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: 1, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
+// raise FILE_VERSION when a project file needs a newer app to be read fully
+const FILE_VERSION = 1
+export const deckFile = slides => JSON.stringify({ format: 'slides-builder', version: FILE_VERSION, ...JSON.parse(snapshot()), ...(slides && { slides: toRaw(slides) }), assets: usedAssets(slides), files: toRaw(deck.files), styles: usedStyles(slides || deck.slides), themeDef: themeDef(deck.theme) })
 
 const MIME = { mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', ogv: 'video/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const readDataUrl = blob => new Promise((res, rej) => {
@@ -244,31 +261,35 @@ export const removeFont = id => { const { [id]: _, ...rest } = deck.fonts; deck.
 watch(() => deck.fonts, setOwnFonts, { flush: 'sync' })
 
 // --- undo/redo: snapshots of everything except assets ---
-const history = []
+const history = [], HISTORY_MAX = 40e6
 let at = -1 // position of the current state in history
 // a change is written (history + IndexedDB) 300 ms after the last edit; flush() writes it now.
 // The watch only sets `due`: the snapshot (JSON of the whole deck) is built here, not on every pointermove
 let timer, due = false
 // used assets of the last asset write: images come and go with edits and undo, so a changed set is written again
 let assetKey = null
-let quiet = false // undo/redo just set the deck to a history state
+let undone = false // undo/redo just set the deck to a history state: the change it causes is no new edit
 const usedKey = () => Object.keys(usedAssets()).sort().join('\0')
 function flush() {
   clearTimeout(timer)
   if (!due || !deck.id) { due = false; return }
   due = false
   const json = snapshot()
+  if (undone && json === history[at]) { undone = false; return } // undo saved it already
+  undone = false
   if (json !== history[at]) {
     // the state before this change, at most every SNAP_EVERY while editing
     if (history[at] && Date.now() - lastSnap >= SNAP_EVERY) saveSnapshot(history[at]).catch(snapFailed)
     history.splice(at + 1, Infinity, json) // a new change discards the redo states
-    if (history.length > 200) history.shift()
+    // at most 200 steps and HISTORY_MAX characters: each step is the whole deck, big decks keep fewer
+    let size = history.reduce((n, h) => n + h.length, 0)
+    while (history.length > 2 && (history.length > 200 || size > HISTORY_MAX)) size -= history.shift().length
     at = history.length - 1
   }
   persist(json)
   if (usedKey() !== assetKey) persistAssets()
 }
-const dirty = () => due // an edit not yet in history (may turn out to change nothing)
+const dirty = () => due && !undone // an edit not yet in history (may turn out to change nothing)
 export function undo(step = -1) {
   flush() // an edit of the last 300 ms is its own step
   if (!history[at + step]) return
@@ -283,21 +304,21 @@ export function undo(step = -1) {
   const before = deck.slides[i], after = d.slides[i]
   const prev = new Map(before?.id === after?.id ? before.elements.map(e => [e.id, JSON.stringify(e)]) : [])
   const sel = changed && prev.size ? after.elements.filter(e => JSON.stringify(e) !== prev.get(e.id)).map(e => e.id) : []
-  for (const k of ['title', 'source', 'typo', 'theme', 'transition', 'duration', 'rehearsals', 'entry', 'slides', 'master', 'layouts', 'fonts']) if (k in d) deck[k] = d[k]
+  for (const k of DECK_KEYS) if (k in d && k !== 'aspectRatio' && k !== 'canvasWidth') deck[k] = d[k] // the format: setFormat below
   if (ui.master && ui.master !== 'master' && !deck.layouts.some(l => l.id === ui.master)) ui.master = 'master' // the layout being edited is gone
   setFormat(d.aspectRatio, d.canvasWidth)
   Object.assign(ui, { slide: i, sel, editing: null })
-  // saved right away; the watch must not count this as a new edit (it would grey out Redo for 300 ms)
+  // saved right away; the change it causes is no new edit (dirty() would grey out Redo for 300 ms)
   persist(history[at])
   if (usedKey() !== assetKey) persistAssets()
-  quiet = true
-  Promise.resolve().then(() => { quiet = false }) // after Vue's watcher flush, which was queued by the changes above
+  undone = true
 }
 export const redo = () => undo(1)
 // a freshly opened project: its loaded state is the first entry, so the first change can be undone.
 // Not left to the watch below: on startup the last project opens before that watch exists.
 function startHistory() {
   history.length = 0
+  undone = false
   history.push(snapshot())
   at = 0
   lastSnap = 0 // the first change keeps the state the project was opened with
@@ -505,7 +526,7 @@ export async function projectFile(id) {
   if (!json) throw new Error(t('Project not found'))
   const updated = library.list.find(p => p.id === id)?.updated
   const d = JSON.parse(json)
-  return JSON.stringify({ format: 'slides-builder', version: 1, id, updated, ...d, assets: assets || {}, files: files || {}, styles: usedStyles(d.slides), themeDef: themeDef(d.theme) })
+  return JSON.stringify({ format: 'slides-builder', version: FILE_VERSION, id, updated, ...d, assets: assets || {}, files: files || {}, styles: usedStyles(d.slides), themeDef: themeDef(d.theme) })
 }
 // a .slides.json goes back into the project it was saved from (id) instead of a copy next to it;
 // a backup older than the browser copy must not overwrite newer work: it comes in as a separate copy
@@ -591,8 +612,7 @@ export async function restore(session = {}) {
   if (!deck.id || session.home) ui.home = true
 
   // only marks the change: serializing the deck on every drag frame would be too slow (flush does it)
-  watch(() => [deck.title, deck.source, deck.typo, deck.theme, deck.aspectRatio, deck.canvasWidth, deck.transition, deck.duration, deck.rehearsals, deck.entry, deck.slides, deck.master, deck.layouts, deck.fonts], () => {
-    if (quiet) return
+  watch(() => DECK_KEYS.map(k => deck[k]), () => {
     clearTimeout(timer)
     due = true
     timer = setTimeout(flush, 300)

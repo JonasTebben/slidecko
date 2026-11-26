@@ -1389,4 +1389,6 @@ export default {
   "Theme “{0}” updated": "Tema «{0}» actualizado",
   "The theme could not be loaded: {0}": "No se pudo cargar el tema: {0}",
   "This project is also open in another tab. Edit it in one tab only: each tab saves its own state.": "Este proyecto también está abierto en otra pestaña. Edítalo solo en una pestaña: cada pestaña guarda su propio estado.",
+  "This file comes from a newer Slidecko. What this version does not know is left out.": "Este archivo procede de una versión más reciente de Slidecko. Lo que esta versión no conoce se omite.",
+  "{0} elements could not be read and were left out.": "No se pudieron leer {0} elementos y se omitieron.",
 }
