@@ -27,19 +27,19 @@ test('mergeList drops what this tab deleted and replaces only its own entries', 
 
 // a fresh store on a fake IndexedDB: requests succeed before their transaction commits or aborts, as in browsers
 const data = new Map()
-let quota = false // the next write transaction aborts with a full disk, after its request succeeded
+let quota = false // the next write transaction (true) or the next one writing this key aborts with a full disk, after its request succeeded
 const fakeIdb = {
   open() {
     const later = f => setTimeout(f, 0)
     const db = { objectStoreNames: { contains: () => true }, transaction(_, mode) {
-      const tx = { error: null }, writes = []
+      const tx = { error: null }, writes = [], keys = []
       let rq
       tx.objectStore = () => {
         const req = (f, w) => { rq = {}; later(() => { if (w) writes.push(w); rq.result = f(); rq.onsuccess?.(); finish() }); return rq }
-        return { get: k => req(() => data.get(k)), put: (v, k) => req(() => undefined, () => data.set(k, v)), delete: k => req(() => undefined, () => data.delete(k)) }
+        return { get: k => req(() => data.get(k)), put: (v, k) => (keys.push(k), req(() => undefined, () => data.set(k, v))), delete: k => req(() => undefined, () => data.delete(k)) }
       }
       const finish = () => later(() => {
-        if (mode === 'readwrite' && quota) { quota = false; tx.error = { name: 'QuotaExceededError', message: 'quota' }; return tx.onabort?.() }
+        if (mode === 'readwrite' && (quota === true || keys.includes(quota))) { quota = false; tx.error = { name: 'QuotaExceededError', message: 'quota' }; return tx.onabort?.() }
         writes.forEach(w => w()); tx.oncomplete?.()
       })
       return tx
@@ -332,7 +332,7 @@ test('web pages on slides: https only, never the app itself (its sandbox would a
 test('a full disk: the older half of the project\'s snapshots makes room and the save is tried again', async () => {
   const snap = at => ({ at, slides: 1, json: JSON.stringify({ slides: [] }) })
   data.set('s:full', { list: [snap(4), snap(3), snap(2), snap(1)], assets: {} })
-  quota = true
+  quota = 'p:full' // this project's save, not a write another test left running
   await S.createProject({ title: 'Full', slides: [{ elements: [] }] }, 'full')
   assert.deepEqual(data.get('s:full').list.map(s => s.at), [4, 3])
   assert.equal(JSON.parse(data.get('p:full')).title, 'Full')
