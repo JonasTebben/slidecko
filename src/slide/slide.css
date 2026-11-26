@@ -102,12 +102,12 @@
 /* appears on click: not revealed yet while presenting, but keeps its place; fades in and out softly like Slidev's v-click */
 .slide .el:is([data-click], [data-until]), .slide .el li[data-click] { transition: opacity .15s ease, visibility .15s; }
 .slide .el[data-unshown], .slide .el li[data-unshown] { visibility: hidden; opacity: 0; }
-/* entrance effects: from their start state into place (the HTML presentation toggles .unshown) */
+/* entrance effects: from their start state into place (the HTML presentation toggles .unshown); gone again, it only fades */
 .slide .el[data-effect] { transition: opacity .4s ease, visibility .4s, translate .4s cubic-bezier(.2, .7, .3, 1), scale .4s cubic-bezier(.2, .7, .3, 1); }
-.slide .el[data-effect="fly-left"]:is([data-unshown], .unshown) { translate: -120px 0; }
-.slide .el[data-effect="fly-right"]:is([data-unshown], .unshown) { translate: 120px 0; }
-.slide .el[data-effect="fly-up"]:is([data-unshown], .unshown) { translate: 0 120px; }
-.slide .el[data-effect="zoom"]:is([data-unshown], .unshown) { scale: .6; }
+.slide .el[data-effect="fly-left"]:is([data-unshown], .unshown):not([data-gone], .gone) { translate: -120px 0; }
+.slide .el[data-effect="fly-right"]:is([data-unshown], .unshown):not([data-gone], .gone) { translate: 120px 0; }
+.slide .el[data-effect="fly-up"]:is([data-unshown], .unshown):not([data-gone], .gone) { translate: 0 120px; }
+.slide .el[data-effect="zoom"]:is([data-unshown], .unshown):not([data-gone], .gone) { scale: .6; }
 @media (prefers-reduced-motion: reduce) { .slide .el:is([data-click], [data-until], [data-effect]), .slide .el li[data-click] { transition: none; } }
 /* v-mark: hand-drawn marks over the text; a mark with a click step draws itself along its strokes (the HTML
    presentation toggles .unshown), with reduced motion it just appears */

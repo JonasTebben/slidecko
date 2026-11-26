@@ -151,7 +151,11 @@ for (const s of slides) s.addEventListener('animationend', e => { if (e.target =
 const stepsOf = s => +s.dataset.steps || 0
 let k = 0
 function reveal() {
-  for (const e of slides[i].querySelectorAll('[data-click], [data-until]')) e.classList.toggle('unshown', k < +(e.dataset.click || 0) || (+e.dataset.until > 0 && k >= +e.dataset.until))
+  for (const e of slides[i].querySelectorAll('[data-click], [data-until]')) {
+    const gone = +e.dataset.until > 0 && k >= +e.dataset.until
+    e.classList.toggle('unshown', k < +(e.dataset.click || 0) || gone)
+    e.classList.toggle('gone', gone) // gone again: it fades out, an entrance effect does not run backwards
+  }
   for (const f of slides[i].querySelectorAll('.timer-face[data-auto]')) if (!f.closest('.unshown')) f.start?.() // shown: an auto timer starts
   for (const pre of slides[i].querySelectorAll('pre[data-stages]')) {
     const stage = String(pre.dataset.stages.split(' ').filter(n => +n <= k).length)

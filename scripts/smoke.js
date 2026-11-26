@@ -246,16 +246,21 @@ await step('dev: a sound file goes onto the slide; video and sound play while pr
   if ((await page.locator('.presenter .el.media video').count()) !== 1) throw new Error('the tap turned the slide')
   await page.keyboard.press('Escape'); await page.waitForSelector('.presenter', { state: 'detached' })
 })
-await step('dev: an element with an entrance effect waits below its place and flies in on its click; the inspector names the effect', async () => {
+await step('dev: an element with an entrance effect waits below its place, flies in on its click and only fades when it goes; the inspector names the effect', async () => {
   await go(page, 5)
-  await page.evaluate(async () => { const S = await import('/src/core/store.js'); S.ui.sel = [S.deck.slides[S.ui.slide].elements.find(e => e.effect).id] })
+  await page.evaluate(async () => { const S = await import('/src/core/store.js'), e = S.deck.slides[S.ui.slide].elements.find(e => e.effect); e.clickUntil = e.click + 1; S.ui.sel = [e.id] })
   await page.waitForFunction(() => document.querySelector('.inspector select.effect')?.value === 'fly-up')
   await page.locator('.right .tb.primary').click(); await page.waitForSelector('.pv-slide .el[data-effect="fly-up"][data-unshown]', { state: 'attached' })
   const before = await page.locator('.pv-slide .el[data-effect="fly-up"]').evaluate(e => getComputedStyle(e).translate)
   if (before !== '0px 120px') throw new Error(`waits at ${before}`)
   await page.keyboard.press('ArrowRight')
   await page.waitForFunction(() => { const e = document.querySelector('.pv-slide .el[data-effect="fly-up"]'); return e && !e.hasAttribute('data-unshown') && getComputedStyle(e).translate === 'none' })
+  await page.keyboard.press('ArrowRight')
+  await page.waitForSelector('.pv-slide .el[data-effect="fly-up"][data-gone][data-unshown]', { state: 'attached' })
+  const gone = await page.locator('.pv-slide .el[data-effect="fly-up"]').evaluate(e => getComputedStyle(e).translate)
+  if (gone !== 'none') throw new Error(`goes away to ${gone}`)
   await page.keyboard.press('Escape'); await page.waitForSelector('.presenter', { state: 'detached' })
+  await page.evaluate(async () => { const S = await import('/src/core/store.js'); delete S.deck.slides[S.ui.slide].elements.find(e => e.effect).clickUntil }) // the deck stays as the exports expect it
 })
 await step('dev: the agent skill example imports with every element it describes', async () => {
   const md = readFileSync(new URL('../skills/slidecko/SKILL.md', import.meta.url), 'utf8').match(/````markdown\n([\s\S]*?)\n````/)[1]

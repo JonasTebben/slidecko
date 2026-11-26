@@ -172,7 +172,7 @@ function morphNames(slides, def) {
   const names = new Map()
   let n = 0
   slides.forEach((s, i) => {
-    if (!slides[i + 1] || (s.transition || def) !== 'morph') return
+    if (!slides[i + 1] || ((i && s.transition) || def) !== 'morph') return // slide 1 has the headmatter's (see below)
     for (const [a, b] of morphPairs(s.elements, slides[i + 1].elements)) {
       const name = names.get(a) || `mm-${++n}`
       names.set(a, name).set(b, name)
