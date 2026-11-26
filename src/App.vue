@@ -64,11 +64,10 @@ const mdDialog = ref(), mdText = ref(''), mdTarget = ref('slide')
 const paletteDialog = ref(), paletteQuery = ref(''), paletteIndex = ref(0)
 const deckDialog = ref(), deckNameInput = ref(''), deckRenaming = ref(null)
 const deleteDialog = ref(), deleteWhat = ref('slide')
-const openDelete = () => { deleteWhat.value = deck.slides.length > 1 ? 'slide' : 'project'; openDlg(deleteDialog.value) }
+const openDelete = () => { const f = fileOf(deck.slides[ui.slide] || {}); deleteWhat.value = f !== deck.entry ? 'deck:' + f : 'project'; openDlg(deleteDialog.value) }
 function deleteChosen() {
   const w = deleteWhat.value
-  if (w === 'slide') A.deleteSlide()
-  else if (w.startsWith('deck:')) A.removeDeck(w.slice(5))
+  if (w.startsWith('deck:')) A.removeDeck(w.slice(5))
   else if (w === 'project') A.run(() => removeProject(deck.id))
 }
 const confirmDialog = ref(), confirmText = ref(''), confirmAction = ref(null)
@@ -1832,12 +1831,11 @@ function onClipboard(e) {
       </form>
     </dialog>
 
-    <!-- Delete in the File menu: the slide, one of the added decks or the whole project, the smallest one chosen first -->
+    <!-- Delete in the File menu: one of the added decks or the whole project (a single slide is deleted in the slide list); the current slide's deck is chosen first -->
     <dialog ref="deleteDialog" class="delete-dlg" @close="deleteDialog.returnValue === 'ok' && deleteChosen()">
       <form method="dialog">
         <h2>{{ t('What do you want to delete?') }}</h2>
         <div class="delete-options" role="radiogroup" :aria-label="t('What do you want to delete?')">
-          <label v-if="deck.slides.length > 1"><input v-model="deleteWhat" type="radio" value="slide" /><span><b>{{ t('This slide') }}</b><small>{{ t('Slide {0}', ui.slide + 1) }} · {{ t('You can get it back with “Undo”.') }}</small></span></label>
           <label v-for="g in decks.filter(g => g.file !== deck.entry)" :key="g.file"><input v-model="deleteWhat" type="radio" :value="'deck:' + g.file" /><span><b>{{ t('Deck “{0}”', g.name) }}</b><small>{{ g.count === 1 ? t('Slide {0}', g.start + 1) : t('Slides {0}–{1}', g.start + 1, g.start + g.count) }} · {{ t('You can get it back with “Undo”.') }}</small></span></label>
           <label class="danger"><input v-model="deleteWhat" type="radio" value="project" /><span><b>{{ t('Whole project “{0}”', deck.title) }}</b><small>{{ t('All slides, decks, images, media and saved versions in this browser. This cannot be undone: save the project as a file first if you may need it again.') }}</small></span></label>
         </div>

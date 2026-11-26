@@ -1353,7 +1353,6 @@ export default {
   "What’s new": "Novedades",
   "Report a problem or suggest an idea": "Informar de un problema o proponer una idea",
   "What do you want to delete?": "¿Qué quieres eliminar?",
-  "This slide": "Esta diapositiva",
   "Deck “{0}”": "Conjunto de diapositivas “{0}”",
   "Slides {0}–{1}": "Diapositivas {0}–{1}",
   "Whole project “{0}”": "Todo el proyecto “{0}”",

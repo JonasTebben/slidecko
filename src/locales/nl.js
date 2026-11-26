@@ -1353,7 +1353,6 @@ export default {
   "What’s new": "Wat is er nieuw",
   "Report a problem or suggest an idea": "Probleem melden of idee voorstellen",
   "What do you want to delete?": "Wat wil je verwijderen?",
-  "This slide": "Deze dia",
   "Deck “{0}”": "Diareeks “{0}”",
   "Slides {0}–{1}": "Dia's {0}–{1}",
   "Whole project “{0}”": "Het hele project “{0}”",

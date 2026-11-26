@@ -1353,7 +1353,6 @@ export default {
   "What’s new": "Neuigkeiten",
   "Report a problem or suggest an idea": "Problem melden oder Idee vorschlagen",
   "What do you want to delete?": "Was möchtest du löschen?",
-  "This slide": "Diese Folie",
   "Deck “{0}”": "Foliensatz „{0}“",
   "Slides {0}–{1}": "Folien {0}–{1}",
   "Whole project “{0}”": "Das ganze Projekt „{0}“",

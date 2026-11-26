@@ -446,7 +446,7 @@ await page.context().close()
 page = await open(DEV, 'ipad', undefined, devices['iPad Pro 11 landscape'])
 await presenting(page, 'ipad', true)
 await page.context().close()
-await step('menus: Help holds the tour and shortcuts; File → Delete asks what: a slide (undoable), then the whole project', async () => {
+await step('menus: Help holds the tour and shortcuts; File → Delete offers the whole project when there are no added decks', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
   await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
   const q = await ctx.newPage()
@@ -457,11 +457,7 @@ await step('menus: Help holds the tour and shortcuts; File → Delete asks what:
   await q.keyboard.press('Escape')
   const del = async () => { await q.locator('.menubar > button.tb', { hasText: 'File' }).click(); await q.locator('.menubar .mi.danger', { hasText: 'Delete …' }).click(); await q.waitForSelector('dialog.delete-dlg[open]') }
   await del()
-  if (!(await q.locator('dialog.delete-dlg input[value="slide"]').isChecked())) throw new Error('the slide is not the first choice')
-  await q.locator('dialog.delete-dlg button.danger').click()
-  await q.waitForFunction(() => document.querySelectorAll('.slide-list .thumb').length === 1)
-  await del()
-  if (!(await q.locator('dialog.delete-dlg input[value="project"]').isChecked())) throw new Error('one slide left: the project should be the choice')
+  if (!(await q.locator('dialog.delete-dlg input[value="project"]').isChecked())) throw new Error('no added decks: the project should be the choice')
   await q.locator('dialog.delete-dlg button.danger').click()
   await q.waitForSelector('.home')
   if (await q.locator('.project').count()) throw new Error('the project is still listed')
