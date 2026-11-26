@@ -1103,13 +1103,30 @@ const codeCut = ta => navigator.clipboard.writeText(taText(ta)).then(() => taRep
 const codePaste = ta => navigator.clipboard.readText().then(s => taReplace(ta, s), () => A.toast(t('Paste not allowed – please use ⌘V/Ctrl+V.')))
 const ctxTable = (fn, where) => A.run(() => fn(ctxAt.value.el, where))
 const CLIP = 'application/x-slides-builder'
+// what was last copied: Edit → Paste reads the clipboard itself, which offers text and images but not this type
+let lastCopy = null
+async function menuPaste() {
+  let items
+  try { items = await navigator.clipboard.read() } catch { return A.toast(t('Paste not allowed – please use ⌘V/Ctrl+V.')) }
+  const data = {}, files = []
+  for (const it of items) for (const type of it.types) {
+    const blob = await it.getType(type)
+    if (type.startsWith('image/')) files.push(new File([blob], 'pasted.' + type.split('/')[1], { type }))
+    else if (type === 'text/plain') data[type] = await blob.text()
+  }
+  if (lastCopy && (data['text/plain'] ?? '') === lastCopy.text) data[CLIP] = lastCopy.data
+  onClipboard({ type: 'paste', target: document.body, preventDefault() {}, clipboardData: { getData: k => data[k] || '', files } })
+}
+// Slide → Layout, background and transition: the inspector shows them with nothing selected
+const slideProps = () => { ui.sel = []; ui.editing = null; panels.props = true }
 function onClipboard(e) {
   if (presenting.value || ui.home || inField(e)) return
   if (e.type !== 'paste') {
     if (!selection.value.length) return
     // the images ride along, so pasting into another project keeps them (also those inside text)
-    e.clipboardData.setData(CLIP, JSON.stringify({ elements: selection.value, assets: usedAssets([{ elements: selection.value }]) }))
-    e.clipboardData.setData('text/plain', selection.value.map(el => el.code || el.html?.replace(/<[^>]+>/g, '') || '').join('\n'))
+    lastCopy = { data: JSON.stringify({ elements: selection.value, assets: usedAssets([{ elements: selection.value }]) }), text: selection.value.map(el => el.code || el.html?.replace(/<[^>]+>/g, '') || '').join('\n') }
+    e.clipboardData.setData(CLIP, lastCopy.data)
+    e.clipboardData.setData('text/plain', lastCopy.text)
     if (e.type === 'cut') A.remove()
   } else if (e.clipboardData.getData(CLIP)) {
     A.run(() => {
@@ -1172,6 +1189,10 @@ function onClipboard(e) {
             <button class="mi" :disabled="!canUndo()" @click="undo()"><Icon name="undo" />{{ t('Undo') }}<kbd>{{ kbd('undo') }}</kbd></button>
             <button class="mi" :disabled="!canRedo()" @click="redo"><Icon name="redo" />{{ t('Redo') }}<kbd>{{ kbd('redo') }}</kbd></button>
             <hr />
+            <button class="mi" :disabled="!selection.length" @click="clip('cut')"><Icon name="cut" />{{ t('Cut') }}<kbd>{{ mod }}X</kbd></button>
+            <button class="mi" :disabled="!selection.length" @click="clip('copy')"><Icon name="copy" />{{ t('Copy') }}<kbd>{{ mod }}C</kbd></button>
+            <button class="mi" @click="menuPaste"><Icon name="clipboard" />{{ t('Paste') }}<kbd>{{ mod }}V</kbd></button>
+            <hr />
             <button class="mi" @click="openFind()"><Icon name="search" />{{ t('Find …') }}<kbd>{{ kbd('find') }}</kbd></button>
             <button class="mi" @click="openFind(true)"><Icon name="search" />{{ t('Replace …') }}<kbd>{{ kbd('replace') }}</kbd></button>
             <hr />
@@ -1215,6 +1236,20 @@ function onClipboard(e) {
             <button class="mi" @click="A.insert('toc')"><Icon name="list" />{{ t('Table of contents') }}</button>
             <button class="mi" @click="openMarkdown('new')"><Icon name="markdown" />{{ t('Markdown / AI slides …') }}<kbd>{{ kbd('markdownSlides') }}</kbd></button>
           </Menu>
+          <!-- the current slide; a single slide is deleted here, not under File → Delete -->
+          <Menu :label="t('Slide')">
+            <button class="mi" @click="A.addSlide()"><Icon name="slidePlus" />{{ t('New slide') }}<kbd>N</kbd></button>
+            <button class="mi" @click="A.duplicateSlide()"><Icon name="copy" />{{ t('Duplicate slide') }}<kbd>{{ kbd('duplicateSlide') }}</kbd></button>
+            <button class="mi" :disabled="deck.slides.length < 2" @click="A.deleteSlide()"><Icon name="trash" />{{ t('Delete slide') }}<kbd>{{ kbd('deleteSlide') }}</kbd></button>
+            <button class="mi" :aria-pressed="!!slide?.hidden" @click="A.toggleHidden()"><Icon :name="slide?.hidden ? 'eye' : 'eyeOff'" />{{ slide?.hidden ? t('Show slide') : t('Hide slide') }}</button>
+            <hr />
+            <button class="mi" :disabled="ui.slide === 0" @click="A.moveSlide(ui.slide, ui.slide - 1)"><Icon name="up" />{{ t('Move up') }}<kbd>{{ kbd('moveSlideUp') }}</kbd></button>
+            <button class="mi" :disabled="ui.slide === deck.slides.length - 1" @click="A.moveSlide(ui.slide, ui.slide + 1)"><Icon name="down" />{{ t('Move down') }}<kbd>{{ kbd('moveSlideDown') }}</kbd></button>
+            <hr />
+            <button class="mi" @click="slideProps"><Icon name="layout" />{{ t('Layout, background and transition …') }}</button>
+            <button class="mi" @click="openMarkdown('slide')"><Icon name="markdown" />{{ t('Edit this slide’s Markdown') }}<kbd>M</kbd></button>
+            <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
+          </Menu>
           <Menu :label="t('Arrange')">
             <button class="mi" :disabled="!A.canOrder('front')" @click="A.order('front')"><Icon name="toFront" />{{ t('Bring to front') }}<kbd>{{ kbd('front') }}</kbd></button>
             <button class="mi" :disabled="!A.canOrder('forward')" @click="A.order('forward')"><Icon name="forward" />{{ t('Bring forward') }}<kbd>{{ kbd('forward') }}</kbd></button>
@@ -1238,20 +1273,18 @@ function onClipboard(e) {
             <button class="mi" @click="rehearse()"><Icon name="timer" />{{ t('Rehearse the talk') }}</button>
             <button class="mi" @click="recordTalk"><Icon name="record" />{{ t('Record presentation …') }}</button>
             <hr />
+            <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ kbd('toggleSlides') }}</kbd></button>
+            <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ kbd('toggleProps') }}</kbd></button>
+            <button class="mi" :aria-pressed="a11yOpen" @click="a11yOpen = !a11yOpen"><Icon name="eye" />{{ t('Check accessibility …') }}</button>
+            <hr />
             <button class="mi" @click="zoomBy(1.25)"><Icon name="zoomIn" />{{ t('Zoom in') }}<kbd>{{ kbd('zoomIn') }}</kbd></button>
             <button class="mi" @click="zoomBy(1 / 1.25)"><Icon name="zoomOut" />{{ t('Zoom out') }}<kbd>{{ kbd('zoomOut') }}</kbd></button>
             <button class="mi" @click="setZoom(null)"><Icon name="fullscreen" />{{ t('Fit slide to window') }}<kbd>{{ kbd('fitWindow') }}</kbd></button>
             <button class="mi" @click="setZoom(1)"><Icon name="check" :style="{ visibility: zoom === 1 ? null : 'hidden' }" />{{ t('Zoom to 100 %') }}<kbd>{{ kbd('zoom100') }}</kbd></button>
-            <hr />
-            <button class="mi" :aria-pressed="panels.slides" @click="panels.slides = !panels.slides"><Icon name="slides" />{{ t('Show/hide slide list') }}<kbd>{{ kbd('toggleSlides') }}</kbd></button>
-            <button class="mi" :aria-pressed="panels.props" @click="panels.props = !panels.props"><Icon name="layout" />{{ t('Show/hide properties') }}<kbd>{{ kbd('toggleProps') }}</kbd></button>
-            <hr />
-            <button class="mi" :aria-pressed="!!ui.master" @click="ui.master ? (ui.master = null) : A.editMaster()"><Icon name="slides" />{{ t('Edit master and layouts') }}</button>
-            <button class="mi" :aria-pressed="a11yOpen" @click="a11yOpen = !a11yOpen"><Icon name="eye" />{{ t('Check accessibility …') }}</button>
           </Menu>
           <!-- learning the app, then the outside links (they open in a new tab) -->
           <Menu :label="t('Help')">
-            <button class="mi" @click="openPalette"><Icon name="search" />{{ t('All commands …') }}<kbd>{{ kbd('palette') }}</kbd></button>
+            <button class="mi" @click="openPalette"><Icon name="search" />{{ t('Search menus …') }}<kbd>{{ kbd('palette') }}</kbd></button>
             <button class="mi" @click="openKeys"><Icon name="keyboard" />{{ t('Keyboard shortcuts …') }}<kbd>{{ kbd('shortcuts') }}</kbd></button>
             <button class="mi" @click="begin(false)"><Icon name="info" />{{ t('Take the tour') }}</button>
             <button class="mi" @click="openTutorial()"><Icon name="book" />{{ t('Markdown tutorial …') }}</button>
@@ -1371,7 +1404,17 @@ function onClipboard(e) {
           <button class="mi" @click="openExport()"><Icon name="download" />{{ t('Export …') }}<kbd>{{ kbd('export') }}</kbd></button>
           <button v-if="decks.length > 1" class="mi" @click="openExport(decks.find(d => d.file !== deck.entry)?.file)"><Icon name="file" />{{ t('Export single deck …') }}</button>
         </Menu></span>
-        <button class="tb primary" data-tour="present" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
+        <span class="present-split">
+          <button class="tb primary" data-tour="present" :title="t('Present (F5)')" @click="present()"><Icon name="play" /><span>{{ t('Present') }}</span></button>
+          <!-- the other ways to present, as in the View menu -->
+          <Menu icon="chevron" :title="t('More ways to present')" primary>
+            <button class="mi two" @click="presenterView = true; present()"><Icon name="presenter" /><span>{{ t('Presenter view') }}<small>{{ t('Notes, timer and the next slide for you; the slides can go to a second screen') }}</small></span><kbd>{{ kbd('presenterView') }}</kbd></button>
+            <button class="mi" @click="present(0)"><Icon name="play" />{{ t('Present from beginning') }}<kbd>⇧P</kbd></button>
+            <hr />
+            <button class="mi" @click="rehearse()"><Icon name="timer" />{{ t('Rehearse the talk') }}</button>
+            <button class="mi" @click="recordTalk"><Icon name="record" />{{ t('Record presentation …') }}</button>
+          </Menu>
+        </span>
       </div>
       </div>
     </header>
