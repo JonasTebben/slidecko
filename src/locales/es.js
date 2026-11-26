@@ -208,6 +208,8 @@ export default {
   "First step": "Primer paso",
   "Fit height to text": "Ajustar la altura al texto",
   "Font": "Fuente",
+  "{0} px for every “{1}”": "{0} px para cada “{1}”",
+  "Every “{0}” in the project gets this size (Font for all slides); boxes with their own size keep it": "Cada “{0}” del proyecto toma este tamaño (fuente de todas las diapositivas); los cuadros con tamaño propio lo conservan",
   "Font for all slides": "Fuente de todas las diapositivas",
   "Font size": "Tamaño de fuente",
   "For sharing, printing and archiving": "Para compartir, imprimir y archivar",

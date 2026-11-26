@@ -208,6 +208,8 @@ export default {
   "First step": "Première étape",
   "Fit height to text": "Ajuster la hauteur au texte",
   "Font": "Police",
+  "{0} px for every “{1}”": "{0} px pour chaque « {1} »",
+  "Every “{0}” in the project gets this size (Font for all slides); boxes with their own size keep it": "Chaque « {0} » du projet prend cette taille (police pour toutes les diapositives) ; les zones avec leur propre taille la gardent",
   "Font for all slides": "Police pour toutes les diapositives",
   "Font size": "Taille de police",
   "For sharing, printing and archiving": "Pour partager, imprimer et archiver",

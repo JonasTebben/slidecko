@@ -462,6 +462,18 @@ await page.context().close()
 page = await open(DEV, 'ipad', undefined, devices['iPad Pro 11 landscape'])
 await presenting(page, 'ipad', true)
 await page.context().close()
+await step('a heading box’s own size becomes the size of that heading level in the whole project', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))
+  const q = await ctx.newPage()
+  await q.goto(DEV + '?lang=en'); await q.waitForSelector('.home', { timeout: 20000 })
+  await q.evaluate(async () => { const S = await import('/src/core/store.js'); await S.createProject({ title: 'T', theme: 'hell', slides: [{ layout: 'default', elements: [
+    { type: 'text', x: 60, y: 100, w: 600, h: 60, html: '<h3>One</h3>', fontSize: 48 }, { type: 'text', x: 60, y: 300, w: 600, h: 60, html: '<h3>Two</h3>' }] }] }) })
+  await q.locator('.stage .el.text').first().click()
+  await q.locator('.inspector button', { hasText: '48 px for every “Heading 3”' }).click()
+  await q.waitForFunction(() => [...document.querySelectorAll('.stage .el.text h3')].every(h => getComputedStyle(h).fontSize === '48px'))
+  await ctx.close()
+})
 await step('menus: Help holds the tour and shortcuts; Edit copies and pastes; Slide duplicates; Present has its options; File → Delete offers the whole project when there are no added decks', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] })
   await ctx.addInitScript(() => localStorage.setItem('slides-builder:tour', 'done'))

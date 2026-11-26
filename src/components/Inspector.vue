@@ -23,7 +23,7 @@ import { PALETTE, FILLS, SHAPE_NAMES, DIAGRAMS, FORMULAS } from '../slide/preset
 import { picker as iconPicker } from '../slide/icons.js'
 import { diagram } from '../slide/diagram.js'
 import { MARKS, MARK_NAMES, MARK_COLORS, markAt, setMark, markSteps } from '../slide/marks.js'
-import { themeOf } from '../slide/themes.js'
+import { themeOf, CENTERED } from '../slide/themes.js'
 import { mathError, formulaHtml } from '../slide/math.js'
 
 const emit = defineEmits(['link', 'markdown'])
@@ -153,7 +153,19 @@ function setVideo(v) {
   if (id) Object.assign(el.value, { youtube: id, url: undefined })
   else if (url) Object.assign(el.value, { url, youtube: undefined })
 }
-const TYPO = [['text', 'Text', [12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28]], ['title', 'Title', [24, 26, 28, 30, 32, 36, 40, 44, 48]], ['code', 'Code', [8, 9, 10, 11, 12, 13, 14, 16, 18, 20]]]
+const TYPO = [['text', 'Text', [12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28]], ['title', 'Title', [24, 26, 28, 30, 32, 36, 40, 44, 48]], ['h2', 'Heading 2', [18, 20, 22, 24, 26, 28, 30, 32, 36, 40]],
+  ['h3', 'Heading 3', [16, 18, 20, 22, 24, 26, 28, 32]], ['code', 'Code', [8, 9, 10, 11, 12, 13, 14, 16, 18, 20]]]
+// the list plus the size set now (e.g. 64 px taken over from a text box), so the select shows it
+const typoSizes = (k, sizes) => [...new Set([...sizes, deck.typo[k]].filter(Boolean))].sort((a, b) => a - b)
+// a text box that is one heading level: its own size can become that level's size in the whole project
+const TYPO_OF = { h1: ['title', 'Title'], h2: ['h2', 'Heading 2'], h3: ['h3', 'Heading 3'] }
+const typoFor = computed(() => el.value?.type === 'text' && el.value.fontSize && TYPO_OF[curTag.value]?.[0] && deck.typo[TYPO_OF[curTag.value][0]] !== el.value.fontSize && TYPO_OF[curTag.value])
+function sizeForAll() {
+  const e = el.value
+  setTypo(typoFor.value[0], e.fontSize)
+  // the project sizes count on content layouts (themes.js typoCss); on a centred one the box keeps its own
+  if (!CENTERED.includes(slide.value?.layout)) { e.fontSize = undefined; fitHeight(e) }
+}
 function setTypo(k, v) {
   const t = { ...deck.typo }
   delete t.from // set by hand: it stays when the theme changes back
@@ -346,6 +358,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
           <button v-if="FONTS[el.font]?.[2] === 'own'" class="ib" :aria-label="t('Remove font {0} from the project', FONTS[el.font][0])" :title="t('Remove font {0} from the project', FONTS[el.font][0])" @click="removeFont(el.font)"><Icon name="trash" /></button>
           <select class="size" :aria-label="t('Font size')" :title="t('Font size')" :value="el.fontSize || ''" @change="el.fontSize = +$event.target.value || undefined; fitHeight(el)"><option value="">{{ t('Default') }}</option><option v-for="s in SIZES" :key="s" :value="s">{{ s }} px</option></select>
         </div>
+        <button v-if="typoFor" class="ib wide" :title="t('Every “{0}” in the project gets this size (Font for all slides); boxes with their own size keep it', t(typoFor[1]))" @click="sizeForAll"><Icon name="fontSize" /> {{ t('{0} px for every “{1}”', el.fontSize, t(typoFor[1])) }}</button>
         <div class="seg-row" @mousedown.prevent>
           <!-- disabled buttons get no hover: the wrapper explains why -->
           <span class="seg" role="group" :aria-label="t('Character')" :title="typing ? null : t('Double-click into the text to format words.')">
@@ -896,7 +909,7 @@ const tip = computed(() => el.value && !(el.value.type === 'shape' && el.value.s
         <p class="hint">{{ t('Applies to the whole project, in every theme and in exports. Individual elements can have their own sizes.') }}</p>
         <div class="grid3">
           <label v-for="[k, n, sizes] in TYPO" :key="k">{{ t(n) }}
-            <select :value="deck.typo[k] || ''" @change="setTypo(k, +$event.target.value)"><option value="">{{ t('Theme') }}</option><option v-for="v in sizes" :key="v" :value="v">{{ v }} px</option></select>
+            <select :value="deck.typo[k] || ''" @change="setTypo(k, +$event.target.value)"><option value="">{{ t('Theme') }}</option><option v-for="v in typoSizes(k, sizes)" :key="v" :value="v">{{ v }} px</option></select>
           </label>
         </div>
       </Sec>

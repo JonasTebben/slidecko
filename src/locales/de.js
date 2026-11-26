@@ -208,6 +208,8 @@ export default {
   "First step": "Erster Schritt",
   "Fit height to text": "Höhe an Text anpassen",
   "Font": "Schriftart",
+  "{0} px for every “{1}”": "{0} px für alle „{1}“",
+  "Every “{0}” in the project gets this size (Font for all slides); boxes with their own size keep it": "Alle „{0}“ im Projekt bekommen diese Größe (Schrift für alle Folien); Textfelder mit eigener Größe behalten ihre",
   "Font for all slides": "Schrift für alle Folien",
   "Font size": "Schriftgröße",
   "For sharing, printing and archiving": "Zum Verteilen, Drucken und Archivieren",

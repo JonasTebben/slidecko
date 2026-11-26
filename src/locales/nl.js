@@ -208,6 +208,8 @@ export default {
   "First step": "Eerste stap",
   "Fit height to text": "Hoogte aan tekst aanpassen",
   "Font": "Lettertype",
+  "{0} px for every “{1}”": "{0} px voor elke “{1}”",
+  "Every “{0}” in the project gets this size (Font for all slides); boxes with their own size keep it": "Elke “{0}” in het project krijgt deze grootte (lettertype voor alle dia's); tekstvakken met een eigen grootte houden die",
   "Font for all slides": "Lettertype voor alle dia's",
   "Font size": "Tekengrootte",
   "For sharing, printing and archiving": "Om te delen, af te drukken en te archiveren",
